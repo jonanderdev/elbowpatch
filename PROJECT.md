@@ -231,13 +231,14 @@ A narrow contract that providers implement, for example:
 
 ---
 
-## 10. Roadmap (time-boxed)
+## 10. Roadmap
 
-1. **Weeks 1-2:** The Page, local persistence, pieces, export. Start using it.
-2. **Weeks 3-4:** Snapshots and the Time Machine timeline. Use daily.
-3. **Weeks 5-6:** Polish, README with screenshot/GIF, first-run experience. Decide whether to continue.
-4. **Then:** sync provider interface + GitHub, only if the daily-use test felt good.
-5. **One public launch**, once (e.g. a single post on a relevant community), then let it grow organically.
+1. **Core:** the Page, local persistence, pieces, export. *Done when:* you use it for your own notes instead of your current tool.
+2. **Time Machine:** snapshots and the timeline. *Done when:* you've used it daily for a while and restoring an old state has saved you at least once.
+3. **Polish:** README with screenshot/GIF, first-run experience. *Done when:* someone else can open it and get it without you explaining.
+4. **Gate:** did daily use feel good? If not, stop or rethink.
+5. **Sync:** provider interface + GitHub, only if you passed the gate.
+6. **Launch:** one public post (e.g. on a relevant community), once, then let it grow organically.
 
 Success = the maintainer uses it every day. An audience is a bonus.
 
