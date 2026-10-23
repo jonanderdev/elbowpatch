@@ -1,0 +1,149 @@
+{
+  "version": 1,
+  "skills": {
+    "ponytail": {
+      "source": "https://github.com/DietrichGebert/ponytail/tree/main/skills",
+      "author": "DietrichGebert",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-23T09:33:58.393Z"
+    },
+    "ponytail-review": {
+      "source": "https://github.com/DietrichGebert/ponytail/tree/main/skills",
+      "author": "DietrichGebert",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-23T09:33:58.394Z"
+    },
+    "ponytail-audit": {
+      "source": "https://github.com/DietrichGebert/ponytail/tree/main/skills",
+      "author": "DietrichGebert",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-23T09:33:58.394Z"
+    },
+    "ponytail-debt": {
+      "source": "https://github.com/DietrichGebert/ponytail/tree/main/skills",
+      "author": "DietrichGebert",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-23T09:33:58.394Z"
+    },
+    "diagnosing-bugs": {
+      "source": "https://github.com/mattpocock/skills",
+      "author": "Matt Pocock",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-23T09:33:58.394Z"
+    },
+    "premortem": {
+      "source": "https://github.com/joetawil7/first-pass/tree/main/skills",
+      "author": "GeorgeT",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-23T09:33:58.394Z"
+    },
+    "grill-me": {
+      "source": "https://github.com/mattpocock/skills",
+      "author": "Matt Pocock",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-23T09:33:58.394Z"
+    },
+    "grilling": {
+      "source": "https://github.com/mattpocock/skills",
+      "author": "Matt Pocock",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-23T09:33:58.394Z"
+    },
+    "design-reference-hunt": {
+      "source": "local",
+      "author": "Long Beard",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-23T09:33:58.394Z"
+    },
+    "design-taste-frontend": {
+      "source": "https://github.com/Leonxlnx/taste-skill",
+      "author": "Leonxlnx",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-23T09:33:58.394Z"
+    },
+    "animate": {
+      "source": "https://github.com/emilkowalski/skills/tree/main/skills/animate",
+      "author": "emilkowalski",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-23T09:33:58.394Z"
+    },
+    "figma-design-to-code": {
+      "source": "https://github.com/figma/mcp-server-guide/tree/main/skills",
+      "author": "Figma",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-23T09:33:58.394Z"
+    },
+    "web-design-guidelines": {
+      "source": "https://github.com/vercel-labs/agent-skills/tree/main/skills/web-design-guidelines",
+      "author": "Vercel",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-23T09:33:58.394Z"
+    },
+    "jury": {
+      "source": "https://github.com/juliobsz/skills/tree/main/jury",
+      "author": "juliobsz",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-23T09:33:58.394Z"
+    },
+    "handoff": {
+      "source": "https://github.com/mattpocock/skills",
+      "author": "Matt Pocock",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-23T09:33:58.394Z"
+    },
+    "design-md": {
+      "source": "local",
+      "author": "Long Beard",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-23T09:33:58.394Z"
+    }
+  }
+}
