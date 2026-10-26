@@ -32,8 +32,8 @@ it probably doesn't belong.
 - Most writing tools are noisy: sidebars, metrics, notifications, accounts, proprietary clouds.
 - Minimal editors write beautifully but remember little.
 - Version control remembers everything but is technical and ugly for prose.
-- Existing options (Obsidian + Git plugin, Bear, iA Writer, Scrivener) each miss one of: beautiful to open
-  daily, real history, plain files the user owns, works on every device, free.
+- Existing options each miss one of: beautiful to open daily, real history, plain files the user owns,
+  works on every device, free.
 
 Elbowpatch's wedge is the combination: **beautiful daily-driver feel + effortless, explorable history +
 user-owned data + runs everywhere**. Beauty and feel are the product. Code is the cheap part.
@@ -133,7 +133,7 @@ universal escape hatch and the answer to "what if this app disappears".
 - No gamification, streaks, or productivity metrics inside the editor
 - No plugin system in v1
 - No Git jargon in the UI
-- Not trying to replace Scrivener or Obsidian feature for feature
+- Not trying to match the big writing and notes apps feature for feature
 
 ---
 

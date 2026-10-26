@@ -34,7 +34,7 @@ Write so a person can use the reply in one read. End with what you did not check
 This repo is public and open source (MIT). Everything committed is published. Before committing:
 
 - `.design/` stays out of git (it is ignored). Reference shots, moodboards and hunt notes are other people's work. Never force-add it.
-- Committed docs (`DESIGN.md`, READMEs) describe the design in our own words: no names of the apps, shots or designers we looked at, and no links into `.design/`.
+- Committed docs (`PROJECT.md`, `DESIGN.md`, READMEs) speak in our own words: no names of other products, competitors, shots or designers, and no links into `.design/`.
 - No secrets, tokens or `.env` files, no personal notes, and no feedback notes written for other tools.
 - Other people's images, fonts or text go in only when their licence allows redistribution, with credit.
 - Check `git diff --cached` against this list before every commit, and say what you checked.
