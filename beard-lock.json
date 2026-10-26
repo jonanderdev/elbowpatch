@@ -8,7 +8,7 @@
         "cursor",
         "claude-code"
       ],
-      "installedAt": "2026-10-23T09:33:58.393Z"
+      "installedAt": "2026-10-26T08:53:36.690Z"
     },
     "ponytail-review": {
       "source": "https://github.com/DietrichGebert/ponytail/tree/main/skills",
@@ -17,7 +17,7 @@
         "cursor",
         "claude-code"
       ],
-      "installedAt": "2026-10-23T09:33:58.394Z"
+      "installedAt": "2026-10-26T08:53:36.690Z"
     },
     "ponytail-audit": {
       "source": "https://github.com/DietrichGebert/ponytail/tree/main/skills",
@@ -26,7 +26,7 @@
         "cursor",
         "claude-code"
       ],
-      "installedAt": "2026-10-23T09:33:58.394Z"
+      "installedAt": "2026-10-26T08:53:36.690Z"
     },
     "ponytail-debt": {
       "source": "https://github.com/DietrichGebert/ponytail/tree/main/skills",
@@ -35,7 +35,7 @@
         "cursor",
         "claude-code"
       ],
-      "installedAt": "2026-10-23T09:33:58.394Z"
+      "installedAt": "2026-10-26T08:53:36.690Z"
     },
     "diagnosing-bugs": {
       "source": "https://github.com/mattpocock/skills",
@@ -44,7 +44,7 @@
         "cursor",
         "claude-code"
       ],
-      "installedAt": "2026-10-23T09:33:58.394Z"
+      "installedAt": "2026-10-26T08:53:36.690Z"
     },
     "premortem": {
       "source": "https://github.com/joetawil7/first-pass/tree/main/skills",
@@ -53,7 +53,7 @@
         "cursor",
         "claude-code"
       ],
-      "installedAt": "2026-10-23T09:33:58.394Z"
+      "installedAt": "2026-10-26T08:53:36.690Z"
     },
     "grill-me": {
       "source": "https://github.com/mattpocock/skills",
@@ -62,7 +62,7 @@
         "cursor",
         "claude-code"
       ],
-      "installedAt": "2026-10-23T09:33:58.394Z"
+      "installedAt": "2026-10-26T08:53:36.690Z"
     },
     "grilling": {
       "source": "https://github.com/mattpocock/skills",
@@ -71,7 +71,7 @@
         "cursor",
         "claude-code"
       ],
-      "installedAt": "2026-10-23T09:33:58.394Z"
+      "installedAt": "2026-10-26T08:53:36.690Z"
     },
     "design-reference-hunt": {
       "source": "local",
@@ -80,7 +80,8 @@
         "cursor",
         "claude-code"
       ],
-      "installedAt": "2026-10-23T09:33:58.394Z"
+      "installedAt": "2026-10-26T08:53:36.690Z",
+      "version": "0.6.0"
     },
     "design-taste-frontend": {
       "source": "https://github.com/Leonxlnx/taste-skill",
@@ -89,7 +90,7 @@
         "cursor",
         "claude-code"
       ],
-      "installedAt": "2026-10-23T09:33:58.394Z"
+      "installedAt": "2026-10-26T08:53:36.691Z"
     },
     "animate": {
       "source": "https://github.com/emilkowalski/skills/tree/main/skills/animate",
@@ -98,7 +99,7 @@
         "cursor",
         "claude-code"
       ],
-      "installedAt": "2026-10-23T09:33:58.394Z"
+      "installedAt": "2026-10-26T08:53:36.691Z"
     },
     "figma-design-to-code": {
       "source": "https://github.com/figma/mcp-server-guide/tree/main/skills",
@@ -107,7 +108,7 @@
         "cursor",
         "claude-code"
       ],
-      "installedAt": "2026-10-23T09:33:58.394Z"
+      "installedAt": "2026-10-26T08:53:36.691Z"
     },
     "web-design-guidelines": {
       "source": "https://github.com/vercel-labs/agent-skills/tree/main/skills/web-design-guidelines",
@@ -116,7 +117,7 @@
         "cursor",
         "claude-code"
       ],
-      "installedAt": "2026-10-23T09:33:58.394Z"
+      "installedAt": "2026-10-26T08:53:36.691Z"
     },
     "jury": {
       "source": "https://github.com/juliobsz/skills/tree/main/jury",
@@ -125,7 +126,7 @@
         "cursor",
         "claude-code"
       ],
-      "installedAt": "2026-10-23T09:33:58.394Z"
+      "installedAt": "2026-10-26T08:53:36.691Z"
     },
     "handoff": {
       "source": "https://github.com/mattpocock/skills",
@@ -134,7 +135,7 @@
         "cursor",
         "claude-code"
       ],
-      "installedAt": "2026-10-23T09:33:58.394Z"
+      "installedAt": "2026-10-26T08:53:36.691Z"
     },
     "design-md": {
       "source": "local",
@@ -143,7 +144,8 @@
         "cursor",
         "claude-code"
       ],
-      "installedAt": "2026-10-23T09:33:58.394Z"
+      "installedAt": "2026-10-26T08:53:36.691Z",
+      "version": "0.6.0"
     }
   }
 }

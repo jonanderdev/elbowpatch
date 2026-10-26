@@ -44,22 +44,52 @@ muz.li collects other people’s work. Open the original. That page still has to
 
 Pins on pinterest.com are pictures, never sites. Keep one when it is a single real page or screen and you can name what is worth taking. Prefer this year when the pin shows a date. A photograph of this subject can be imagery. Drop mood boards, collages, AI mush, and anything you would drop on Dribbble. Do not capture a board or a search grid.
 
+If Pinterest shows a login wall, write `Pinterest: login wall` under the board’s drops and continue. That counts as the pass.
+
 ## Dribbble / Behance
 
-Open `/shots/...`, not search.
+Listing pages are client-rendered (WebFetch returns empty). Shot pages (`/shots/...`) often hit Human Verification in headless Chrome. Use `scripts/dribbble-cards.mjs` on a popular-search listing; take artwork from `cdn.dribbble.com`. Run queries one at a time. A 0-card query is retried after 8 seconds, then after 30 seconds; if it is still 0, write `<query>: 0 cards (rate limit?)` under the board's drops. An empty search and a rate limit look the same from one try.
 
-Sort this year by most saved or most liked. Latest is the wrong feed. A Pinterest pass does not replace this sort. Look through that sort, then the page type, the component, and the element, including other subjects. A whole-look board keeps up to 20 that pass this filter. On a website they lose to a kept live site. On an application they outweigh award sites. A piece hunt keeps 10 after it has opened at least 30. Open more than you keep. The keep does not rise because another gallery was added. If the pass is weak, the board stays short. Do not lower the filter to finish the count.
+**Query for the form, not the word.** A search for the subject’s word returns things that share the word and not the idea: for “writing app”, print-on-demand tees, CV services, tracing worksheets, essay mills, posters, AI assistants. Use a category path and add the form — `/search/shots/popular/product-design?q=writing+app+ui`, `/mobile?q=text+editor+screen`, `/web-design?q=…`.
 
-Keep if you can name what is worth taking in one line (a crop, a type pairing, a palette, a component, a screen). The shot has to be one people actually saved.
+**Negative list.** `scripts/dribbble-cards.mjs` drops these by whole word in the slug and title before a thumbnail is fetched, and prints the noise rate on stderr: `t-shirt, tee, merch, apparel, hoodie, resume, cv, cover letter, essay, worksheet, tracing, handwriting practice, alphabet, halloween, christmas, valentine, logo, logotype, branding, brand identity, packaging, poster, book cover, sticker, mockup, chatbot, mood tracker, habit tracker`. A project extends it with `--drop "a,b"` and relaxes it with `--keep "a,b"` (a font hunt keeps `logotype`; a product about moods keeps `mood tracker`). Put the noise rate under the board’s drops. A high rate means the query is wrong: fix the query, do not scroll more. Words that may be the subject itself, like “ai” and “illustration”, are judged on the shot, not filtered on the title.
+
+Sort this year by **popular** (`timeframe=year`). There is no “most saved/liked” sort on the listing. `scripts/dribbble-cards.mjs` prints `id-slug`, **likes**, **views**, image URL, and title, each count read from the card's own stat element. A count it cannot read is empty — it never guesses one from the title. `score:` uses whichever counts came back: `score: 39 likes, 6k views`, or `score: 5.4k views (likes unavailable)`. Do not put a number on a card that the helper left empty. `timeframe=year` is not strict — older shots appear; when the slug or shot ID reveals a year, record it on the card so an old shot is visible as old.
+
+A Pinterest pass does not replace this sort. Look through that sort, then the page type, the component, and the element, including other subjects. A whole-look board keeps up to 20 that pass this filter. On a website they lose to a kept live site. On an application they outweigh award sites. A piece hunt keeps 10 after it has opened at least 30. Open more than you keep. The keep does not rise because another gallery was added. If the pass is weak, the board stays short. Do not lower the filter to finish the count.
+
+Keep if you can name what is worth taking in one line (a crop, a type pairing, a palette, a component, a screen). The shot has to be one people actually saved (or viewed, when that is the only signal).
 
 Drop: AI mush, fake browser chrome around a 3-card landing, purple gradient on dark, Inter-everywhere, emoji icons, melted type, a shot whose only job is “bakery website mockup.”
 
 A Dribbble drawing is **imagery**, never a site.
 
+## Shipped, or a concept
+
+A Dribbble shot of a screen is usually a mockup with a few short, curated sample texts. It has never faced a long essay, a phone keyboard, Markdown, empty or error states, or the product’s key feature. Mark every app card `shipped: yes | concept`. Shipped sources first for an app: the product’s own in-app screenshots (App Store listings, press kits, help docs) and shipped-screen galleries such as Mobbin or Refero, which may need the person’s login — write `Mobbin: login wall` under drops and go on. When the lead is a concept, **Read this** says what it does not show (`not shown`).
+
+For a typography-first brief, a register source outside screens is allowed: book design, publishers, editorial typography. Say on the card why it is the register.
+
+## A seed
+
+A picture the person gave you is a seed. It is not scored, not dropped for being off-gallery, and it is shown on the moodboard like any other tile. It steers queries (“more like this”) and it ranks candidates on the contact sheet.
+
 ## Unsplash / Wikimedia
 
-Search **this** subject, not a stock category name. Drop posed lifestyle and fake product. One real place or material beats a pile of similar ones.
+Search **this** subject, not a stock category name. Drop posed lifestyle and fake product. One real place or material beats a pile of similar ones. Download routes: see [shots.md](shots.md).
 
 A file counts when you can point at a crop where that principle is the subject. If the thing you would leave is what the frame is about, drop it or write the crop. Do not keep ten near-misses to fill a count. The page may use fewer.
 
 If a pass across these galleries cannot fill the count without lowering these gates, the board stays short. Do not fill it with 4s.
+
+## Colour and contrast
+
+Hexes come from a kept shot, sampled from a **crop of the element** they name — never from a photograph, mockup frame, or presentation background unless that is the role. On the card: `#2c2824 body text`, `#b0563a active-tab dot`.
+
+Every adapted hex needs a reason: contrast, the `change` twist, this subject's own pictures, or a brand colour they already have. A generic sampled hex — cream paper, warm ink — may be kept exactly as it was sampled when it is not the reference's identity. Moving `#f6f1e7` to `#f4efe4` is the same cream on screen; it is a change nobody can see, not an adaptation. `leave` lists their identity: a brand accent, a licensed face. It is not every hex on the card.
+
+Before the persist ask, run every adapted text/background pair through `scripts/contrast.mjs` (`"#fg on #bg"`, optional `:large` or `:mark` for 3:1). Body and small text need 4.5:1; large text and non-text marks need 3:1. List each pair with ratio and verdict under **Read this**. A failing colour is adjusted; keep both hexes as `sampled → used`. Card hexes stay what we saw. They are not the brand.
+
+## Type licence
+
+A type pick needs a `licence:` line that covers how this project ships it (bundled in app, self-hosted web, default UI). If it does not cover that use, drop it and name it under drops.

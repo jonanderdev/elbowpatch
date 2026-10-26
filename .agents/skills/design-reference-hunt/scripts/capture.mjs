@@ -3,10 +3,14 @@
 // repeat the same fold. Node 22+. Uses an installed Chrome/Edge/Chromium.
 //
 //   node capture.mjs <url> --out .design/refs/name.jpg
-import { spawn } from "node:child_process";
+//   node capture.mjs <url> --out .design/refs/name.jpg --review /tmp/name-review.jpg
+//   node capture.mjs <url> --out .design/refs/name.jpg --clip x,y,w,h
+//   node capture.mjs <url> --out .design/refs/name.jpg --clip-selector "main"
+//   node capture.mjs file:///abs/path/moodboard.html --out /tmp/moodboard.jpg
+import { spawn, execSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 
 const args = process.argv.slice(2);
 const flag = (name, def) => {
@@ -17,11 +21,54 @@ const flag = (name, def) => {
   return v;
 };
 const url = args[0];
-const out = resolve(flag("out", "") || "");
-if (!url || !/^https?:\/\//.test(url) || !out) {
-  console.error("usage: node capture.mjs <https://url> --out .design/refs/name.jpg");
+const outArg = flag("out", "") || "";
+const reviewArg = flag("review", "") || "";
+const clipArg = flag("clip", "") || "";
+const clipSelector = flag("clip-selector", "") || "";
+if (!url || !/^(https?|file):\/\//.test(url) || !outArg) {
+  console.error(
+    'usage: node capture.mjs <https://url | file:///path> --out .design/refs/name.jpg [--review /tmp/name-review.jpg] [--clip x,y,w,h | --clip-selector "css"]',
+  );
   process.exit(2);
 }
+if (clipArg && clipSelector) {
+  console.error("pass --clip or --clip-selector, not both");
+  process.exit(2);
+}
+
+function projectRoot() {
+  try {
+    return execSync("git rev-parse --show-toplevel", { encoding: "utf8" }).trim();
+  } catch {
+    return process.cwd();
+  }
+}
+
+function resolveOut(path) {
+  if (!path) return "";
+  if (isAbsolute(path)) return path;
+  return resolve(projectRoot(), path);
+}
+
+const out = resolveOut(outArg);
+const reviewOut = resolveOut(reviewArg);
+
+function parseClip(s) {
+  if (!s) return null;
+  const parts = s.split(",").map((n) => Number(n.trim()));
+  if (parts.length !== 4 || parts.some((n) => !Number.isFinite(n) || n < 0)) {
+    console.error("clip must be x,y,w,h (non-negative numbers)");
+    process.exit(2);
+  }
+  const [x, y, w, h] = parts;
+  if (w < 1 || h < 1) {
+    console.error("clip width and height must be >= 1");
+    process.exit(2);
+  }
+  return { x, y, width: w, height: h, scale: 1 };
+}
+
+const clip = parseClip(clipArg);
 
 function findChrome() {
   const env = process.env.CHROME_PATH;
@@ -156,18 +203,47 @@ await page("Emulation.setDeviceMetricsOverride", {
 await page("Page.navigate", { url }, 40000);
 await sleep(2500);
 
+const beforeHref = (
+  await page("Runtime.evaluate", {
+    expression: "location.href",
+    returnByValue: true,
+  })
+).result.value;
+
 await page("Runtime.evaluate", {
   expression: `(() => {
-    const labels = /accept|agree|ok|got it|allow|i understand|acepto|aceptar/i;
-    for (const el of document.querySelectorAll("button, [role=button], a")) {
-      const t = (el.innerText || el.textContent || "").trim();
+    const labels = /^(accept( all)?( cookies)?|agree|ok|okay|got it|allow( all)?|i understand|acepto|aceptar)$/i;
+    const clickable = document.querySelectorAll("button, [role=button]");
+    for (const el of clickable) {
+      const t = (el.innerText || el.textContent || "").trim().replace(/\\s+/g, " ");
       if (t.length < 40 && labels.test(t)) { el.click(); break; }
+    }
+    // Strip short privacy/cookie dialogs (e.g. Google Fonts "×" banner).
+    const privacy = /uses cookies|privacy and google fonts|cookie settings/i;
+    for (const el of [...document.querySelectorAll("div, section, aside, dialog")]) {
+      const t = (el.innerText || el.textContent || "").trim();
+      if (t.length > 0 && t.length < 300 && privacy.test(t) && el.children.length < 12) {
+        el.remove();
+      }
     }
   })()`,
   awaitPromise: true,
   returnByValue: true,
 });
 await sleep(800);
+
+const afterHref = (
+  await page("Runtime.evaluate", {
+    expression: "location.href",
+    returnByValue: true,
+  })
+).result.value;
+
+if (afterHref !== beforeHref) {
+  console.error(`navigated away: ${afterHref}`);
+  drop();
+  process.exit(1);
+}
 
 await page(
   "Runtime.evaluate",
@@ -226,17 +302,59 @@ await page("Runtime.evaluate", {
 });
 await sleep(400);
 
+// --clip-selector takes the element's box in document coordinates, measured
+// after the unstick pass so the numbers match what the capture sees.
+let selected = null;
+if (clipSelector) {
+  const { result } = await page("Runtime.evaluate", {
+    expression: `(() => {
+      const el = document.querySelector(${JSON.stringify(clipSelector)});
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return {
+        x: Math.max(0, Math.round(r.left + window.scrollX)),
+        y: Math.max(0, Math.round(r.top + window.scrollY)),
+        width: Math.round(r.width),
+        height: Math.round(r.height),
+      };
+    })()`,
+    returnByValue: true,
+  });
+  selected = result?.value || null;
+  if (!selected) {
+    console.error(`no element matches ${clipSelector}`);
+    drop();
+    process.exit(1);
+  }
+  if (selected.width < 1 || selected.height < 1) {
+    console.error(`${clipSelector} has no box (width ${selected.width}, height ${selected.height})`);
+    drop();
+    process.exit(1);
+  }
+}
+
 const metrics = await page("Page.getLayoutMetrics");
 const size = metrics.cssContentSize || metrics.contentSize;
-const width = Math.max(1, Math.ceil(size.width || 1440));
-const height = Math.max(1, Math.min(Math.ceil(size.height || 900), 14000));
+const fullWidth = Math.max(1, Math.ceil(size.width || 1440));
+const fullHeight = Math.max(1, Math.min(Math.ceil(size.height || 900), 14000));
+const clipBox = clip || (selected ? { ...selected, scale: 1 } : null);
+const shotClip = clipBox
+  ? {
+      x: Math.min(clipBox.x, fullWidth - 1),
+      y: Math.min(clipBox.y, fullHeight - 1),
+      width: Math.min(clipBox.width, fullWidth - Math.min(clipBox.x, fullWidth - 1)),
+      height: Math.min(clipBox.height, fullHeight - Math.min(clipBox.y, fullHeight - 1)),
+      scale: 1,
+    }
+  : { x: 0, y: 0, width: fullWidth, height: fullHeight, scale: 1 };
+
 const { data } = await page(
   "Page.captureScreenshot",
   {
     format: "jpeg",
     quality: 70,
     captureBeyondViewport: true,
-    clip: { x: 0, y: 0, width, height, scale: 1 },
+    clip: shotClip,
   },
   60000,
 );
@@ -244,5 +362,66 @@ const { data } = await page(
 mkdirSync(dirname(out), { recursive: true });
 writeFileSync(out, Buffer.from(data, "base64"));
 console.log(out);
+
+if (reviewOut) {
+  // Side-by-side columns ~2800 px tall so a tall capture stays readable.
+  // Real capture stays the single tall file; review is scratch only.
+  const reviewHtml = `<!doctype html><meta charset=utf-8>
+<canvas id=c></canvas>
+<script>
+const src = "data:image/jpeg;base64,${data}";
+const img = new Image();
+img.onload = () => {
+  const colH = 2800;
+  const gap = 20;
+  const cols = Math.max(1, Math.ceil(img.height / colH));
+  const c = document.getElementById("c");
+  c.width = cols * img.width + (cols - 1) * gap;
+  c.height = Math.min(colH, img.height);
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = "#111";
+  ctx.fillRect(0, 0, c.width, c.height);
+  for (let i = 0; i < cols; i++) {
+    const sy = i * colH;
+    const sh = Math.min(colH, img.height - sy);
+    ctx.drawImage(img, 0, sy, img.width, sh, i * (img.width + gap), 0, img.width, sh);
+  }
+  document.title = "ready";
+};
+img.src = src;
+</script>`;
+  const reviewPage = join(dir, "review.html");
+  writeFileSync(reviewPage, reviewHtml);
+  await page("Page.navigate", { url: `file://${reviewPage}` }, 20000);
+  await sleep(400);
+  for (let i = 0; i < 40; i++) {
+    const title = (
+      await page("Runtime.evaluate", { expression: "document.title", returnByValue: true })
+    ).result.value;
+    if (title === "ready") break;
+    await sleep(100);
+  }
+  const { result: sizeResult } = await page("Runtime.evaluate", {
+    expression: `(() => {
+      const c = document.getElementById("c");
+      return { w: c.width, h: c.height };
+    })()`,
+    returnByValue: true,
+  });
+  const { data: reviewData } = await page(
+    "Page.captureScreenshot",
+    {
+      format: "jpeg",
+      quality: 75,
+      clip: { x: 0, y: 0, width: sizeResult.value.w, height: sizeResult.value.h, scale: 1 },
+      captureBeyondViewport: true,
+    },
+    60000,
+  );
+  mkdirSync(dirname(reviewOut), { recursive: true });
+  writeFileSync(reviewOut, Buffer.from(reviewData, "base64"));
+  console.log(reviewOut);
+}
+
 drop();
 process.exit(0);
