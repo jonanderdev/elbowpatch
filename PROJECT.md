@@ -209,8 +209,7 @@ A narrow contract that providers implement, for example:
 
 ## 8. Licensing and project stance
 
-- Open source from day one. License to be decided: **MIT** (max adoption) or **AGPL-3.0** (prevents closed
-  hosted forks). Default recommendation: MIT unless the maintainer prefers the stronger stance.
+- Open source from day one, under the **MIT** license: the simplest to understand, and the widest reuse.
 - Provided as-is, no warranty. Say so in the README and on the first-run screen.
 - The maintainer hosts a main instance on a best-effort basis. Self-hosting must always be a real option.
 - Donations (GitHub Sponsors / Ko-fi) are optional and never shown inside the writing view.
@@ -249,7 +248,7 @@ Success = the maintainer uses it every day. An audience is a bonus.
 - [ ] Final history engine: custom snapshots (recommended) vs Git semantics
 - [ ] Svelte vs React (or other)
 - [ ] Editor library: CodeMirror 6 vs custom
-- [ ] License: MIT vs AGPL
+- [x] License: MIT
 - [ ] How the timeline appears without breaking the quiet UI (gesture, shortcut, edge reveal)
 - [ ] Thinning policy for snapshots
 - [ ] Journal-by-day entry design (calendar vs list)
