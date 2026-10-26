@@ -43,3 +43,6 @@ Thumbs.db
 !.vscode/extensions.json
 !.vscode/settings.json
 *.swp
+
+# Design hunt working files (references, moodboard, proof): local only. DESIGN.md is the record.
+.design/

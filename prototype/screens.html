@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Elbowpatch — screens for Figma</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,200..900;1,7..72,200..900&family=EB+Garamond:ital,wght@1,400..600&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* The board around the frames: not part of the design. */
+    body.board { background: #e9e9e6; height: auto; font: 13px/1.4 -apple-system, "Helvetica Neue", Arial, sans-serif; color: #444; }
+    .board main { display: flex; flex-wrap: wrap; gap: 64px; padding: 64px; align-items: flex-start; }
+    .board figure { margin: 0; }
+    .board figcaption { margin: 0 0 12px; }
+    .frame { position: relative; overflow: hidden; }
+    .frame.phone { width: 390px; height: 844px; }
+    .frame.desktop { width: 1440px; height: 900px; }
+  </style>
+</head>
+<body class="board">
+  <main>
+    <figure><figcaption>Phone · Paper · library (where the app opens)</figcaption><div class="frame phone" id="phone-lib"></div></figure>
+    <figure><figcaption>Phone · Night · library</figcaption><div class="frame phone" id="phone-lib-night"></div></figure>
+    <figure><figcaption>Phone · Paper · reading</figcaption><div class="frame phone" id="phone-paper"></div></figure>
+    <figure><figcaption>Phone · Paper · writing, keyboard up</figcaption><div class="frame phone" id="phone-kb"></div></figure>
+    <figure><figcaption>Phone · Night · writing, keyboard up</figcaption><div class="frame phone" id="phone-kb-night"></div></figure>
+    <figure><figcaption>Phone · Paper · selection menu</figcaption><div class="frame phone" id="phone-select"></div></figure>
+    <figure><figcaption>Phone · Paper · page 2, pull quote</figcaption><div class="frame phone" id="phone-quote"></div></figure>
+    <figure><figcaption>Phone · Night · page 2, pull quote</figcaption><div class="frame phone" id="phone-quote-n"></div></figure>
+    <figure><figcaption>Phone · Night · earlier paragraph dimmed</figcaption><div class="frame phone" id="phone-night"></div></figure>
+    <figure><figcaption>Phone · Paper · tools open</figcaption><div class="frame phone" id="phone-open"></div></figure>
+    <figure><figcaption>Phone · Paper · text settings</figcaption><div class="frame phone" id="phone-settings"></div></figure>
+    <figure><figcaption>Phone · Night · tools open</figcaption><div class="frame phone" id="phone-open-night"></div></figure>
+    <figure><figcaption>Phone · Paper · empty first page</figcaption><div class="frame phone" id="phone-empty"></div></figure>
+    <figure><figcaption>Phone · Paper · justified, drop cap</figcaption><div class="frame phone" id="phone-book"></div></figure>
+    <figure><figcaption>Desktop · Paper · library</figcaption><div class="frame desktop" id="desk-lib"></div></figure>
+    <figure><figcaption>Desktop · Paper · tools open</figcaption><div class="frame desktop" id="desk-paper"></div></figure>
+    <figure><figcaption>Desktop · Night · justified, drop cap, earlier paragraphs dimmed</figcaption><div class="frame desktop" id="desk-night"></div></figure>
+  </main>
+  <script src="sample.js"></script>
+  <script src="app.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const paper = { mode: "paper" };
+    const night = { mode: "night" };
+    const book = { align: "justify", dropcap: true };
+    // Sample library for the frames: placeholder titles, word counts and dates.
+    const day = 86400000;
+    const words = (n) => `<p>${"word ".repeat(n)}</p>`;
+    const pieces = [
+      ["The second draft", 1240, 0],
+      ["Chapter four: the harbour in winter", 3872, 1],
+      ["Notes from the night ferry", 412, 3],
+      ["Letter to my sister, unsent", 968, 9],
+      ["On keeping old pages", 2105, 23],
+      ["Untitled", 87, 41],
+    ].map(([title, n, ago], i) => ({ id: "s" + i, title: title === "Untitled" ? "" : title, html: words(n), updated: Date.now() - ago * day }));
+    Promise.all([
+      EPmount($("phone-lib"), { static: true, phone: true, settings: paper, view: "library", pieces }),
+      EPmount($("phone-lib-night"), { static: true, phone: true, settings: night, view: "library", pieces }),
+      EPmount($("desk-lib"), { static: true, settings: paper, view: "library", pieces }),
+      EPmount($("phone-paper"), { static: true, phone: true, settings: paper }),
+      EPmount($("phone-kb"), { static: true, phone: true, settings: paper, keyboard: true, caret: true }),
+      EPmount($("phone-kb-night"), { static: true, phone: true, settings: night, keyboard: true, caret: true, dimUntil: 1 }),
+      EPmount($("phone-select"), { static: true, phone: true, settings: paper, select: { block: 1, from: "Most of the work", to: "already there." } }),
+      EPmount($("phone-quote"), { static: true, phone: true, settings: paper, page: 1 }),
+      EPmount($("phone-quote-n"), { static: true, phone: true, settings: night, page: 1 }),
+      EPmount($("phone-night"), { static: true, phone: true, settings: night, writing: true, dimUntil: 1 }),
+      EPmount($("phone-open"), { static: true, phone: true, settings: paper, open: true }),
+      EPmount($("phone-settings"), { static: true, phone: true, settings: paper, open: true, sheet: true }),
+      EPmount($("phone-open-night"), { static: true, phone: true, settings: night, open: true }),
+      EPmount($("phone-empty"), { static: true, phone: true, settings: paper, empty: true }),
+      EPmount($("phone-book"), { static: true, phone: true, settings: { ...paper, ...book } }),
+      EPmount($("desk-paper"), { static: true, settings: paper, open: true }),
+      EPmount($("desk-night"), { static: true, settings: { ...night, ...book }, writing: true, dimUntil: 2 }),
+    ]).then(() => document.body.dataset.ready = "1");
+  </script>
+</body>
+</html>
