@@ -27,7 +27,7 @@ A journal is one piece with a page per day, and a book is one piece made of chap
 - On launch, a working copy that differs from its base version becomes a version first. This is how text left by a crash enters history.
 
 ### When versions are written
-- A snapshot moment comes on 3 seconds idle, on blur or the page hidden, on switching pieces, and on "keep this moment". At each moment, every section whose text changed since its last version gets a new version, all with the same timestamp. A section that did not change gets nothing.
+- A snapshot moment comes on 3 seconds idle, but at most once every 5 minutes while writing; and always on blur or the page hidden, on switching pieces, on closing, and on "keep this moment". *Updated 2026-10-27:* it was every 3-second pause, which kept far more history than anyone travels back through; the working copy, saved about a second after typing stops, is what protects against a crash, so fewer moments lose nothing. Anything finer than 5 minutes is undo's job (0003), which is on the writing bar on a phone. At each moment, every section whose text changed since its last version gets a new version, all with the same timestamp. A section that did not change gets nothing.
 
 ### Thinning (local only)
 Each section's local history gets sparser with age, keeping the last version in each period:
