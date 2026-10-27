@@ -2,7 +2,11 @@
 
 The look of Elbowpatch. Builders follow this file. PROJECT.md §9 still applies: calm, analog, typography first, accessibility required.
 
-To see it working: `prototype/` (open `index.html`; `screens.html` has the still frames). The prototype shows this file; it does not define it. Where they differ, this file wins, and the prototype is fixed to match.
+## Sources of truth
+- **This file** holds the direction and the rules: what the look is, why, and what it never does. It wins on principle.
+- **The Figma file** holds the exact screens and components — every screen in paper and night, phone and desktop, built from shared components, colour variables and text styles: [Elbowpatch on Figma](https://www.figma.com/design/yRuD5MDnH3WHbNjqMEUPpB/Elbowpatch). Builders take sizes, spacing, states and copy from there.
+- **When they disagree,** the rule here wins until both are put right. A change to the look updates this file (if it changes a rule) and the Figma file (if it changes a screen) together, never one alone.
+- The first prototype was retired on 2026-10-27: its screens live in the Figma file, its decisions in this file. Motion was never reviewed in it, so the timings below are proposals (see Motion).
 
 ## Direction
 - leads: a minimalist e-reader page, in light and dark
@@ -66,7 +70,7 @@ Two themes, both first-class. Paper follows light system appearance, night follo
 - Justified text always hyphenates.
 - **Selection menu:** the same rounded bar, floating over the selected words: bold, italic, pull quote, § (start chapter here), and "keep this moment" (a Time Machine save).
 - **Writing on a phone:** above the keyboard, the same bar: bold, italic, pull quote, § (new chapter), hide keyboard.
-- **Keyboard up:** the page keeps its size. When the caret would go under the keyboard, the page slides up so the caret line sits just above the writing bar. *Library* and the running head stay, on a strip of page colour with a 28px fade under it, so text leaving the top goes softly instead of meeting them; once the title has slid away, the running head carries it. This is the one fade on the page, only while the keyboard pushes it. Page numbers do not change when the keyboard comes up.
+- **Keyboard up:** the page keeps its size. When the caret would go under the keyboard, the page slides up so the caret line sits just above the writing bar. *Library* and the running head stay, on a strip of page colour with a 44px fade under it (solid for its first 15%), so text leaving the top goes softly instead of meeting them; once the title has slid away, the running head carries it. This is the one fade on the page, only while the keyboard pushes it. Page numbers do not change when the keyboard comes up.
 - **Moving around with the keyboard up:** drag the text up or down to see the part of the page behind the keyboard (the caret stays where it is); swipe sideways to turn pages; tap a word to move the caret there. "Hide keyboard" in the writing bar puts the keyboard down; return only ever makes a new paragraph. To go far — the start of the piece, another chapter, another day — tap the page button beside the writing bar: the tools open, and the page count opens Contents (or Days), all without leaving the keyboard.
 - **§ is the chapter mark.** Set in Literata like B and I, it starts a new chapter in the writing bar and "starts chapter here" on a selection. Typing `#` at the start of a line does the same.
 - **Back to the library:** the word *Library*, 13px, secondary grey, at the left of the running-head line, aligned with the text's left edge; it darkens on hover and has a 44px-tall tap area. A word, not an icon: an arrow felt generic and a pile-of-sheets glyph read as "copy". (Provisional: whether it should fade while writing is still open.)
@@ -101,7 +105,7 @@ Two themes, both first-class. Paper follows light system appearance, night follo
 - **The margin:** the journal alone has a hairline (the surface-line colour) down the left margin, from top to bottom. On a phone it sits 24px from the edge and the text starts at 44px; on desktop it sits 44px left of the text. A deliberate exception to "nothing frames the page", for the journal only.
 - **The day's words** sit at the foot, upright, 12px secondary: "312 words" at the text's left edge, level with the page button on the right. Not rotated, not beside the title. (Chosen on 2026-10-27 over a count beside the title, which sat at no clear line.)
 - **The way in:** "26 Oct · 312 words" in the tools bar opens a Days sheet as a **month** (in the MVP; changed on 2026-10-27 from a list): the month and year between two arrow icon buttons for the months before and after, a seven-column grid under one-letter weekday initials (12px, secondary), each day a round button — written days in the title colour at weight 560, today with the pressed tint and a hairline ring, days still to come disabled. At the foot, "19 days written in October" (13px, secondary) and "Done". Each day is labelled for assistive tech ("26 October, written").
-- The same sheet is also drawn as a list (screens.html): "Days" and how many are written, the month in italic, then each written day with its word count, today first ("nothing yet" until begun).
+- The same sheet is also drawn as a list in the Figma file, as an alternative not in the MVP: "Days" and how many are written, the month in italic, then each written day with its word count, today first ("nothing yet" until begun).
 
 ## Settings
 - Opened from the library only. The same view as the library: "Settings" set like a piece title, *Library* at the top left to go back. Each area is a row that says what it is set to: Writing ("Medium · normal spacing · narrow · left"), Appearance, Time Machine, Backup & sync ("GitHub · last copy 2 minutes ago"), Export, About & privacy.
@@ -122,23 +126,28 @@ Two themes, both first-class. Paper follows light system appearance, night follo
 - **A page is what fits the screen** at the current text settings — not a fixed book page. Larger text makes more pages, never a scroll, so nothing ever slides under the head or the foot and no fade is needed. Chosen on 2026-10-27 over a fixed book page, which on a phone means scrolling inside every page and text cut at the edges.
 - **Page numbers are for orientation, not addresses.** They follow the screen, as on an e-reader: page 18 on a phone is not page 18 on a desktop. Finding things is by chapter (Contents) and by date (journal), never by page number. Fixed, printable numbers come only from the export.
 - **Your place travels with the piece.** The app keeps where you were: the caret if you were writing, otherwise the first line on screen — as a paragraph, an offset and a few words of its text, so it survives edits made elsewhere (if the words are gone, the nearest paragraph). With a connected place this goes with the piece, so another device opens on the page that holds it, caret restored. The most recent position wins; it is only a position, nothing is lost.
-- **The turn** is a quiet horizontal slide (460ms, ease-out). With `prefers-reduced-motion` it is an instant cut. A page change is announced to screen readers; typing is not.
+- **The turn** is a quiet horizontal slide (timing in Motion). With `prefers-reduced-motion` it is an instant cut. A page change is announced to screen readers; typing is not.
 - **Night focus:** paragraphs before the current one dim to #8c8c8a; the current paragraph stays at body colour. Never dimmer than 4.5:1. Paper does not dim.
 - **The tools bar** opens out of the page button and folds back into it.
 - Settings and the theme are remembered; until the writer picks, the theme follows the system.
 
+## Motion
+Proposed, **not yet reviewed** — carried over from the first prototype, where motion was never checked. Decide each before it is built; these are starting points, not rules.
+- What moves: the page turn (a horizontal slide), the tools bar opening out of the page button and folding back, the library fading in over the page, sheets (text settings, Contents, Days, confirmations) appearing over the page, the night dimming as the caret moves between paragraphs, the theme changing, and the page sliding up when the keyboard comes.
+- Starting values: the turn 460ms ease-out; the tools bar opening 340ms from the 44px circle; the library fade 220ms; colour changes (theme, night dimming) 300–400ms; presses 160ms.
+- Fixed already: one quiet kind of motion, never a 3D paper curl; with `prefers-reduced-motion` every move is an instant cut; nothing moves while you type except the page turning when it fills.
+
 ## Imagery
 - None in the interface. Photos inside a piece are allowed only when cleanly placed and shaped — small, framed, beside or between paragraphs, never full-bleed. Not designed yet: see Gaps.
-- The logo is the user's own; the round page button may inform it.
+- **The mark:** § in Literata at display size — the chapter mark already on the page. The app icon is § in paper white on the night black; a paper version (dark § on paper) serves light places. The wordmark is § then "Elbowpatch" in the title's face (Literata Light). Both are in the Figma file. The README uses the paper wordmark card (dark ink on paper, 16px corners), outlined as `docs/brand/wordmark.svg`.
 
 ## Gaps
 Open — treat as undesigned, not as solved by a familiar pattern:
-- The writing state on a real phone: the prototype draws the keyboard and writing bar, but it has not been tested with a real keyboard, or with editing in the middle of a long piece.
-- Pull quote, bold, italic and "keep this moment" are designed (selection menu, writing bar) but not yet working in the prototype.
+- The writing state on a real phone: designed (keyboard up, writing bar), but never tested with a real keyboard, or with editing in the middle of a long piece.
+- Motion: proposed, not reviewed (see Motion).
 - The Time Machine / history view (the differentiator).
 - Settings areas not yet drawn: Appearance, Time Machine, Export, About & privacy.
-- Chapters and the journal are designed (screens.html) but not built in the live prototype; reordering chapters and Collections (folders) are after the MVP.
-- Restoring your place on another device: designed (Behaviour), not built.
+- Reordering chapters and Collections (folders) are after the MVP.
 - A photo placed inside a piece.
 
 Paged writing is new ground: typing on a paged page, a phone keyboard, Markdown, an empty first page and a long title being written all still need designing.
