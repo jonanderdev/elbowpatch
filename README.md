@@ -1,7 +1,7 @@
 <div align="center">
   <p><img src="docs/brand/logo.svg" alt="Elbowpatch" width="200"></p>
-  <p><strong>A quiet place to write, with a memory.</strong></p>  
-  <p><strong>Local-first and private: your words stay close, and every draft is kept safe.</strong></p>
+  <p><strong>Ebowpatch</strong></p>
+  <p><strong>A quiet place to write, with a memory. <br/> Local-first and private: your words stay close, and every draft is kept safe.</strong></p>
 </div>
 
 ***
