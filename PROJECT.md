@@ -9,7 +9,7 @@ Owner: a solo maintainer building this first as a personal tool, hoping it finds
 
 ## 1. What this is
 
-Elbowpatch is a minimalist, beautiful writing app for journals, essays, and eventually longer work. It
+Elbowpatch is a minimalist, beautiful writing app for journals, essays and books. It
 feels like a quiet study with a lamp on: one page, good typography, nothing else on screen. Behind the
 page it keeps a complete, effortless history of everything written, so the writer can travel back through
 their own words without ever thinking about "version control".
@@ -41,7 +41,7 @@ user-owned data + runs everywhere**. Beauty and feel are the product. Code is th
 ### Who it is for (in order)
 1. The maintainer, who will use it daily. This is the success bar.
 2. Journalers and personal writers, including technical people who like analog, quiet tools.
-3. Essayists and, later, novelists (long-form structure is v2+, see Non-goals).
+3. Essayists and novelists (books with chapters are in the MVP).
 
 ---
 
@@ -65,24 +65,27 @@ user-owned data + runs everywhere**. Beauty and feel are the product. Code is th
 ## 4. Product concept
 
 ### 4.1 The Page
-- A single centered column, generous margins, carefully chosen typography (readable serif or mono as
-  options, comfortable measure, good line height).
-- Light and dark themes, plus a warm "paper" and a dark "night" feel. Respect `prefers-color-scheme`.
-- Typewriter-like calm: optional subtle caret, optional typewriter scrolling (current line stays centered).
-- Markdown-based, but gentle: render nicely while typing, never intimidating.
+- A single centered column, generous margins, carefully chosen typography. DESIGN.md has the details.
+- Paper and night themes. Respect `prefers-color-scheme`.
+- **Paged, not scrolled:** a page is what fits the screen; when it fills, the next page begins and you
+  turn to it (docs/decisions/0003).
+- Markdown-based, but gentle: render nicely while typing, never intimidating. Only Markdown is stored.
 - Zero chrome while writing. Controls appear on a small gesture (move mouse to edge, a key chord, or a
   tap) and fade away.
 
 ### 4.2 Pieces
-The unit of writing is a **piece** (a document). A journal is a piece per day with a calendar-style way
-in. An essay is one piece. Novels (chapters, ordering, binder) are explicitly out of scope for v1.
+The unit of writing is a **piece** (a document). A **journal** is one piece where each day starts on a
+fresh page; a writer can keep more than one journal. An essay is one piece. A **book** (a novel, a memoir) is one piece made of **chapters**: each chapter
+starts on a fresh page, its title is the running head of the pages after it, and a Contents sheet lists
+the chapters with the page each starts on. Reordering chapters by drag and a binder view are later.
 
 ### 4.3 The Time Machine (the differentiator)
 - The app automatically takes **snapshots** while the user writes (debounced, plus on pause, on blur, and
   on close). Users never press "save" or "commit".
 - A **timeline** lets the user move back through a piece's history as a story, not a diff list:
-  visually calm, with a scrubber, dates written in plain language ("Tuesday evening", "3 weeks ago"),
-  and a gentle view of what changed (words added and removed shown softly, never a code-style diff).
+  visually calm, with a scrubber, dates written in plain language ("Tuesday evening", "3 weeks ago").
+  Later, perhaps, a gentle view of what changed (words added and removed shown softly, never a
+  code-style diff); v1 shows the old version only (docs/decisions/0008).
 - Actions in plain language: **Look back**, **Bring this version back** (restores as the current text but
   never destroys later history), **Keep a copy as a new draft**.
 - Alternate versions ("drafts") exist so a writer can try a different ending without fear. Comparing and
@@ -94,12 +97,17 @@ in. An essay is one piece. Novels (chapters, ordering, binder) are explicitly ou
   can lose data and offers to connect a backup destination or export.
 - Sync is built behind a **provider interface**, not hard-wired to any service. See Architecture.
 - v1 ships exactly **one** provider: GitHub (the user's own private repo, which the app creates for them).
+- **One place at a time.** Connecting another place replaces the current one after one confirmation; the
+  old place stops receiving copies and everything already there stays. No dormant second connection.
+- Each piece's **reading position** (caret or first visible line, as a paragraph, offset and a short text
+  snippet) is stored with the piece and travels with it, so another device opens where the writer was.
 - Other providers (GitLab, Codeberg/Gitea/Forgejo, WebDAV, S3-compatible) are future work and a good
   contribution area.
 
 ### 4.5 Export
-One click: download everything as a zip of Markdown files (plus metadata for history). Export is the
-universal escape hatch and the answer to "what if this app disappears".
+One click: download everything as a zip of Markdown files, with full history and put-away pieces. A
+single piece exports as Markdown or PDF (browser print). Import never overwrites. Export is the universal
+escape hatch and the answer to "what if this app disappears" (docs/decisions/0007).
 
 ---
 
@@ -107,11 +115,14 @@ universal escape hatch and the answer to "what if this app disappears".
 
 ### MVP (time-boxed; goal: usable daily by the maintainer)
 - [ ] PWA shell: installable, offline-capable (service worker), responsive to phone/tablet/desktop
-- [ ] The Page: centered editor, Markdown, themes, typography, typewriter scrolling option
+- [ ] The Page: paged editor (screen-sized pages), Markdown, themes, typography
 - [ ] Local persistence (IndexedDB) with `navigator.storage.persist()` requested
-- [ ] Pieces: create, open, rename, delete (delete is soft with an undo window), journal-by-day entry
-- [ ] Automatic snapshots + the Time Machine timeline (look back, bring back, keep a copy)
-- [ ] One-click export (zip of Markdown) and import of Markdown files
+- [ ] Pieces: create, open, rename, put away (restorable for 30 days); the journal opens on today
+- [ ] Books and chapters: new chapter (writing bar, selection, `#` at a line start), Contents sheet,
+      chapter as running head; a contents page generated on export
+- [ ] Automatic snapshots + the Time Machine (look back, bring back, keep a copy); no changes view yet
+- [ ] One-click export (zip of Markdown with history), one piece as Markdown or PDF, import that never
+      overwrites
 - [ ] First-run note about storage safety and backup/export
 - [ ] Basic settings: theme, font, size, measure
 
@@ -119,11 +130,12 @@ universal escape hatch and the answer to "what if this app disappears".
 - [ ] Sync provider interface + GitHub provider (OAuth via tiny stateless worker, REST API based)
 - [ ] Optional drafts/branches UX polish
 - [ ] Search across pieces (local, simple)
+- [ ] Collections: group pieces like folders (a series, a project, a year of journals)
 
 ### Later / contributions welcome
 - Additional sync providers
 - Optional client-side encryption before sync
-- Long-form structure (chapters, reorder), word-count goals, EPUB/DOCX export
+- Reordering chapters, a binder view, word-count goals, EPUB/DOCX export
 - Mobile polish, widgets-like shortcuts
 
 ### Non-goals (explicitly)
@@ -145,25 +157,30 @@ universal escape hatch and the answer to "what if this app disappears".
 - **Local-first.** IndexedDB is the working store. Everything works offline.
 - **Storage-agnostic sync.** The editor and timeline know nothing about GitHub.
 
-### 6.2 Suggested stack (open to change)
+### 6.2 Stack (decided, see docs/decisions/0002–0004)
 - TypeScript, Vite, `vite-plugin-pwa` (Workbox) for the service worker
-- UI: Svelte or React; prefer whichever keeps the bundle small and the code simple
-- Editor: CodeMirror 6 (Markdown) or a lightweight custom editor; avoid heavy rich-text frameworks
-- Storage: IndexedDB via a thin wrapper (e.g. `idb`)
-- Tests: Vitest for logic (snapshots, restore, sync adapters), Playwright for key flows
+- UI: React. The page is an uncontrolled component; business logic lives outside the UI
+- Editor: our own paged `contenteditable` that stores Markdown
+- Storage: IndexedDB via a thin wrapper (e.g. `idb`), behind a domain interface
+- Code: `app/src/{domain,adapters,page,ui}`; a future landing site in `site/`
+- Tests: Vitest for the domain and page module, Playwright for key flows
 - No runtime dependencies without a reason; the bundle should stay small and fast
 
 ### 6.3 Data model (sketch)
-- `Piece { id, title, createdAt, updatedAt, kind: 'journal' | 'essay' | ..., currentVersionId }`
-- `Version (snapshot) { id, pieceId, parentId, createdAt, content, label? }`
-  - **Immutable** and append-only. New versions are new records.
-  - `parentId` forms a history; a draft is simply a branch of that chain with a human name.
-- Snapshot policy: debounce while typing, snapshot on pause (~a few seconds idle), on blur, on close,
-  and on explicit "keep this moment". Avoid unbounded growth (e.g. thin out very dense snapshots over
-  time, but never delete user-labeled ones).
+Decided in docs/decisions/0005.
+- `Piece { id, title, createdAt, updatedAt, kind: 'journal' | 'essay' | 'book' }`
+- `Section` = a journal day, a book chapter, or the whole of an essay.
+- `Version { id, pieceId, sectionId, parentId, createdAt, content, label? }`: one section's full
+  Markdown. **Immutable** and append-only; ids are UUIDs.
+- `Outline { id, pieceId, createdAt, sections: [{ sectionId, title }] }`: the piece's structure, also
+  immutable. The piece at a moment = outline + each section's latest version at or before it.
+- Snapshot policy: on 3 s idle, blur, switching pieces and "keep this moment", for each changed section.
+- Local thinning: every version for the last hour, then one per hour (day), per day (month), per week
+  (year), per month (older). Never thinned: latest, first, labeled, and the one before a restore.
+- Reading position is mutable, kept per piece outside the versions; the most recent wins.
 - Content is plain Markdown strings. Prose diffs are done by word/sentence, not line.
 
-### 6.4 History engine decision (open, decide early)
+### 6.4 History engine decision (decided: A, see docs/decisions/0001)
 Option A: custom immutable snapshot store (recommended default). Works with any provider, trivial to
 sync as small immutable files, avoids `.git` corruption in synced folders.
 Option B: use Git semantics (e.g. isomorphic-git). Powerful, but heavy and awkward in browsers.
@@ -174,6 +191,10 @@ A narrow contract that providers implement, for example:
 - `authenticate()`
 - `listPieces()`, `readPiece(id)`, `writePiece(id, content, message)`
 - `listVersions(id)`, `readVersion(id, versionId)`
+- Each connector declares whether it **keeps history**. Git-based: push current section files only,
+  commits are the far history. Others: also push a `history/` folder of the thinned versions.
+- Pushes every few minutes while writing, and on pause and close, to stay within rate limits.
+- The Time Machine shows local versions offline and fills in older moments from the connector online.
 - Conflict policy: single-writer assumption, last-write-wins plus **keep both** as a draft. Never
   silently discard content.
 - Sync runs in the background, never blocks the editor, and is retry-safe.
@@ -245,13 +266,16 @@ Success = the maintainer uses it every day. An audience is a bonus.
 
 ## 11. Open questions (resolve and record decisions)
 
-- [ ] Final history engine: custom snapshots (recommended) vs Git semantics
-- [ ] Svelte vs React (or other)
-- [ ] Editor library: CodeMirror 6 vs custom
+- [x] History engine: our own immutable versions (0001)
+- [x] UI: React (0002)
+- [x] Editor: our own paged contenteditable (0003)
 - [x] License: MIT
-- [ ] How the timeline appears without breaking the quiet UI (gesture, shortcut, edge reveal)
-- [ ] Thinning policy for snapshots
-- [ ] Journal-by-day entry design (calendar vs list)
+- [x] How the Time Machine appears: from the tools bar or a shortcut, full screen (0008)
+- [x] What one version holds: one section, with an outline for structure (0005)
+- [x] Thinning: by age, local only (0005)
+- [x] Journal: one piece, a page per day
+- [x] Journal way in: the month calendar, in the MVP (DESIGN.md, The journal)
+- [x] "Keep a copy as a new draft" in a journal or book copies that one day or chapter (0008)
 - [ ] Name check: confirm domain, GitHub org/user, npm availability for "Elbowpatch" (a project named
       `elbow-patch` exists on GitHub with a dash; confirm it is unrelated)
 

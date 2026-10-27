@@ -50,40 +50,78 @@ Two themes, both first-class. Paper follows light system appearance, night follo
 - **Body:** Literata at weight 360, 19px on desktop and 18px on a phone, line height 1.55, measure 34rem, old-style figures; paragraphs spaced by one line, no indent. Settings change these within fixed steps (see Control).
 - **Title:** weight 300, optical size 60, 2.05 × the body size, line height 1.12, slightly tightened (−0.012em). Title only — no label above it naming the kind of piece (essay, journal) in v1.
 - **Running head:** from page 2 on, the piece title in small italic (13px), centred at the top in secondary grey, like a book's running head.
-- **Drop cap (optional):** the first letter of the piece, three lines deep, weight 500, optical size 72, title colour.
+- **Drop cap (optional):** the first letter of the piece, four lines deep, weight 500, optical size 72, title colour. (Three lines read too small; changed on 2026-10-27.) Where a browser lacks `initial-letter`, a floated letter of the same depth stands in.
 - **Pull quote:** one paragraph, centred, with space above and below; no author line in v1.
+- **Indented paragraphs (optional, off by default):** as in a printed book, each paragraph's first line steps in by 1.5em and the space between paragraphs goes. The first paragraph of a piece or chapter, and the one after a pull quote, start flush.
+- **Italic in the text:** EB Garamond italic, as the pull quote — scaled to 1.17em so its x-height matches Literata's, with line-height 1 so it sits on the same baseline and never moves the leading. Bold in the text is Literata at 600.
 - **Numbers in controls** (page button, word count) are lining and tabular, so they do not jump.
+- **Thousands take a dot, European style:** 1.240 words, never 1,240.
 
 ## Control
 - No filled button on the page, and no text in letter-spaced capitals. Tools appear only when summoned (PROJECT.md §4.1) and on selection, and leave when dismissed.
 - **The page button:** a 44px circle at the bottom right, on a surface with a soft lift, showing the current page number (it grows into a pill past page 99). Its label for assistive tech says "Page N of M. Open tools". It shows one number only — the total appears when the tools are open.
-- **The tools bar:** the page button opens into one rounded bar, in place: "3 of 12 · 1,240 words" in secondary grey, then icon buttons — Time Machine, text settings (Aa), paper / night (moon or sun), close. Escape or close folds it back into the button.
+- **The tools bar:** the page button opens into one rounded bar, in place: "3 of 12 · 1.240 words" in secondary grey, then icon buttons — Time Machine, text settings (Aa), paper / night (moon or sun), close. Escape or close folds it back into the button.
 - **Icons:** one set, drawn for this app: 20px, 1.5px stroke, round caps and joins, current text colour — all the same colour, none highlighted. Icon buttons are 36px circles with a soft round pressed tint, no border — every round control is fully round.
-- **Text settings:** a sheet over the page, applied live as you change it. Each setting is a segmented control, one row each: size (S / M / L), line spacing (tight 1.42 / normal 1.55 / loose 1.72), alignment (left / justified — icons), theme (Paper / Night, with a small swatch), measure (narrow 34rem / wide 40rem). Drop cap is one on/off switch. "Done" closes it as a text link.
+- **Text settings:** a sheet over the page, applied live as you change it. Each setting is a segmented control, one row each: size (S / M / L), line spacing (tight 1.42 / normal 1.55 / loose 1.72), alignment (left / justified — icons), theme (Paper / Night, with a small swatch), measure (narrow 34rem / wide 40rem). Drop cap is one on/off switch; Indent paragraphs is another, off by default. "Done" closes it as a text link.
 - Justified text always hyphenates.
-- **Selection menu:** the same rounded bar, floating over the selected words: bold, italic, pull quote, and "keep this moment" (a Time Machine save).
-- **Writing on a phone:** above the keyboard, the same bar: bold, italic, pull quote, hide keyboard.
+- **Selection menu:** the same rounded bar, floating over the selected words: bold, italic, pull quote, § (start chapter here), and "keep this moment" (a Time Machine save).
+- **Writing on a phone:** above the keyboard, the same bar: bold, italic, pull quote, § (new chapter), hide keyboard.
+- **Keyboard up:** the page keeps its size. When the caret would go under the keyboard, the page slides up so the caret line sits just above the writing bar. *Library* and the running head stay, on a strip of page colour with a 28px fade under it, so text leaving the top goes softly instead of meeting them; once the title has slid away, the running head carries it. This is the one fade on the page, only while the keyboard pushes it. Page numbers do not change when the keyboard comes up.
+- **Moving around with the keyboard up:** drag the text up or down to see the part of the page behind the keyboard (the caret stays where it is); swipe sideways to turn pages; tap a word to move the caret there. "Hide keyboard" in the writing bar puts the keyboard down; return only ever makes a new paragraph. To go far — the start of the piece, another chapter, another day — tap the page button beside the writing bar: the tools open, and the page count opens Contents (or Days), all without leaving the keyboard.
+- **§ is the chapter mark.** Set in Literata like B and I, it starts a new chapter in the writing bar and "starts chapter here" on a selection. Typing `#` at the start of a line does the same.
 - **Back to the library:** the word *Library*, 13px, secondary grey, at the left of the running-head line, aligned with the text's left edge; it darkens on hover and has a 44px-tall tap area. A word, not an icon: an arrow felt generic and a pile-of-sheets glyph read as "copy". (Provisional: whether it should fade while writing is still open.)
 - **Focus:** a 2px ring in the title colour, offset 2px, on every control, visible on keyboard focus only.
 
 ## Layout
-- One page, one narrow column, generous leading. The page carries the design; nothing frames it — no hairline, no fade, no page dots at the foot.
+- One page, one narrow column, generous leading. The page carries the design; nothing frames it — no hairline, no fade, no page dots at the foot. (The journal's left margin rule is the one exception; see The journal.)
 - Page 1 opens with the piece title like a chapter, then the text. Later pages have the running head instead.
-- Margins: 88px above the text and 96px below on desktop; 64px above and 92px below on a phone, 24px each side. With the keyboard up, the page ends above the writing bar.
+- Margins: 88px above the text and 96px below on desktop; 64px above and 92px below on a phone, 24px each side. With the keyboard up, the page keeps its size and slides up (see Control).
 - Top left: *Library*. Bottom right: the page button. That is all the page carries besides the text; a long running title is cut short before it reaches *Library*.
 
 ## The library
-- Where the app opens: the list of pieces (essays, novels, journals — no types shown in v1).
-- "Library" set like a piece title; settings as one quiet icon button in the top-right corner (the settings themselves are not designed yet).
-- Each piece is a row: its title (Literata, a little larger than the body) and "1,240 words · 25 Oct" in secondary grey, most recent first. Rows are separated by space, not rules, with a soft rounded pressed tint.
-- New piece: the round button at the bottom right, in the place of the page button, with a +. A new piece left empty is not kept.
+- Where the app opens. "Library" set like a piece title; settings as one quiet icon button in the top-right corner.
+- **Continue:** on top, the piece you were last in, as a compact open page — a surface with the soft lift, 16px corners: two lines from where you stopped (slightly smaller than the body, cut with "…"), then one line of *chapter* · book in secondary grey, and the page number in a 28px outlined patch at the right. The meta line never wraps: the book title is cut first, then the chapter. Tapping it opens the piece where you were. (Chosen on 2026-10-27, made compact after a first, taller version.)
+- **Grouped by kind:** below it, the pieces under *Books*, *Journal* and *Essays*, each kind named once in small italic secondary grey (15px), most recent first within a kind. Groups breathe: 2.6em above each heading, 0.5em below it, so the gap between kinds is clearly larger than the gap between rows. The piece in Continue is not repeated in its group.
+- Each piece is a row: its title (Literata, a little larger than the body) and a line in secondary grey — "6 chapters · 48 pages · 9 Oct" for a book, "214 days · nothing yet today" for the journal, "1.240 words · 25 Oct" for an essay. Rows are separated by space, not rules, with a soft rounded pressed tint.
+- **Kinds have marks, not drawings:** typographic marks set in Literata, regular, as § is for a chapter — **&** for a book (and so on, chapter after chapter), **today's date with its ordinal** for the journal ("27th": the ordinal half size and raised, since Literata has no superior letters; it changes daily), **¶** (the pilcrow) for an essay. 19px in the new-piece bar (title colour, as its word), 16px before the word in each library group heading (secondary grey, as its word). (Chosen on 2026-10-27 from 36 marks Literata draws itself, over line drawings, which felt busier than §.)
+- **New piece:** the round button at the bottom right, in the place of the page button, with a +. Tapped, it opens into a bar like the tools bar: Book, Journal, Essay — each its icon and its word — then a separator and close, where the + was. Choosing one opens its first page. A new piece left empty is not kept.
 - The library fades in over the page (220ms; instant with reduced motion). The page behind is inert while the library shows.
 - Empty: one calm line, "Nothing written yet."
 - Main settings (account, global options, connectors) open from the library only, never from the page.
+
+## Books and chapters
+- A book is one piece made of chapters. A chapter starts on a fresh page with its title set like page 1's, and no running head on that page — as a printed book does. Later pages carry the chapter title as their running head.
+- A new chapter's title shows "Chapter title" in secondary grey until written, then "Begin anywhere."
+- The page button keeps counting the whole book.
+- **Contents:** tapping "18 of 48" in the tools bar opens a sheet like text settings: "Contents" and the book's page count, then each chapter with the page it starts on (right, tabular, secondary). The current chapter has the soft pressed tint. "§ New chapter" and "Done" are text links at its foot. Contents is a sheet, never a page in the book, so page numbers do not shift while writing; on export a contents page is printed at the front.
+
+## The journal
+- A journal is one piece; each day begins on a fresh page with the date as its title ("Monday 26 October"). The date is not editable — an entry with its own title is an essay. The journal's own name ("Journal", "Dream journal") is edited in the library.
+- Opening the journal lands on today. Turning back goes to earlier days. A long day runs onto the next page, with the date as the running head.
+- **The margin:** the journal alone has a hairline (the surface-line colour) down the left margin, from top to bottom. On a phone it sits 24px from the edge and the text starts at 44px; on desktop it sits 44px left of the text. A deliberate exception to "nothing frames the page", for the journal only.
+- **The day's words** sit at the foot, upright, 12px secondary: "312 words" at the text's left edge, level with the page button on the right. Not rotated, not beside the title. (Chosen on 2026-10-27 over a count beside the title, which sat at no clear line.)
+- **The way in:** "26 Oct · 312 words" in the tools bar opens a Days sheet as a **month** (in the MVP; changed on 2026-10-27 from a list): the month and year between two arrow icon buttons for the months before and after, a seven-column grid under one-letter weekday initials (12px, secondary), each day a round button — written days in the title colour at weight 560, today with the pressed tint and a hairline ring, days still to come disabled. At the foot, "19 days written in October" (13px, secondary) and "Done". Each day is labelled for assistive tech ("26 October, written").
+- The same sheet is also drawn as a list (screens.html): "Days" and how many are written, the month in italic, then each written day with its word count, today first ("nothing yet" until begun).
+
+## Settings
+- Opened from the library only. The same view as the library: "Settings" set like a piece title, *Library* at the top left to go back. Each area is a row that says what it is set to: Writing ("Medium · normal spacing · narrow · left"), Appearance, Time Machine, Backup & sync ("GitHub · last copy 2 minutes ago"), Export, About & privacy.
+- Each area is its own view, its name as the title and *Settings* at the top left to go back. On desktop, the areas are words on the left (the open one with the pressed tint) and the open area on the right.
+- **Writing:** defaults for new pieces, with the text settings' segmented controls and the drop cap switch. Each piece can still change its own in Aa.
+- **Backup & sync:** one sentence on where the writing lives. **One place at a time:** the connected place is a surface at the top — its name, "Copying here · last copy 2 minutes ago · as you write" and "Copy now". Other places sit below under *Use another place instead*, each with "Switch" (or "Not available yet"). Switching asks once in a sheet — "Copy to Dropbox instead? GitHub stops receiving copies. Everything already there stays" — with "Keep GitHub" and "Switch to Dropbox". "Disconnect" is a text link in the note under the list. Every action is a word; no filled button. No Git words, apart from the provider's own name.
+- Nothing connected: the sentence says plainly that the writing lives only in this browser, and that clearing it loses everything; "Connect" sits beside GitHub.
+
+## Patterns
 - Patterns to follow: settings as a quiet sheet over the page, applied live; a single round control that opens into a bar; themes named for a mood, not a hex; writing tools on the selection, not in a toolbar; a calm one-line serif sentence for empty and closing states.
 
 ## Behaviour
-- **Paging, not scrolling.** Writing fills a page; the next page begins when it is full and the view turns to it. Turn pages by swipe, arrow keys, Alt + ← / → or Page Up / Page Down. Page breaks re-flow as text changes.
+- **Paging, not scrolling.** Writing fills a page; the next page begins when it is full and the view turns to it. Page breaks re-flow as text changes.
+- **Turning a page** (decided 2026-10-27):
+  - **Phone:** swipe sideways — left for the next page, right for the one before. No tap zones at the edges: a tap in the text places the caret, and the 24px side margin is too narrow to tell the two apart. A vertical drag is kept for seeing what is behind the keyboard (see Control).
+  - **Desktop:** Page Up / Page Down or Alt + ← / →; a two-finger swipe sideways on a trackpad; a scroll of the wheel or trackpad turns **one page per gesture** (a gesture is one continuous scroll, so a long flick still turns one page), because people scroll by habit; and a click in the wide side margins turns back (left) or forward (right) — they are hundreds of pixels wide there, so they never meet the text.
+  - Each turn is the same quiet slide, and is announced to screen readers.
+- **A page is what fits the screen** at the current text settings — not a fixed book page. Larger text makes more pages, never a scroll, so nothing ever slides under the head or the foot and no fade is needed. Chosen on 2026-10-27 over a fixed book page, which on a phone means scrolling inside every page and text cut at the edges.
+- **Page numbers are for orientation, not addresses.** They follow the screen, as on an e-reader: page 18 on a phone is not page 18 on a desktop. Finding things is by chapter (Contents) and by date (journal), never by page number. Fixed, printable numbers come only from the export.
+- **Your place travels with the piece.** The app keeps where you were: the caret if you were writing, otherwise the first line on screen — as a paragraph, an offset and a few words of its text, so it survives edits made elsewhere (if the words are gone, the nearest paragraph). With a connected place this goes with the piece, so another device opens on the page that holds it, caret restored. The most recent position wins; it is only a position, nothing is lost.
 - **The turn** is a quiet horizontal slide (460ms, ease-out). With `prefers-reduced-motion` it is an instant cut. A page change is announced to screen readers; typing is not.
 - **Night focus:** paragraphs before the current one dim to #8c8c8a; the current paragraph stays at body colour. Never dimmer than 4.5:1. Paper does not dim.
 - **The tools bar** opens out of the page button and folds back into it.
@@ -98,15 +136,16 @@ Open — treat as undesigned, not as solved by a familiar pattern:
 - The writing state on a real phone: the prototype draws the keyboard and writing bar, but it has not been tested with a real keyboard, or with editing in the middle of a long piece.
 - Pull quote, bold, italic and "keep this moment" are designed (selection menu, writing bar) but not yet working in the prototype.
 - The Time Machine / history view (the differentiator).
-- Main settings, opened from the library.
-- Chapters: proposed — the page count in the tools bar opens a contents sheet (chapters and the page each starts on; "New chapter" at its end, and "start chapter here" on selection); a chapter starts on a fresh page with its title set like page 1's. Not built.
+- Settings areas not yet drawn: Appearance, Time Machine, Export, About & privacy.
+- Chapters and the journal are designed (screens.html) but not built in the live prototype; reordering chapters and Collections (folders) are after the MVP.
+- Restoring your place on another device: designed (Behaviour), not built.
 - A photo placed inside a piece.
 
 Paged writing is new ground: typing on a paged page, a phone keyboard, Markdown, an empty first page and a long title being written all still need designing.
 
 ## Do not
 - Scroll a long page endlessly; page it.
-- Fade over readable text, or add a hairline, fade or dots at the foot of the page.
+- Fade over readable text, or add a hairline, fade or dots at the foot of the page. (The one exception: the short fade under the head while the keyboard pushes the page up.)
 - Use a 3D paper curl, page textures, parchment, typewriter fonts, quills, or any old-writer illustration in the interface.
 - Add an accent colour, cream, or amber in this pass.
 - Add a third font family without a reason recorded here.
