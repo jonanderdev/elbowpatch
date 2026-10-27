@@ -107,12 +107,31 @@ Two themes, both first-class. Paper follows light system appearance, night follo
 - **The way in:** "26 Oct · 312 words" in the tools bar opens a Days sheet as a **month** (in the MVP; changed on 2026-10-27 from a list): the month and year between two arrow icon buttons for the months before and after, a seven-column grid under one-letter weekday initials (12px, secondary), each day a round button — written days in the title colour at weight 560, today with the pressed tint and a hairline ring, days still to come disabled. At the foot, "19 days written in October" (13px, secondary) and "Done". Each day is labelled for assistive tech ("26 October, written").
 - The same sheet is also drawn as a list in the Figma file, as an alternative not in the MVP: "Days" and how many are written, the month in italic, then each written day with its word count, today first ("nothing yet" until begun).
 
+## The Time Machine
+Designed on 2026-10-27. How it opens and what one version holds are in docs/decisions/0008 and 0005.
+- **One section at a time:** it travels through the section in view — this chapter, this day, or the whole essay. Turning pages in it stays inside that section.
+- **The way in:** the Time Machine icon in the tools bar, or ⌘/Ctrl + Alt + Z (a step further back than undo). It takes the place of the page and opens on the most recent moment that differs from now, so the first thing seen is already the past.
+- **The past reads by its frame, never by its text:** the old text keeps full contrast — no tint, no grey, no caret, and night does not dim earlier paragraphs. *Library* becomes *Now* (same place, same style), which goes back to the present, as does Escape. The running head shows the moment ("Tuesday evening · 14 Oct") on every page, page 1 included. The page button is gone; the moment bar takes the foot.
+- **The moment bar:** one rounded surface, like the tools bar, in two rows. Full width less 16px each side on a phone; centred at the column's width on desktop.
+  - Row 1: a previous-moment arrow, the track, a next-moment arrow. One step per moment, evenly spaced (not by time, which would crowd the last hour into a sliver); the right end is now. The track is a 1px secondary line, the current moment a 14px circle in the title colour, and moments kept with "keep this moment" a small secondary dot.
+  - Row 2: the page count at the left ("3 of 9", secondary, tabular), which opens Contents — or Days in a journal — **as it was at that moment**; the actions at the right as words in the title colour, separated by a middle dot. If row 2 cannot hold them, *Keep a copy* moves up to row 1.
+  - Dragging the track is for travel; the arrows step one moment. The running head follows the drag, so the writer reads where they are instead of aiming at a dot.
+- **Bring this back** names what it replaces: *Bring this chapter back* in a book, *Bring this day back* in a journal, *Bring this back* in an essay. Nothing else in the piece changes. It does not ask first, because nothing is lost: it closes onto the page with the old text in place, and one calm line shows for a few seconds — "Chapter 3 brought back from Tuesday evening. The rest of the book is as it was." The text it replaced stays a moment, never thinned.
+- **Removed and renamed chapters:** Contents as it was lists the chapters of that moment under their titles of that moment; a chapter removed since carries "removed since" in secondary. It opens like any other, and *Bring this chapter back* puts it back in its old place — or at the end, if the chapters around it are gone — with its old title.
+- **Bringing back a part:** the old text is read-only but selectable. A selection shows the selection bar with two words: *Bring this part back* and *Copy*. Bringing a part back returns to now and inserts the passage where it stood — after the paragraph that came before it, found as a reading place is (paragraph, offset, a few words), or at the end of the section if that paragraph is gone. It arrives as its own paragraph, left selected so it can be moved or trimmed, and one undo removes it. It never replaces or merges anything. Its line: "Brought back from Tuesday evening."
+- **Keep a copy** copies the section only and opens the copy at once as a new essay ("Chapter 3, draft 2"), with one line: "A copy of Tuesday evening, kept as a new essay." The piece it came from is untouched. Copying a whole book as it was is after the MVP.
+- **Nothing earlier:** the bar holds one line, "Nothing earlier yet. Moments are kept as you write." — no track, no actions.
+- **Dates in plain words:** "Just now" under a minute; "12 minutes ago" within the hour; "This afternoon, 14:05" today; "Yesterday evening, 21:10"; "Tuesday evening" within the week; "14 October" this year; "14 October 2025" before. A 24-hour clock. Morning 5–12, afternoon 12–18, evening 18–23, night 23–5.
+- **Moving around:** sideways swipe, Page Up / Page Down, Alt + ← / →, the wheel and the side margins still turn pages of the old text. The track is a slider: ← / → step a moment when it has focus, Home goes to the oldest, End to now. It takes drags only on itself.
+- **For assistive tech:** the track is a slider whose value is the full date ("Tuesday 14 October, 21:10"); a change of moment is announced, as a page turn is.
+
 ## Settings
-- Opened from the library only. The same view as the library: "Settings" set like a piece title, *Library* at the top left to go back. Each area is a row that says what it is set to: Writing ("Medium · normal spacing · narrow · left"), Appearance, Time Machine, Backup & sync ("GitHub · last copy 2 minutes ago"), Export, About & privacy.
+- Opened from the library only. The same view as the library: "Settings" set like a piece title, *Library* at the top left to go back. Each area is a row that says what it is set to: Writing ("Medium · normal spacing · narrow · left"), Appearance, Time Machine ("Thinned with age · 14 MB"), Backup & sync ("GitHub · last copy 2 minutes ago"), Export, About & privacy.
 - Each area is its own view, its name as the title and *Settings* at the top left to go back. On desktop, the areas are words on the left (the open one with the pressed tint) and the open area on the right.
 - **Writing:** defaults for new pieces, with the text settings' segmented controls and the drop cap switch. Each piece can still change its own in Aa.
 - **Backup & sync:** one sentence on where the writing lives. **One place at a time:** the connected place is a surface at the top — its name, "Copying here · last copy 2 minutes ago · as you write" and "Copy now". Other places sit below under *Use another place instead*, each with "Switch" (or "Not available yet"). Switching asks once in a sheet — "Copy to Dropbox instead? GitHub stops receiving copies. Everything already there stays" — with "Keep GitHub" and "Switch to Dropbox". "Disconnect" is a text link in the note under the list. Every action is a word; no filled button. No Git words, apart from the provider's own name.
 - Nothing connected: the sentence says plainly that the writing lives only in this browser, and that clearing it loses everything; "Connect" sits beside GitHub.
+- **Time Machine:** nothing to set in v1. One sentence on how moments are kept — "Every pause is kept for an hour, then one an hour for a day, one a day for a month, one a week for a year, then one a month. Moments you keep are never thinned." — and the space they use. No "keep everything" switch: it would be the one setting that fills the browser's storage.
 
 ## Patterns
 - Patterns to follow: settings as a quiet sheet over the page, applied live; a single round control that opens into a bar; themes named for a mood, not a hex; writing tools on the selection, not in a toolbar; a calm one-line serif sentence for empty and closing states.
@@ -133,8 +152,8 @@ Two themes, both first-class. Paper follows light system appearance, night follo
 
 ## Motion
 Proposed, **not yet reviewed** — carried over from the first prototype, where motion was never checked. Decide each before it is built; these are starting points, not rules.
-- What moves: the page turn (a horizontal slide), the tools bar opening out of the page button and folding back, the library fading in over the page, sheets (text settings, Contents, Days, confirmations) appearing over the page, the night dimming as the caret moves between paragraphs, the theme changing, and the page sliding up when the keyboard comes.
-- Starting values: the turn 460ms ease-out; the tools bar opening 340ms from the 44px circle; the library fade 220ms; colour changes (theme, night dimming) 300–400ms; presses 160ms.
+- What moves: the page turn (a horizontal slide), the tools bar opening out of the page button and folding back, the library fading in over the page, sheets (text settings, Contents, Days, confirmations) appearing over the page, the night dimming as the caret moves between paragraphs, the theme changing, the page sliding up when the keyboard comes, and the Time Machine opening and changing moment.
+- Starting values: the turn 460ms ease-out; the tools bar opening 340ms from the 44px circle; the library fade 220ms; colour changes (theme, night dimming) 300–400ms; presses 160ms; the Time Machine opening and closing as a 220ms cross-fade; a change of moment a 120ms fade in place — never a slide, so it never reads as a page turn; dragging the track instant.
 - Fixed already: one quiet kind of motion, never a 3D paper curl; with `prefers-reduced-motion` every move is an instant cut; nothing moves while you type except the page turning when it fills.
 
 ## Imagery
@@ -145,8 +164,8 @@ Proposed, **not yet reviewed** — carried over from the first prototype, where 
 Open — treat as undesigned, not as solved by a familiar pattern:
 - The writing state on a real phone: designed (keyboard up, writing bar), but never tested with a real keyboard, or with editing in the middle of a long piece.
 - Motion: proposed, not reviewed (see Motion).
-- The Time Machine / history view (the differentiator).
-- Settings areas not yet drawn: Appearance, Time Machine, Export, About & privacy.
+- The Time Machine: designed (see The Time Machine), but never tried with a real history of hundreds of moments; whether a passage brought back lands in the right place after heavy edits needs a test once the page is built.
+- Settings areas not yet drawn: Appearance, Export, About & privacy.
 - Reordering chapters and Collections (folders) are after the MVP.
 - A photo placed inside a piece.
 
