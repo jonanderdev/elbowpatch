@@ -5,7 +5,7 @@ Date: 2026-10-27 · Status: accepted
 ## Decision
 - Opens from the Time Machine button in the tools bar, or a keyboard shortcut. Nothing new on the writing page.
 - Full screen, in place of the page: the text as it was at the chosen moment, laid out as the same pages, with a scrubber at the foot labelled in plain words ("Tuesday evening", "14 October").
-- Actions: **Bring this back** (a new version with the old text; nothing later is lost) and **Keep a copy as a new draft**.
+- Actions: **Bring chapter / day / essay back** (a new version with the old text; nothing later is lost), **Bring part back** (inserts a selected passage) and **Keep a copy** (as a new essay). See The design below.
 - No "what changed" view in v1. If one comes later, it stays simple and soft, nothing like a code diff.
 
 ## The design
