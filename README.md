@@ -1,4 +1,4 @@
-<h1 style="text-align: center;"><img src="docs/brand/wordmark.svg" alt="Elbowpatch" width="342" height="121"></h1>
+<h1 align="center"><img src="docs/brand/wordmark.svg" alt="Elbowpatch" width="342" height="121"></h1>
 
 A quiet place to write, with a memory. Local-first and private: your words stay close, and every draft is kept safe.
 
