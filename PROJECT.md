@@ -172,7 +172,7 @@ escape hatch and the answer to "what if this app disappears" (docs/decisions/000
 
 ### 6.3 Data model (sketch)
 Decided in docs/decisions/0005.
-- `Piece { id, title, createdAt, updatedAt, kind: 'journal' | 'essay' | 'book' }`
+- `Piece { id, title, lang, createdAt, updatedAt, kind: 'journal' | 'essay' | 'book' }`
 - `Section` = a journal day, a book chapter, or the whole of an essay.
 - `Version { id, pieceId, sectionId, parentId, createdAt, content, label? }`: one section's full
   Markdown (its body; titles are not in the text). **Immutable** and append-only; ids are UUIDs.
@@ -180,9 +180,10 @@ Decided in docs/decisions/0005.
   its title and its chapter titles, also immutable. `Piece.title` is a copy of the latest, for the library. The piece at a moment = outline + each section's latest version at
   or before it.
 - `Working { sectionId, content, title?, baseVersionId, updatedAt }`: the one mutable copy of a
-  section's text and title, saved about a second after typing stops; a moment turns it into a
-  version, and a changed title into a new outline version.
-- Snapshot policy: on 3 s idle, blur, switching pieces and "keep this moment", for each changed section.
+  section's text and title, saved about a second after typing stops and at least every 5 s while
+  typing goes on; a moment turns it into a version, and a changed title into a new outline version.
+- Snapshot policy: on 3 s idle at most every 5 minutes; always on blur, switching pieces, closing and
+  "keep this moment"; for each changed section. Order comes from `parentId`, not the clock.
 - Local thinning: every version for the last hour, then one per hour (day), per day (month), per week
   (year), per month (older). Never thinned: latest, first, labeled, and the one before a restore.
 - Reading position is mutable, kept per piece outside the versions; the most recent wins.

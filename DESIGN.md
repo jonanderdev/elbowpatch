@@ -133,7 +133,7 @@ Designed on 2026-10-27. How it opens and what one version holds are in docs/deci
 - **Writing:** defaults for new pieces, with the text settings' segmented controls and the drop cap switch. Each piece can still change its own in Aa.
 - **Backup & sync:** one sentence on where the writing lives. **One place at a time:** the connected place is a surface at the top — its name, "Copying here · last copy 2 minutes ago · as you write" and "Copy now". Other places sit below under *Use another place instead*, each with "Switch" (or "Not available yet"). Switching asks once in a sheet — "Copy to Dropbox instead? GitHub stops receiving copies. Everything already there stays" — with "Keep GitHub" and "Switch to Dropbox". "Disconnect" is a text link in the note under the list. Every action is a word; no filled button. No Git words, apart from the provider's own name.
 - Nothing connected: the sentence says plainly that the writing lives only in this browser, and that clearing it loses everything; "Connect" sits beside GitHub.
-- **Time Machine:** nothing to set in v1. One sentence on how moments are kept — "A moment is kept every 5 minutes while you write, and whenever you stop. After an hour, one an hour is kept for a day, then one a day for a month, one a week for a year, and one a month after that. Moments you keep are never thinned." — and the space they use. No "keep everything" switch: it would be the one setting that fills the browser's storage.
+- **Time Machine:** nothing to set in v1. One sentence on how moments are kept — "While you write, a moment is kept when you pause, at most one every 5 minutes, and always when you leave the page. After an hour, one an hour is kept for a day, then one a day for a month, one a week for a year, and one a month after that. Moments you keep are never thinned." — and the space they use. No "keep everything" switch: it would be the one setting that fills the browser's storage.
 
 ## Patterns
 - Patterns to follow: settings as a quiet sheet over the page, applied live; a single round control that opens into a bar; themes named for a mood, not a hex; writing tools on the selection, not in a toolbar; a calm one-line serif sentence for empty and closing states.
@@ -170,6 +170,8 @@ Open — treat as undesigned, not as solved by a familiar pattern:
 - Settings areas not yet drawn: Appearance, Export, About & privacy.
 - Reordering chapters and Collections (folders) are after the MVP.
 - A photo placed inside a piece.
+- Installing: an invitation to add the app to the Home Screen (or install it), and an area for it in Settings. What it must say is in docs/decisions/0010; how it looks is not designed.
+- The line shown when a save fails ("Can't save right now. Your words are still here." with *Save a copy*, docs/decisions/0010): its place and look.
 
 Paged writing is new ground: typing on a paged page, a phone keyboard, Markdown, an empty first page and a long title being written all still need designing.
 

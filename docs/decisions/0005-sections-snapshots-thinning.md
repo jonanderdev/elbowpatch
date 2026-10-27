@@ -12,6 +12,7 @@ A journal is one piece with a page per day, and a book is one piece made of chap
 - A version holds the full Markdown of **one section**, and is immutable (0001).
 - A piece also has immutable **outline** versions: the ordered list of its sections and their titles. A new outline version is written when a section is added, split (typing `#` mid-chapter), removed or renamed.
 - The piece at any moment = the outline at that moment + each section's latest version at or before it.
+- *Updated 2026-10-27:* a section's newest version is found by following `parentId` from its first version, not by time. `createdAt` is never earlier than the previous version's (now, or the previous plus 1 ms, whichever is later). Device clocks jump; timestamps label moments, they do not order them.
 
 ### Titles
 *Updated 2026-10-27.*
@@ -22,7 +23,7 @@ A journal is one piece with a page per day, and a book is one piece made of chap
 
 ### The working copy
 *Updated 2026-10-27.*
-- Each section has one mutable **working copy**: `{ sectionId, content, title?, baseVersionId, updatedAt }`. It is written about a second after typing stops, in the text or in a chapter's title, so a crash loses about a second at most.
+- Each section has one mutable **working copy**: `{ sectionId, content, title?, baseVersionId, updatedAt }`. It is written about a second after typing stops, and at least every 5 seconds while typing goes on, in the text or in a chapter's title, so a crash loses a few seconds at most.
 - A snapshot moment turns working copies into versions in the same transaction, and writes one new outline version if any title changed.
 - On launch, a working copy that differs from its base version becomes a version first. This is how text left by a crash enters history.
 
@@ -45,5 +46,6 @@ Never removed: the latest version of each section, its first version, versions m
 ## Consequences
 - Storage stays bounded: an active section holds at most about 200 versions, and a finished day or chapter very few.
 - "Bring this back" can restore one day or one chapter, not a whole year.
+- Thinning works per section, so after a while the whole piece "at a moment" is each section as it was at or before that moment, which may never have been one exact moment. The section on screen in the Time Machine is always exact: the tape steps through its own versions.
 - Thinning is the one place the app deletes history. It lives in `domain/` and carries the heaviest tests.
 - With a connector that keeps history, the far past also lives there (0004).
