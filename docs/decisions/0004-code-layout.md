@@ -7,7 +7,7 @@ A landing site may come later and may deploy on its own subdomain. Business logi
 
 ## Decision
 - The app lives in `app/`. A future landing site goes in `site/`, sharing fonts and colours through DESIGN.md, not a shared package. Workspaces only once `site/` exists.
-- `prototype/` stays untouched as a reference until the new page matches it, then it is deleted.
+- `prototype/` stays untouched as a reference until the new page matches it, then it is deleted. *Updated 2026-10-27:* deleted early, once every screen was in the Figma file and every decision in DESIGN.md. Its paging code (a CSS multi-column flow, one column per page) is in git history if `page/` wants to look at it.
 - Inside `app/src/`:
 
 ```
