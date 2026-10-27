@@ -10,10 +10,11 @@ Date: 2026-10-27 · Status: accepted
 
 ## The design
 *Added 2026-10-27.* DESIGN.md (The Time Machine) holds the screens' rules; these are the decisions behind them.
-- **One section at a time.** The scrubber moves through the versions of the section in view, one step per moment. A whole book on one timeline would be thousands of moments, most of them changing a chapter not on screen.
-- **Bring this back names its scope** ("Bring this chapter back", "Bring this day back") and replaces that section only. It does not ask first: the text it replaces stays a version and is never thinned (0005).
-- **Removed chapters come back through the outline.** The page count opens Contents as it was at that moment, from the outline version of then, so a chapter removed since can be opened and brought back to its old place, with its old title.
-- **Bring this part back** inserts a selected passage where it stood, anchored like a reading place (paragraph, offset, a few words), or at the end of the section. It only inserts, so it needs no merging.
+- **One moment, the whole piece.** The Time Machine stands at a point in time and pages through the whole piece as it was then, crossing chapters as reading does. The scrubber — a tape of ticks under a fixed hairline — steps through the moments when the section on screen changed, so a novel's timeline is not thousands of steps that change a chapter not on screen. (Revised the same day from "one section at a time", which left no way to reach another chapter but an unlabelled page count.)
+- **Navigation at the top, actions at the foot.** *Contents* (or *Days*) sits at the top right, mirroring *Now*, and opens that sheet as it was. The foot holds only the moment, the tape and the two actions.
+- **Bring … back names its scope** ("Bring chapter back", "Bring day back", "Bring essay back") and replaces that section only. It does not ask first: the text it replaces stays a version and is never thinned (0005).
+- **Removed chapters come back through the outline.** *Contents* opens as it was at that moment, from the outline version of then, so a chapter removed since can be opened and brought back to its old place, with its old title.
+- **Bring part back** inserts a selected passage where it stood, anchored like a reading place (paragraph, offset, a few words), or at the end of the section. It only inserts, so it needs no merging.
 - **The shortcut is ⌘/Ctrl + Alt + Z.** ⌘/Ctrl + H and ⌘/Ctrl + Y open the browser's own history.
 - **Keep a copy stays one section** in v1. A copy of a whole book as it was is possible from the data (the outline then, plus each chapter's version then) and waits with the drafts work after dogfooding.
 

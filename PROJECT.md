@@ -84,12 +84,12 @@ the chapters with the page each starts on. Reordering chapters by drag and a bin
   on close). Users never press "save" or "commit".
 - A **timeline** lets the user move back through a piece's history as a story, not a diff list:
   visually calm, with a scrubber, dates written in plain language ("Tuesday evening", "14 October").
-  It travels through one section at a time: a chapter, a day, or an essay. Later, perhaps, a gentle
+  It shows the whole piece at one moment; bringing back acts on one section: a chapter, a day, or an essay. Later, perhaps, a gentle
   view of what changed (words added and removed shown softly, never a code-style diff); v1 shows the
   old version only (docs/decisions/0008, DESIGN.md).
-- Actions in plain language: **Look back**, **Bring this back** (restores that section as the current
-  text but never destroys later history), **Bring this part back** (inserts a selected passage, replacing
-  nothing), **Keep a copy** (as a new draft).
+- Actions in plain language: **Look back**, **Bring chapter / day / essay back** (restores that section as
+  the current text but never destroys later history), **Bring part back** (inserts a selected passage,
+  replacing nothing), **Keep a copy** (as a new draft).
 - Alternate versions ("drafts") exist so a writer can try a different ending without fear. Comparing and
   choosing is the primary interaction. Merging two drafts is NOT a v1 goal.
 - History is **append-only** from the user's view. Restoring never deletes anything.
@@ -282,7 +282,7 @@ Success = the maintainer uses it every day. An audience is a bonus.
 - [x] Fonts, dependencies, state and URLs (0011)
 - [x] License: MIT
 - [x] How the Time Machine appears: from the tools bar or a shortcut, full screen (0008)
-- [x] The Time Machine screen: one section at a time, bring back a chapter, a day or a part (0008, DESIGN.md)
+- [x] The Time Machine screen: the whole piece at one moment, a tape of moments, bring back a chapter, a day or a part (0008, DESIGN.md)
 - [x] What one version holds: one section, with an outline for structure (0005)
 - [x] Thinning: by age, local only (0005)
 - [x] Journal: one piece, a page per day
