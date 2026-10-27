@@ -4,7 +4,7 @@ The look of Elbowpatch. Builders follow this file. PROJECT.md §9 still applies:
 
 ## Sources of truth
 - **This file** holds the direction and the rules: what the look is, why, and what it never does. It wins on principle.
-- **The Figma file** holds the exact screens and components — every screen in paper and night, phone and desktop, built from shared components, colour variables and text styles: [Elbowpatch on Figma](https://www.figma.com/design/yRuD5MDnH3WHbNjqMEUPpB/Elbowpatch). Builders take sizes, spacing, states and copy from there.
+- **The Figma file** holds the exact screens and components — every screen in paper and night, phone and desktop, built from shared components, colour variables and text styles: [Elbowpatch on Figma](https://www.figma.com/design/yRuD5MDnH3WHbNjqMEUPpB/Elbowpatch) — open to anyone to view. Builders take sizes, spacing, states and copy from there.
 - **When they disagree,** the rule here wins until both are put right. A change to the look updates this file (if it changes a rule) and the Figma file (if it changes a screen) together, never one alone.
 - The first prototype was retired on 2026-10-27: its screens live in the Figma file, its decisions in this file. Motion was never reviewed in it, so the timings below are proposals (see Motion).
 
