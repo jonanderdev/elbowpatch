@@ -170,6 +170,8 @@ Open — treat as undesigned, not as solved by a familiar pattern:
 - Settings areas not yet drawn: Appearance, Export, About & privacy.
 - Reordering chapters and Collections (folders) are after the MVP.
 - A photo placed inside a piece.
+- Installing: an invitation to add the app to the Home Screen (or install it), and an area for it in Settings. What it must say is in docs/decisions/0010; how it looks is not designed.
+- The line shown when a save fails ("Can't save right now. Your words are still here." with *Save a copy*, docs/decisions/0010): its place and look.
 
 Paged writing is new ground: typing on a paged page, a phone keyboard, Markdown, an empty first page and a long title being written all still need designing.
 

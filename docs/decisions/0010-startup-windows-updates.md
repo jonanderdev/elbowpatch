@@ -17,6 +17,18 @@ The launch screen (§) shows while the app:
 
 The launch screen leaves once the first page is ready. Thinning runs afterwards, when idle. Persistent storage (`navigator.storage.persist()`) is requested after the first piece is written, not at launch, because some browsers ask the user.
 
+### A save never fails silently
+*Added 2026-10-27.* Safari on iOS can drop the database connection when the app goes to the background, and a full disk fails a save the same way.
+- The store reopens its connection when the app comes back (`visibilitychange`, `pageshow`) and retries.
+- Every write can run twice safely: same ids, same result.
+- If a save still cannot complete, the text stays in memory and one calm line shows on the page: "Can't save right now. Your words are still here." with *Save a copy*, which downloads the piece as `.md`.
+
+### Keeping the browser from clearing it
+*Added 2026-10-27.* Safari deletes a site's storage after 7 days of browsing without a visit; an app added to the Home Screen keeps its own count, reset each time it opens, and is the one Safari grants persistent storage to.
+- The app encourages installing it (Add to Home Screen on Safari, Install elsewhere), and, once sync exists, connecting a place.
+- In Safari outside the Home Screen, the first-run note says it plainly: "Safari clears this after 7 days away. Add Elbowpatch to your Home Screen, or export now and then."
+- How the invitation looks, and its area in Settings, are not designed yet (DESIGN.md, Gaps).
+
 ### One window writes a piece
 - One window at a time holds a lock per piece (the Web Locks API).
 - Another window opening that piece shows it read-only, with one quiet line: "Open in another window · Write here". *Write here* takes the lock; the first window saves and becomes read-only.
