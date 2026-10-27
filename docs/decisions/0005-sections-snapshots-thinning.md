@@ -13,8 +13,20 @@ A journal is one piece with a page per day, and a book is one piece made of chap
 - A piece also has immutable **outline** versions: the ordered list of its sections and their titles. A new outline version is written when a section is added, split (typing `#` mid-chapter), removed or renamed.
 - The piece at any moment = the outline at that moment + each section's latest version at or before it.
 
+### Titles
+*Updated 2026-10-27.*
+- A chapter's title is a field, written in its own input, not in the text. It lives in the outline, so renaming a chapter writes a new outline version and the Time Machine remembers old titles.
+- The piece's own title (an essay's, a book's, a journal's name) lives in the outline too, so the Time Machine shows the title as it was. The piece record keeps a copy of the current title for the library; edits save there like a working copy, and the next moment writes the outline version.
+- A section's Markdown holds its body only. An essay's title is the piece title; a journal day's title is its date.
+- Export writes `# Title` at the top of each chapter's file, and import reads it back as the title (0007).
+
+### The working copy
+*Updated 2026-10-27.*
+- Each section has one mutable **working copy**: `{ sectionId, content, title?, baseVersionId, updatedAt }`. It is written about a second after typing stops, in the text or in a chapter's title, so a crash loses about a second at most.
+- A snapshot moment turns working copies into versions in the same transaction, and writes one new outline version if any title changed.
+- On launch, a working copy that differs from its base version becomes a version first. This is how text left by a crash enters history.
+
 ### When versions are written
-- The current text is autosaved on every short pause, so a crash loses about a second at most.
 - A snapshot moment comes on 3 seconds idle, on blur or the page hidden, on switching pieces, and on "keep this moment". At each moment, every section whose text changed since its last version gets a new version, all with the same timestamp. A section that did not change gets nothing.
 
 ### Thinning (local only)

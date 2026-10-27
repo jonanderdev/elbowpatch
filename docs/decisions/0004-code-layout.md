@@ -12,16 +12,18 @@ A landing site may come later and may deploy on its own subdomain. Business logi
 
 ```
 domain/     pieces, versions, snapshot rules, put away, export/import,
-            the sync contract (Connector interface, "what is unsynced")
-            — plain TypeScript, no browser APIs, no React
+            Markdown reading and writing, the sync contract
+            (Connector interface, "what is unsynced")
+            — plain TypeScript, no browser APIs, no React (0009)
 adapters/   the outside world behind domain interfaces:
-            indexeddb store, in-memory store for tests, later github, ...
-page/       paging maths, DOM ↔ Markdown, caret — plain TypeScript
+            indexeddb store, in-memory store for tests, window lock,
+            the moment scheduler, later github, ...
+page/       ProseMirror, paging maths, Markdown tree ↔ editor, caret
 ui/         React: Library, Page, Tools, Time Machine, Settings
 main.tsx    wires adapters → domain → ui
 ```
 
-- Imports point inward: `ui` → `domain`, `page`; `adapters` → `domain`; `domain` → nothing outside itself.
+- Imports point inward: `ui` → `domain`, `page`; `adapters` → `domain`; `page` → `domain` (the Markdown tree); `domain` → nothing outside itself.
 
 ## The connector contract (built after the dogfooding gate)
 - Each connector declares whether it **keeps history**.
@@ -29,6 +31,9 @@ main.tsx    wires adapters → domain → ui
   - No (e.g. WebDAV, S3): push the current files plus a `history/` folder mirroring the local, thinned versions.
 - Pushes run every few minutes while writing, plus on pause and close, not on every local snapshot, to stay within provider rate limits.
 - The Time Machine shows local versions offline, and fills in older moments from the connector when online.
+
+### Open question, for when sync is built
+Thinning (0005) deletes local versions that a connector which keeps history still has. Comparing sets of ids (0001) would then pull them back down. To decide with the sync work: for example a list of thinned ids, or a rule that old versions only travel one way. Nothing is built for it now.
 
 ## Consequences
 - A new connector is a new adapter. The domain decides what to send and how conflicts are kept ("keep both", never discard).

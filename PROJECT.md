@@ -157,13 +157,15 @@ escape hatch and the answer to "what if this app disappears" (docs/decisions/000
 - **Local-first.** IndexedDB is the working store. Everything works offline.
 - **Storage-agnostic sync.** The editor and timeline know nothing about GitHub.
 
-### 6.2 Stack (decided, see docs/decisions/0002–0004)
+### 6.2 Stack (decided, see docs/decisions/0002–0004, 0009–0011)
 - TypeScript, Vite, `vite-plugin-pwa` (Workbox) for the service worker
-- UI: React. The page is an uncontrolled component; business logic lives outside the UI
-- Editor: our own paged `contenteditable` that stores Markdown
-- Storage: IndexedDB via a thin wrapper (e.g. `idb`), behind a domain interface
+- UI: React's API, run on Preact. The page is an uncontrolled component; business logic lives outside the UI
+- Editor: ProseMirror on our own paged view (CSS columns), one section at a time, storing Markdown
+- Storage: IndexedDB via `idb`, behind a domain interface; a versioned schema with migrations
 - Code: `app/src/{domain,adapters,page,ui}`; a future landing site in `site/`
-- Tests: Vitest for the domain and page module, Playwright for key flows
+- Domain: plain functions in the product's words, behind ports; no browser types compile there (0009)
+- Tests: Vitest for the domain and paging logic, Playwright for real layout and key flows
+- Fonts served by the app, no CDN; the full dependency list is in 0011
 - No runtime dependencies without a reason; the bundle should stay small and fast
 
 ### 6.3 Data model (sketch)
@@ -171,9 +173,13 @@ Decided in docs/decisions/0005.
 - `Piece { id, title, createdAt, updatedAt, kind: 'journal' | 'essay' | 'book' }`
 - `Section` = a journal day, a book chapter, or the whole of an essay.
 - `Version { id, pieceId, sectionId, parentId, createdAt, content, label? }`: one section's full
-  Markdown. **Immutable** and append-only; ids are UUIDs.
-- `Outline { id, pieceId, createdAt, sections: [{ sectionId, title }] }`: the piece's structure, also
-  immutable. The piece at a moment = outline + each section's latest version at or before it.
+  Markdown (its body; titles are not in the text). **Immutable** and append-only; ids are UUIDs.
+- `Outline { id, pieceId, createdAt, title, sections: [{ sectionId, title }] }`: the piece's structure,
+  its title and its chapter titles, also immutable. `Piece.title` is a copy of the latest, for the library. The piece at a moment = outline + each section's latest version at
+  or before it.
+- `Working { sectionId, content, title?, baseVersionId, updatedAt }`: the one mutable copy of a
+  section's text and title, saved about a second after typing stops; a moment turns it into a
+  version, and a changed title into a new outline version.
 - Snapshot policy: on 3 s idle, blur, switching pieces and "keep this moment", for each changed section.
 - Local thinning: every version for the last hour, then one per hour (day), per day (month), per week
   (year), per month (older). Never thinned: latest, first, labeled, and the one before a restore.
@@ -267,8 +273,11 @@ Success = the maintainer uses it every day. An audience is a bonus.
 ## 11. Open questions (resolve and record decisions)
 
 - [x] History engine: our own immutable versions (0001)
-- [x] UI: React (0002)
-- [x] Editor: our own paged contenteditable (0003)
+- [x] UI: React's API on Preact (0002)
+- [x] Editor: ProseMirror on our own paged view (0003)
+- [x] Domain shape: plain functions behind ports, compiler-enforced (0009)
+- [x] Startup, one writing window, updates, stored format (0010)
+- [x] Fonts, dependencies, state and URLs (0011)
 - [x] License: MIT
 - [x] How the Time Machine appears: from the tools bar or a shortcut, full screen (0008)
 - [x] What one version holds: one section, with an outline for structure (0005)
