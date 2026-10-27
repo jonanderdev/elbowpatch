@@ -1,6 +1,10 @@
-<h1 align="center"><img src="docs/brand/logo.svg" alt="Elbowpatch" width="300" height="300"></h1>
+<div align="center">
+  <p><img src="docs/brand/logo.svg" alt="Elbowpatch" width="200"></p>
+  <p><strong>A quiet place to write, with a memory.</strong></p>  
+  <p><strong>Local-first and private: your words stay close, and every draft is kept safe.</strong></p>
+</div>
 
-A quiet place to write, with a memory. Local-first and private: your words stay close, and every draft is kept safe.
+***
 
 - [PROJECT.md](PROJECT.md): the idea, what it does and what it will not do.
 - [DESIGN.md](DESIGN.md): the look — the calm of a minimalist e-reader, but you are writing it. The exact screens and components are in Figma, linked from there.
