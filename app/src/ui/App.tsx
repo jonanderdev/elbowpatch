@@ -6,7 +6,7 @@ import type { Held, WriterLock } from '../domain/ports'
 import { Library } from './Library'
 import { download } from './download'
 import { Page, type Opened } from './Page'
-import { unsaved, useUnsaved } from './unsaved'
+import { unsaved } from './unsaved'
 
 const LAST = 'elbowpatch.last'
 
@@ -16,6 +16,8 @@ function useRoute(): [string, (to: string) => void] {
   useEffect(() => {
     const on = () => setRoute(location.hash.slice(1) || '/')
     window.addEventListener('hashchange', on)
+    // A change between the first read and now would otherwise be missed.
+    on()
     return () => window.removeEventListener('hashchange', on)
   }, [])
   const go = useCallback((to: string) => {
@@ -32,7 +34,6 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
   const [pieces, setPieces] = useState<Piece[]>([])
   const [opened, setOpened] = useState<Opened | null>(null)
   const today = isoDay(new Date())
-  const waiting = useUnsaved()
 
   const refresh = useCallback(async () => setPieces(await library(deps)), [deps])
 
@@ -49,8 +50,8 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
         const placed = piece.place && piece.sections.some((s) => s.sectionId === piece.place!.sectionId)
         sectionId = placed ? piece.place!.sectionId : piece.sections[0]!.sectionId
       }
-      const content = found.sections.find((s) => s.sectionId === sectionId)?.content ?? ''
-      return { piece, sectionId, content }
+      const section = found.sections.find((s) => s.sectionId === sectionId)
+      return { piece, sectionId, content: section?.content ?? '', updatedAt: section?.updatedAt }
     },
     [deps],
   )
@@ -62,7 +63,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
     void (async () => {
       try {
         await recover(deps)
-        await replayJournal(deps)
+        await replayJournal(deps, lock)
       } catch {
         // Nothing to recover is not a reason to stop; a store that cannot open shows on the first save.
       }
@@ -127,26 +128,36 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
     if (!pieceId) return
     let alive = true
     setWriter('waiting')
-    void lock.hold(pieceId, onAsked).then((h) => {
+    void (async () => {
+      let h = await lock.hold(pieceId, onAsked)
+      // Back to a piece this window just left: its lock goes once the last save there settles.
+      if (!h && alive) {
+        await settled(closing.current)
+        if (alive) h = await lock.hold(pieceId, onAsked)
+      }
       if (!alive) return h?.release()
       if (h) follow(h)
       else setWriter('elsewhere')
-    })
+    })()
     return () => {
       alive = false
       const h = held.current
       held.current = null
-      // Let go only after the closing page's last save, so no other window writes alongside it.
-      // (A timeout: the page's own cleanup, which sets `closing`, runs after this one.)
-      setTimeout(() => void closing.current.finally(() => h?.release()), 0)
+      // Let go after the closing page's last save, so no other window writes alongside it,
+      // but never wait on a stuck save for long. (A timeout: the page's cleanup, which sets
+      // `closing`, runs after this one.)
+      setTimeout(() => void settled(closing.current).then(() => h?.release()), 0)
     }
   }, [pieceId])
 
   const writeHere = async () => {
-    if (!pieceId) return
-    const h = await lock.take(pieceId, onAsked)
+    const id = pieceId
+    if (!id) return
+    const h = await lock.take(id, onAsked)
+    // Moved on to another piece while waiting: this one is not needed now.
+    if (pieceIdNow.current !== id) return h.release()
     // The other window has saved: start from what it left.
-    const fresh = await open(pieceId)
+    const fresh = await open(id)
     follow(h)
     if (fresh) setOpened(fresh)
   }
@@ -188,14 +199,6 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
             setPieces((all) => (all.some((p) => p.id === piece.id) ? all.map((p) => (p.id === piece.id ? piece : p)) : [piece, ...all]))
           }}
         />
-      )}
-      {inLibrary && waiting.length > 0 && (
-        <div className="line surface library-line" role="alert">
-          Can't save right now. Your words are still here.
-          <button type="button" onClick={() => waiting.forEach((u) => download(u.name, u.markdown))}>
-            Save a copy
-          </button>
-        </div>
       )}
       {inLibrary && (
         <Library
@@ -268,19 +271,43 @@ function askToPersist() {
 
 /**
  * Words the last session could not store before it closed (see Page, journal)
- * go into the database first. One older than its section's stored copy was
- * overtaken by another window: it is not applied, and waits for Save a copy.
+ * go into the database first, under the piece's lock (one writer, 0010). An
+ * entry already stored is dropped. One older than its section's stored copy
+ * was overtaken elsewhere: it is not applied, and waits for Save a copy.
  */
-async function replayJournal(deps: Deps) {
+async function replayJournal(deps: Deps, lock: WriterLock) {
   for (const u of unsaved.all()) {
-    const working = await deps.store.transaction((tx) => tx.working(u.sectionId))
-    if (working && working.updatedAt > u.at) continue
-    // The journal's piece is only a draft: write() keeps what is stored and adds a section it lacks.
-    await write(deps, u.piece, u.sectionId, u.markdown)
-    if (u.title !== null) {
-      if (u.piece.kind === 'essay') await rename(deps, u.piece, u.title)
-      else await renameSection(deps, u.piece, u.sectionId, u.title)
+    const stored = await deps.store.transaction(async (tx) => ({ working: await tx.working(u.sectionId), piece: await tx.piece(u.pieceId) }))
+    const sameText = stored.working?.content === u.markdown
+    const sameTitle = u.title === null || titleIn(stored.piece, u.sectionId) === u.title
+    if (sameText && sameTitle) {
+      unsaved.saved(u.sectionId)
+      continue
     }
-    unsaved.saved(u.sectionId)
+    if (stored.working && stored.working.updatedAt > u.at) continue
+    const held = await lock.hold(u.pieceId, async () => {})
+    if (!held) continue // another window writes it now; the words wait for Save a copy
+    try {
+      // The journal's piece is only a draft: write() keeps what is stored and adds a section it lacks.
+      await write(deps, u.piece, u.sectionId, u.markdown)
+      // A title only if it changed here and nothing renamed the piece since.
+      if (u.title !== null && (!stored.piece || stored.piece.updatedAt <= u.at)) {
+        if (u.piece.kind === 'essay') await rename(deps, u.piece, u.title)
+        else await renameSection(deps, u.piece, u.sectionId, u.title)
+      }
+      unsaved.saved(u.sectionId)
+    } finally {
+      held.release()
+    }
   }
+}
+
+function titleIn(piece: Piece | undefined, sectionId: string): string | undefined {
+  if (!piece) return undefined
+  return piece.kind === 'essay' ? piece.title : piece.sections.find((s) => s.sectionId === sectionId)?.title
+}
+
+/** A promise that settled, or two seconds, whichever comes first; never rejects. */
+function settled(p: Promise<unknown>): Promise<void> {
+  return Promise.race([p.then(() => {}, () => {}), new Promise<void>((r) => setTimeout(r, 2000))])
 }

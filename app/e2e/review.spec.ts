@@ -110,3 +110,35 @@ test('words typed just before closing are there on the next launch', async ({ pa
   await expect(page.locator('.body')).toContainText('The last words.')
   await expect(page.locator('.title')).toHaveText('Closed quickly')
 })
+
+test('words already stored never leave a "Can\'t save" line behind', async ({ page }) => {
+  await newEssay(page, 'Stored')
+  await page.keyboard.type('All stored.')
+  await saved(page, 'All stored.')
+  // A journal entry for words that did reach the database (the save committed as the page unloaded).
+  await page.evaluate(() => {
+    const key = Object.keys(localStorage).find((k) => k.startsWith('elbowpatch.unsaved.'))
+    if (key) localStorage.removeItem(key)
+  })
+  const sectionId = await page.evaluate(
+    () =>
+      new Promise<string>((done) => {
+        const open = indexedDB.open('elbowpatch')
+        open.onsuccess = () => {
+          const all = open.result.transaction('working').objectStore('working').getAll()
+          all.onsuccess = () => done((all.result as { sectionId: string }[])[0]!.sectionId)
+        }
+      }),
+  )
+  await page.evaluate((sectionId) => {
+    localStorage.setItem(
+      `elbowpatch.unsaved.${sectionId}`,
+      JSON.stringify({ piece: { id: 'p', kind: 'essay', sections: [] }, pieceId: 'p', sectionId, name: 'Stored.md', markdown: 'All stored.', title: null, at: Date.now() }),
+    )
+  }, sectionId)
+  await page.reload()
+  await page.goto('./#/')
+  await expect(page.locator('.library')).toBeVisible()
+  await expect(page.getByRole('alert')).toHaveCount(0)
+  expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('elbowpatch.unsaved.')).length)).toBe(0)
+})

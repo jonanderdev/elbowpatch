@@ -12,6 +12,8 @@ export interface OpenSection {
   sectionId: string
   title: string
   content: string
+  /** When this section's text was last stored (its working copy, else its latest version). */
+  updatedAt?: number
 }
 
 /**
@@ -167,15 +169,16 @@ export function openPiece(deps: Pick<Deps, 'store'>, pieceId: string): Promise<{
     const piece = await tx.piece(pieceId)
     if (!piece) return undefined
     const sections: OpenSection[] = []
-    for (const s of piece.sections) sections.push({ ...s, content: await currentText(tx, s.sectionId) })
+    for (const s of piece.sections) sections.push({ ...s, ...(await current(tx, s.sectionId)) })
     return { piece, sections }
   })
 }
 
-async function currentText(tx: Tx, sectionId: string): Promise<string> {
+async function current(tx: Tx, sectionId: string): Promise<{ content: string; updatedAt: number }> {
   const working = await tx.working(sectionId)
-  if (working) return working.content
-  return latest(await tx.versionsOf(sectionId))?.content ?? ''
+  if (working) return { content: working.content, updatedAt: working.updatedAt }
+  const version = latest(await tx.versionsOf(sectionId))
+  return { content: version?.content ?? '', updatedAt: version?.createdAt ?? 0 }
 }
 
 /** Pieces in the library, most recent first. Put-away pieces wait elsewhere (0006). */

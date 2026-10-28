@@ -11,6 +11,8 @@ import startEssayNight from './icons/start-essay-night.svg'
 import startJournal from './icons/start-journal.svg'
 import startJournalNight from './icons/start-journal-night.svg'
 import { theme, update, useSettings } from './settings'
+import { download } from './download'
+import { unsaved, useUnsaved } from './unsaved'
 import { useUpdateWaiting } from './updates'
 
 interface Props {
@@ -108,12 +110,15 @@ export function Library({ pieces, last, today, onOpen, onNew, onRename, onExport
         )}
       </div>
       <NewPiece today={today} onNew={onNew} />
-      <UpdateLine />
-      {line && (
-        <div className="line surface library-line" role="status">
-          {line}
-        </div>
-      )}
+      <div className="library-lines">
+        <UnsavedLine />
+        <UpdateLine />
+        {line && (
+          <div className="line surface" role="status">
+            {line}
+          </div>
+        )}
+      </div>
       {exporting && (
         <ExportSheet
           title={exporting.title.trim() || 'Untitled'}
@@ -129,12 +134,35 @@ export function Library({ pieces, last, today, onOpen, onNew, onRename, onExport
   )
 }
 
+/** Words a closed page could not store (0010): said here too, since the page that said it is gone. */
+function UnsavedLine() {
+  const waiting = useUnsaved()
+  if (waiting.length === 0) return null
+  return (
+    <div className="line surface" role="alert">
+      Can't save right now. Your words are still here.
+      <button
+        type="button"
+        onClick={() =>
+          waiting.forEach((u) => {
+            download(u.name, u.markdown)
+            // A copy is in the writer's hands: it no longer waits here.
+            unsaved.saved(u.sectionId)
+          })
+        }
+      >
+        Save a copy
+      </button>
+    </div>
+  )
+}
+
 /** Only in the library, never on the page: restarting here cannot cut off a sentence (0010). */
 function UpdateLine() {
   const restart = useUpdateWaiting()
   if (!restart) return null
   return (
-    <div className="line surface library-line" role="status">
+    <div className="line surface" role="status">
       A new version is ready ·
       <button type="button" onClick={restart}>
         Restart
@@ -387,7 +415,26 @@ function PieceRow(props: {
         </button>
       )}
       {menuOpen && (
-        <div ref={menu} className="bar surface piece-menu" role="menu" aria-label={piece.title.trim() || 'Untitled'}>
+        <div
+          ref={menu}
+          className="bar surface piece-menu"
+          role="menu"
+          aria-label={piece.title.trim() || 'Untitled'}
+          onKeyDown={(e) => {
+            const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0
+            if (!step) return
+            e.preventDefault()
+            const items = [...menu.current!.querySelectorAll('button')]
+            const at = items.indexOf(document.activeElement as HTMLButtonElement)
+            items[(at + step + items.length) % items.length]?.focus()
+          }}
+          onBlur={(e) => {
+            // Tabbing out closes it, as a press elsewhere does. (Safari does not focus a clicked
+            // button, so a click inside blurs to nothing: that is not leaving.)
+            const to = e.relatedTarget as Node | null
+            if (to && !menu.current?.contains(to)) onMenu(false)
+          }}
+        >
           <button
             type="button"
             role="menuitem"
