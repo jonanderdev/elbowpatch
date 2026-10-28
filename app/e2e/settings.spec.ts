@@ -1,0 +1,94 @@
+import { expect, test, type Page } from '@playwright/test'
+import { saved } from './helpers'
+
+async function essay(page: Page, title: string, text: string) {
+  await page.goto('./#/')
+  if (await page.locator('.start.essay').count()) await page.locator('.start.essay').click()
+  else {
+    await page.getByRole('button', { name: 'New piece' }).click()
+    await page.getByRole('toolbar', { name: 'New piece' }).getByRole('button', { name: 'Essay' }).click()
+  }
+  await expect(page.locator('.title')).toBeFocused()
+  await page.keyboard.type(title)
+  await page.keyboard.press('Enter')
+  await page.keyboard.type(text)
+  await saved(page, text)
+  await page.locator('.library-link').click()
+  await expect(page.locator('.continue')).toContainText(text)
+}
+
+test('export everything, and bring it all back in another browser', async ({ page, browser }) => {
+  await essay(page, 'Kept forever', 'First words.')
+  await page.locator('.continue').click()
+  await page.locator('.body p').last().click()
+  await page.keyboard.press('End')
+  await page.keyboard.type(' More words.')
+  await saved(page, 'More words.')
+  await page.locator('.library-link').click()
+  await page.getByRole('button', { name: 'Settings' }).click()
+  await page.getByRole('button', { name: /Export & import/ }).click()
+  const download = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Export' }).click()
+  const file = await download
+  expect(file.suggestedFilename()).toMatch(/^Elbowpatch \d{1,2} \w+ \d{4}\.zip$/)
+  await expect(page.getByText(/^Everything is in Elbowpatch .*\.zip\.$/)).toBeVisible()
+  const path = await file.path()
+
+  // A browser that has never seen this app.
+  const other = await browser.newContext()
+  const fresh = await other.newPage()
+  await fresh.goto('./#/settings/export')
+  await fresh.locator('input[type=file]').setInputFiles(path)
+  await expect(fresh.getByText('1 piece added.')).toBeVisible()
+  // Importing it again adds nothing: never overwrites, never doubles.
+  await fresh.locator('input[type=file]').setInputFiles(path)
+  await expect(fresh.getByText('0 pieces added. 1 was already here.')).toBeVisible()
+  await fresh.goto('./#/')
+  await fresh.locator('.row', { hasText: 'Kept forever' }).click()
+  await expect(fresh.locator('.title')).toHaveText('Kept forever')
+  await expect(fresh.locator('.body')).toContainText('First words. More words.')
+  await other.close()
+})
+
+test('put away, undo; put away, bring back from Settings', async ({ page }) => {
+  await essay(page, 'Going away', 'Still here.')
+  await essay(page, 'Staying', 'Other.')
+  const row = page.locator('.row', { hasText: 'Going away' })
+  await row.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Put away' }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Put away for 30 days.' })).toBeVisible()
+  await expect(row).toHaveCount(0)
+  await page.getByRole('button', { name: 'Undo' }).click()
+  await expect(row).toBeVisible()
+
+  await row.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Put away' }).click()
+  await expect(row).toHaveCount(0)
+  await page.getByRole('button', { name: 'Settings' }).click()
+  await expect(page.getByRole('button', { name: /Put away 1 piece · the next goes in 30 days/ })).toBeVisible()
+  await page.getByRole('button', { name: /Put away/ }).click()
+  await expect(page.getByText('Essay · put away')).toBeVisible()
+  await page.getByRole('button', { name: 'Bring back' }).click()
+  await expect(page.getByText('Brought back to the library.')).toBeVisible()
+  await expect(page.getByText('Nothing is put away.')).toBeVisible()
+  await page.getByRole('button', { name: 'Settings' }).click()
+  await page.getByRole('button', { name: 'Library' }).click()
+  await page.locator('.row', { hasText: 'Going away' }).click()
+  await expect(page.locator('.body')).toContainText('Still here.')
+})
+
+test('a loose .md file comes in with its kind chosen first', async ({ page }) => {
+  await page.goto('./#/settings/export')
+  await page.locator('input[type=file]').setInputFiles(['e2e/fixtures/winter.md', 'e2e/fixtures/walk.md'])
+  const sheet = page.getByRole('dialog', { name: 'Import' })
+  await expect(sheet).toContainText('2 files')
+  await expect(sheet.getByRole('radiogroup', { name: 'Kind of winter' }).getByRole('radio', { name: 'Book' })).toHaveAttribute('aria-checked', 'true')
+  await expect(sheet.getByRole('radiogroup', { name: 'Kind of winter' }).getByRole('radio', { name: 'Journal' })).toHaveCount(0)
+  await expect(sheet.getByRole('radiogroup', { name: 'Kind of On walking' }).getByRole('radio', { name: 'Essay' })).toHaveAttribute('aria-checked', 'true')
+  await sheet.getByRole('button', { name: 'Import' }).click()
+  await expect(page.getByText('2 pieces added.')).toBeVisible()
+  await page.goto('./#/')
+  await expect(page.locator('.row', { hasText: 'winter' })).toContainText('2 chapters')
+  await page.locator('.row', { hasText: 'On walking' }).click()
+  await expect(page.locator('.body em')).toHaveText('short')
+})

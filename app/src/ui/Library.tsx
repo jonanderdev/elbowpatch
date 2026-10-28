@@ -25,6 +25,9 @@ interface Props {
   onRename(piece: Piece, title: string): void
   /** Downloads the piece as one .md file; gives the file name. */
   onExport(piece: Piece): Promise<string | undefined>
+  onPutAway(piece: Piece): Promise<void>
+  onRestore(piece: Piece): Promise<void>
+  onSettings(): void
 }
 
 const KINDS: { kind: Kind; group: string; word: string }[] = [
@@ -33,7 +36,7 @@ const KINDS: { kind: Kind; group: string; word: string }[] = [
   { kind: 'essay', group: 'Essays', word: 'Essay' },
 ]
 
-export function Library({ pieces, last, today, onOpen, onNew, onRename, onExport }: Props) {
+export function Library({ pieces, last, today, onOpen, onNew, onRename, onExport, onPutAway, onRestore, onSettings }: Props) {
   const settings = useSettings()
   const headingRef = useRef<HTMLHeadingElement>(null)
   useEffect(() => headingRef.current?.focus(), [])
@@ -47,6 +50,29 @@ export function Library({ pieces, last, today, onOpen, onNew, onRename, onExport
     const t = setTimeout(() => setLine(null), 4000)
     return () => clearTimeout(t)
   }, [line])
+  // "Put away for 30 days. Undo", for about 6 seconds; ⌘/Ctrl + Z undoes it too while it shows.
+  const [awayNow, setAwayNow] = useState<Piece | null>(null)
+  useEffect(() => {
+    if (!awayNow) return
+    const t = setTimeout(() => setAwayNow(null), 6000)
+    const undo = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+        e.preventDefault()
+        void undoPutAway()
+      }
+    }
+    window.addEventListener('keydown', undo)
+    return () => {
+      clearTimeout(t)
+      window.removeEventListener('keydown', undo)
+    }
+  }, [awayNow])
+  const undoPutAway = async () => {
+    if (!awayNow) return
+    const piece = awayNow
+    setAwayNow(null)
+    await onRestore(piece)
+  }
 
   return (
     <div className="library" role="main">
@@ -55,7 +81,10 @@ export function Library({ pieces, last, today, onOpen, onNew, onRename, onExport
           <h1 ref={headingRef} tabIndex={-1}>
             Library
           </h1>
-          {/* shortcut: the view switch and settings arrive with the shelf and the Settings views. */}
+          {/* shortcut: the view switch arrives with the shelf. */}
+          <div className="library-actions">
+            <IconButton icon="settings" label="Settings" quiet onClick={onSettings} />
+          </div>
         </div>
 
         {empty ? (
@@ -99,6 +128,12 @@ export function Library({ pieces, last, today, onOpen, onNew, onRename, onExport
                           setMenuFor(null)
                           setExporting(piece)
                         }}
+                        onPutAway={async () => {
+                          setMenuFor(null)
+                          // Never asks first: nothing is lost, and Undo is right there (0006).
+                          await onPutAway(piece)
+                          setAwayNow(piece)
+                        }}
                       />
                     ))}
                   </ul>
@@ -113,6 +148,14 @@ export function Library({ pieces, last, today, onOpen, onNew, onRename, onExport
       <div className="library-lines">
         <UnsavedLine />
         <UpdateLine />
+        {awayNow && (
+          <div className="line surface" role="status">
+            <span className="quiet-text">Put away for 30 days.</span>
+            <button type="button" onClick={() => void undoPutAway()}>
+              Undo
+            </button>
+          </div>
+        )}
         {line && (
           <div className="line surface" role="status">
             {line}
@@ -306,7 +349,6 @@ function meta(piece: Piece, today: string, now: number): string {
 /**
  * One piece in the list. Press and hold, right-click, or the menu key / Shift
  * + F10 opens the piece menu over it (DESIGN.md, The library).
- * shortcut: Put away joins the menu with Settings › Put away, its only way back after the Undo line.
  */
 function PieceRow(props: {
   piece: Piece
@@ -316,6 +358,7 @@ function PieceRow(props: {
   onOpen(): void
   onRename(title: string): void
   onExport(): void
+  onPutAway(): void
 }) {
   const { piece, menuOpen, onMenu } = props
   const [renaming, setRenaming] = useState(false)
@@ -449,6 +492,14 @@ function PieceRow(props: {
           <button type="button" role="menuitem" className="menu-item" onClick={props.onExport}>
             Export
           </button>
+          <span className="tooltip-anchor">
+            <button type="button" role="menuitem" className="menu-item" aria-describedby={`away-${piece.id}`} onClick={props.onPutAway}>
+              Put away
+            </button>
+            <span role="tooltip" id={`away-${piece.id}`} className="tooltip surface">
+              Hidden for 30 days. Bring it back from Settings.
+            </span>
+          </span>
           <span className="bar-separator" />
           <IconButton
             icon="close"

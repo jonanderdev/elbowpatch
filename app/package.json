@@ -12,6 +12,7 @@
     "e2e": "playwright test"
   },
   "dependencies": {
+    "fflate": "^0.8.3",
     "idb": "^8.0.4",
     "preact": "^11.1.0",
     "prosemirror-commands": "^1.7.2",

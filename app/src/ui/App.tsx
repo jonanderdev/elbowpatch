@@ -2,11 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Kind, Piece } from '../domain/model'
 import { pieceAsMarkdown } from '../domain/export'
 import { forgetPutAway, thin } from '../domain/thinning'
-import { library, newPiece, openPiece, recover, rename, renameSection, withDay, write, type Deps } from '../domain/pieces'
+import { library, newPiece, openPiece, putAway, recover, rename, renameSection, restore, withDay, write, type Deps } from '../domain/pieces'
 import type { Held, WriterLock } from '../domain/ports'
 import { Library } from './Library'
 import { download } from './download'
 import { Page, type Opened } from './Page'
+import { Settings } from './SettingsView'
 import { unsaved } from './unsaved'
 
 const LAST = 'elbowpatch.last'
@@ -36,7 +37,11 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
   const [opened, setOpened] = useState<Opened | null>(null)
   const today = isoDay(new Date())
 
-  const refresh = useCallback(async () => setPieces(await library(deps)), [deps])
+  const [everything, setEverything] = useState<Piece[]>([])
+  const refresh = useCallback(async () => {
+    setPieces(await library(deps))
+    setEverything(await deps.store.transaction((tx) => tx.pieces()))
+  }, [deps])
 
   const open = useCallback(
     async (pieceId: string): Promise<Opened | null> => {
@@ -85,7 +90,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
   // Following the route: a piece opens, or the library comes back over the page.
   useEffect(() => {
     if (!ready) return
-    if (route === '/') {
+    if (route === '/' || route.startsWith('/settings')) {
       void refresh()
       return
     }
@@ -176,7 +181,8 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
 
   if (!ready) return null
   // shortcut: Save a copy here holds the unsaved section only, not the whole piece.
-  const inLibrary = route === '/' || !opened
+  const inSettings = route.startsWith('/settings')
+  const inLibrary = (route === '/' || !opened) && !inSettings
   const last = pieces.find((p) => p.id === readLast() && p.place)
 
   return (
@@ -190,7 +196,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
           onWriteHere={() => void writeHere()}
           flushRef={flushPage}
           closingRef={closing}
-          covered={inLibrary}
+          covered={inLibrary || inSettings}
           onLibrary={async () => {
             // Save first, so the library already lists what was just written; never wait long for it.
             // The first save also opens the database; a stuck one never holds the writer on the page for long.
@@ -202,6 +208,18 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
             askToPersist()
             setPieces((all) => (all.some((p) => p.id === piece.id) ? all.map((p) => (p.id === piece.id ? piece : p)) : [piece, ...all]))
           }}
+        />
+      )}
+      {inSettings && (
+        <Settings
+          deps={deps}
+          area={route === '/settings/export' ? 'export' : route === '/settings/put-away' ? 'put-away' : 'list'}
+          pieces={everything}
+          go={go}
+          beforeExport={async () => {
+            await flushPage.current?.()
+          }}
+          onChanged={refresh}
         />
       )}
       {inLibrary && (
@@ -219,6 +237,18 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
               const fresh = await open(piece.id)
               if (fresh) setOpened(fresh)
             }
+          }}
+          onSettings={() => go('/settings')}
+          onPutAway={async (piece) => {
+            if (opened?.piece.id === piece.id) await flushPage.current?.()
+            await putAway(deps, piece.id)
+            // The page behind was this piece: it goes with it; Continue moves on.
+            if (opened?.piece.id === piece.id) setOpened(null)
+            await refresh()
+          }}
+          onRestore={async (piece) => {
+            await restore(deps, piece.id)
+            await refresh()
           }}
           onExport={async (piece) => {
             if (opened?.piece.id === piece.id) await flushPage.current?.()
