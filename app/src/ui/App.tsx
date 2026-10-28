@@ -328,7 +328,7 @@ async function replayJournal(deps: Deps, lock: WriterLock) {
   for (const u of unsaved.all()) {
     const stored = await deps.store.transaction(async (tx) => ({ working: await tx.working(u.sectionId), piece: await tx.piece(u.pieceId) }))
     const sameText = stored.working?.content === u.markdown
-    const sameTitle = u.title === null || titleIn(stored.piece, u.sectionId) === u.title
+    const sameTitle = (u.title === null || titleIn(stored.piece, u.sectionId) === u.title) && (!u.bookTitle || stored.piece?.title === u.bookTitle)
     if (sameText && sameTitle) {
       unsaved.saved(u.sectionId)
       continue
@@ -340,9 +340,12 @@ async function replayJournal(deps: Deps, lock: WriterLock) {
       // The journal's piece is only a draft: write() keeps what is stored and adds a section it lacks.
       await write(deps, u.piece, u.sectionId, u.markdown)
       // A title only if it changed here and nothing renamed the piece since.
-      if (u.title !== null && (!stored.piece || stored.piece.updatedAt <= u.at)) {
-        if (u.piece.kind === 'essay') await rename(deps, u.piece, u.title)
-        else await renameSection(deps, u.piece, u.sectionId, u.title)
+      if (!stored.piece || stored.piece.updatedAt <= u.at) {
+        if (u.title !== null) {
+          if (u.piece.kind === 'essay') await rename(deps, u.piece, u.title)
+          else await renameSection(deps, u.piece, u.sectionId, u.title)
+        }
+        if (u.bookTitle) await rename(deps, u.piece, u.bookTitle)
       }
       unsaved.saved(u.sectionId)
     } finally {

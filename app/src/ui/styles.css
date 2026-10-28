@@ -227,9 +227,12 @@ button {
 }
 
 .running-head {
+  /* Centred over the text column, with the same room either side: as wide as Library
+     and its gap, so it is balanced, never pushed by Library (DESIGN.md, Type). */
   position: absolute;
-  left: calc(var(--side) + 72px);
-  right: calc(var(--side) + 72px);
+  left: var(--side);
+  width: var(--measure-px);
+  padding: 0 64px;
   text-align: center;
   font-size: 13px;
   font-style: italic;
@@ -1187,4 +1190,12 @@ button {
   line-height: 1;
   color: var(--secondary);
   font-variant-numeric: lining-nums tabular-nums;
+}
+
+/* A book's title page: its title alone on page 1; chapter 1 opens on the next page. */
+.title.chapter-opening {
+  break-before: column;
+}
+.title.book-title {
+  break-after: column;
 }

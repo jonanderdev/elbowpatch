@@ -15,7 +15,7 @@ The look of Elbowpatch. Builders follow this file. PROJECT.md §9 still applies:
 - in one line: the calm of a minimalist e-reader — but you are writing it.
 - take: The reader's page — a title placed like a chapter opening, a narrow column, generous leading, a page number at the foot. Paging is the model: the page fills, then you turn to the next one; no long scroll. Earlier paragraphs dim at night while the current one stays lit. Nothing else on the page.
 - change: It is an editor, not a reader: pages form as you type and a new page begins when one fills, numbered like a book. The turn is a quiet slide, not a 3D paper curl. Reader features (search book, bookmarks, ratings, bylines) are gone; the only status is the page number, and the word count when the tools are open. White, black and grey only for now — no cream, no accent colour; more palettes later.
-- ownable: The elbow patch, as the page button — one small round button at the bottom right whose face is the current page number. It is the only shaped mark on the page and the only way into the tools; tapped, it opens into the tools bar. The round shape may carry into the logo. No mustache, no pipe, no illustration. (Replaced the earlier oval page marker on 2026-10-26, after seeing it rendered in the prototype.)
+- ownable: The elbow patch, as the page button — one small round button at the bottom right whose face is the current page number. It is the only raised mark on the page (*Library* is an outline, never a surface) and the only way into the tools; tapped, it opens into the tools bar. The round shape may carry into the logo. No mustache, no pipe, no illustration. (Replaced the earlier oval page marker on 2026-10-26, after seeing it rendered in the prototype.)
 - leave: Reader features; a 3D page curl; cream and amber; anything that reads like an existing writing app — monospace text, a signature accent colour.
 
 ## Colour
@@ -23,13 +23,14 @@ The look of Elbowpatch. Builders follow this file. PROJECT.md §9 still applies:
 Two themes, both first-class. Paper follows light system appearance, night follows `prefers-color-scheme: dark`. Every pair below was checked with WCAG 2.x contrast.
 
 ### Paper
-- #fbfbf9: the page — almost paperwhite.
-- #1f1f1f: titles and body text. 15.91:1 (AAA). Also the focus ring (a mark, ≥ 3:1).
-- #6e6e6e: secondary text (page number, word count, running head). 4.92:1 on the page, 5.10:1 on a surface (AA).
-- #ffffff: surfaces — the page button, the tools bar, the settings sheet, the selection menu — lifted by a soft shadow and a 1px hairline edge.
-- #e8e8e4: the hairline edge of a surface and the separator in the tools bar only — never text.
-- #f1f1ee: a pressed or hovered button.
-- #dcdcd6: text selection. Text on it 11.97:1.
+- #f3f3f0: the page — soft paper, a light grey rather than white, so a long session on a lit screen does not glare. (Changed on 2026-10-28 from #fbfbf9, which read as a bright white sheet.)
+- #1f1f1f: titles and body text. 14.83:1 (AAA). Also the focus ring (a mark, ≥ 3:1).
+- #676767: secondary text (page number, word count, running head). 5.09:1 on the page, 5.66:1 on a surface (AA).
+- #ffffff: surfaces — the page button, the tools bar, the settings sheet, the selection menu — lifted by a soft shadow and a 1px hairline edge. Against the grey page they stand clear of it.
+- #e2e2de: the hairline edge of a surface and the separator in the tools bar only — never text.
+- #c9c9c4: the outline of a word button (see Control) — never text. Decorative: its word already names it.
+- #e9e9e5: a pressed or hovered button. Title text on it 13.54:1, secondary 4.65:1.
+- #d6d6d0: text selection. Text on it 11.29:1.
 - Paper does not dim earlier paragraphs.
 
 ### Night
@@ -39,10 +40,12 @@ Two themes, both first-class. Paper follows light system appearance, night follo
 - #8c8c8a: secondary text and dimmed earlier paragraphs. 5.73:1 on the page, 5.17:1 on a surface (AA) — dimming never goes below this.
 - #1a1a1a: surfaces (as in paper), lifted by a deeper shadow.
 - #2a2a2a: the hairline edge of a surface and the bar separator only.
+- #3a3a38: the outline of a word button (as in paper).
 - #242424: a pressed or hovered button.
 - #3a3a38: text selection. Body on it 5.55:1, titles 9.12:1.
 
 ### Not defined yet
+- **Ink** — a third theme, greyer than paper, close to an e-ink screen; wanted, not in this pass. Checked so far: the page #eeeeea, text #1f1f1f 14.17:1, secondary #636363 5.16:1. Its surfaces, edges, tint and selection are still to set. (Seen beside soft paper on 2026-10-28: liked, but too dim to be the default in daylight.)
 - Further palettes (sepia, a warm night) — later, as named themes.
 
 ## Type
@@ -53,7 +56,7 @@ Two themes, both first-class. Paper follows light system appearance, night follo
 - Literata was chosen because it was made for long reading on screens.
 - **Body:** Literata at weight 360, 19px on desktop and 18px on a phone, line height 1.55, measure 34rem, old-style figures; paragraphs spaced by one line, no indent. Settings change these within fixed steps (see Control).
 - **Title:** weight 300, optical size 60, 2.05 × the body size, line height 1.12, slightly tightened (−0.012em). Title only — no label above it naming the kind of piece (essay, journal) in v1.
-- **Running head:** from page 2 on, the piece title in small italic (13px), centred at the top in secondary grey, like a book's running head.
+- **Running head:** from page 2 on, the piece title in small italic (13px), in secondary grey, like a book's running head: centred over the text column, with the same room on either side as *Library* takes, so it reads balanced rather than pushed by *Library* (changed on 2026-10-28).
 - **Drop cap (optional):** the first letter of the piece, four lines deep, weight 600 (SemiBold), optical size 72, title colour, upright. (Three lines read too small, and at weight 500 the hairlines were light beside the text; both changed on 2026-10-27. An EB Garamond italic cap was tried and left: it broke the opening.) Where a browser lacks `initial-letter`, a floated letter of the same depth stands in.
 - **Pull quote:** one paragraph, centred, with space above and below; no author line in v1.
 - **Indented paragraphs (optional, off by default):** as in a printed book, each paragraph's first line steps in by 1.5em and the space between paragraphs goes. The first paragraph of a piece or chapter, and the one after a pull quote, start flush.
@@ -64,6 +67,7 @@ Two themes, both first-class. Paper follows light system appearance, night follo
 ## Control
 - No filled button on the page, and no text in letter-spaced capitals. Tools appear only when summoned (PROJECT.md §4.1) and on selection, and leave when dismissed.
 - **The page button:** a 44px circle at the bottom right, on a surface with a soft lift, showing the current page number (it grows into a pill past page 99). Its label for assistive tech says "Page N of M. Open tools". It shows one number only — the total appears when the tools are open.
+- **Showing the way in, once:** a number in a circle can read as a page indicator, not as the way to the tools. So until the tools are opened for the first time on this device, the page shows "Your tools are here" beside the page button — 13px italic, secondary, on the page with no surface, level with the button and ending 10px from it. It stays until that first tap, never goes on a timer, and never shows again after. It hides while the keyboard is up and while another line shows at the foot. Hidden from assistive tech, since the button's label already says "Open tools". (Chosen on 2026-10-28 over changing the button.)
 - **The tools bar:** the page button opens into one rounded bar, in place: "3 of 12 · 1.240 words" in secondary grey, then icon buttons — export, Time Machine, text settings (Aa), paper / night (moon or sun), close. The rarest sits furthest from where the bar opens, so the bar's old order stays where the thumb already knows it. Escape or close folds it back into the button. The bar never comes closer than 16px to the screen's edges: when a long count would push it there on a phone, the count drops its last word — "148 of 312 · 41.240" — and its label for assistive tech still says it in full. (Export added on 2026-10-28. Measured: 333px with "1 of 5 · 1.040 words"; 363px with "148 of 312 · 41.240 words", too wide even for a 390px phone; 325px without the word.)
 - **Icons:** one set, drawn for this app: 20px, 1.5px stroke, round caps and joins, current text colour — all the same colour, none highlighted. Icon buttons are 36px circles with a soft round pressed tint, no border — every round control is fully round.
 - **Text settings:** a sheet over the page, applied live as you change it. Each setting is a segmented control, one row each: size (S / M / L), line spacing (tight 1.42 / normal 1.55 / loose 1.72), alignment (left / justified — icons), theme (Paper / Night, with a small swatch), measure (narrow 34rem / wide 40rem). Drop cap is one on/off switch; Indent paragraphs is another, off by default. "Done" closes it as a text link.
@@ -73,7 +77,8 @@ Two themes, both first-class. Paper follows light system appearance, night follo
 - **Keyboard up:** the page keeps its size. When the caret would go under the keyboard, the page slides up so the caret line sits just above the writing bar. *Library* and the running head stay, on a strip of page colour with a 44px fade under it (solid for its first 15%), so text leaving the top goes softly instead of meeting them; once the title has slid away, the running head carries it. This is the one fade on the page, only while the keyboard pushes it. Page numbers do not change when the keyboard comes up.
 - **Moving around with the keyboard up:** drag the text up or down to see the part of the page behind the keyboard (the caret stays where it is); swipe sideways to turn pages; tap a word to move the caret there. "Hide keyboard" in the writing bar puts the keyboard down; return only ever makes a new paragraph. To go far — the start of the piece, another chapter, another day — tap the page button beside the writing bar: the tools open, and the page count opens Contents (or Days), all without leaving the keyboard.
 - **§ is the chapter mark.** Set in Literata like B and I, it starts a new chapter in the writing bar and "starts chapter here" on a selection. Typing `#` at the start of a line does the same.
-- **Back to the library:** the word *Library*, 13px, secondary grey, at the left of the running-head line, aligned with the text's left edge; it darkens on hover and has a 44px-tall tap area. A word, not an icon: an arrow felt generic and a pile-of-sheets glyph read as "copy". (Provisional: whether it should fade while writing is still open.)
+- **Back to the library:** the word *Library* as a **word button** at the left of the running-head line, its word aligned with the text's left edge. A word, not an icon: an arrow felt generic and a pile-of-sheets glyph read as "copy". (Provisional: whether it should fade while writing is still open.)
+- **The word button:** a word in a hairline pill — 13px in the title colour, 12px either side, 30px tall inside a 44px-tall tap area, fully round, a 1px outline in the word-button colour, no fill and no shadow. Hovered or pressed, it takes the pressed tint. It is for a word that stands alone in the head and takes you somewhere: *Library*, *Settings* (back from a settings area), *Now* in the Time Machine, and *Contents* / *Days* opposite it. Words inside a sentence or at the foot of a sheet (*Undo*, *Export*, *Done*) stay plain words. (Chosen on 2026-10-28: the bare grey word read as a label, not something to press. A surface with a lift was left, so the page button stays the only raised mark.)
 - **Focus:** a 2px ring in the title colour, offset 2px, on every control, visible on keyboard focus only.
 - **Tooltips:** rare — only where a word's consequence is not visible, as *Put away* (see The library). A small surface, 12px corners, 13px in the title colour, above the control after a short pause on hover or keyboard focus; desktop only. Never the only place the words live: they are the control's description for assistive tech, and on touch the line after the action says them. Icon buttons do not get tooltips for their names.
 
@@ -105,6 +110,7 @@ Two themes, both first-class. Paper follows light system appearance, night follo
 
 ## Books and chapters
 - A book is one piece made of chapters. A chapter starts on a fresh page with its title set like page 1's, and no running head on that page — as a printed book does. Later pages carry the chapter title as their running head.
+- **The title page:** a book opens on its own title, set like a piece title, alone on page 1 ("Untitled" in secondary grey until written); chapter 1 begins on page 2. A new book opens with the caret in its title; Return goes on to chapter 1's title, then to the text. No running head on the title page. (Chosen on 2026-10-28: the book's name had no place on the page, and could only be set from the library.)
 - A new chapter's title shows "Chapter title" in secondary grey until written, then "Begin anywhere."
 - The page button keeps counting the whole book.
 - **Contents:** tapping "18 of 48" in the tools bar opens a sheet like text settings: "Contents" and the book's page count, then each chapter with the page it starts on (right, tabular, secondary). The current chapter has the soft pressed tint. "§ New chapter" and "Done" are text links at its foot. Contents is a sheet, never a page in the book, so page numbers do not shift while writing; on export a contents page is printed at the front.

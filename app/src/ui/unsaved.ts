@@ -19,6 +19,8 @@ export interface Unsaved {
   markdown: string
   /** Only when the title changed and is not stored yet. */
   title: string | null
+  /** A book's own title, when it changed on its title page and is not stored yet. */
+  bookTitle?: string | null
   at: number
 }
 

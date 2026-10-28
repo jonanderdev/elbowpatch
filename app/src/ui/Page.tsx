@@ -64,6 +64,8 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
   const viewport = useRef<HTMLDivElement>(null)
   const flow = useRef<HTMLDivElement>(null)
   const titleEl = useRef<HTMLHeadingElement>(null)
+  /** A book's own title, on its title page before chapter 1. */
+  const bookTitleEl = useRef<HTMLHeadingElement>(null)
   const mount = useRef<HTMLDivElement>(null)
   const pageButton = useRef<HTMLButtonElement>(null)
   /** The writer typed, clicked into the text or turned a page since this section opened. */
@@ -84,12 +86,16 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
   const readOnlyNow = useRef(readOnly)
   readOnlyNow.current = readOnly
   const titleEditable = piece.kind !== 'journal' && !readOnly
+  // A book opens on its title page: its own title, then chapter 1 on the next page (DESIGN.md, Books and chapters).
+  const titlePage = piece.kind === 'book' && piece.sections[0]?.sectionId === sectionId
 
   // The title field is the page's own text (uncontrolled), set each time a section opens:
   // a rename from the library, or Write here, opens it again with the title as stored.
   useLayoutEffect(() => {
-    const title = keptFor(opened)?.title ?? titleOf(opened)
+    const kept = keptFor(opened)
+    const title = kept?.title ?? titleOf(opened)
     if (titleEl.current) titleEl.current.textContent = title
+    if (bookTitleEl.current) bookTitleEl.current.textContent = kept?.bookTitle ?? opened.piece.title
     setHeading(title)
   }, [opened])
 
@@ -97,12 +103,14 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     moved.current = false
     // Words kept for this section and newer than what is stored start this page, and it saves them.
     const waiting = keptFor(opened)
-    const state = { piece, title: titleOf(opened), saved: opened.content }
+    const state = { piece, title: titleOf(opened), bookTitle: piece.title, saved: opened.content }
     let failedNow = false
     let closed = false
     let retry: ReturnType<typeof setTimeout> | undefined
     /** What this page holds that is not stored: a title only when it changed. */
-    const entry = (markdown: string, title: string | null) => ({
+    const readBookTitle = () => (bookTitleEl.current ? (bookTitleEl.current.textContent ?? state.bookTitle) : null)
+    const entry = (markdown: string, title: string | null, bookTitle: string | null = readBookTitle()) => ({
+      bookTitle: bookTitle !== null && bookTitle !== state.bookTitle ? bookTitle : null,
       piece: state.piece,
       pieceId: piece.id,
       sectionId,
@@ -117,10 +125,11 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
         const since = Date.now()
         const markdown = editor.markdown()
         const title = piece.kind === 'journal' ? null : (titleEl.current?.textContent ?? state.title)
-        const changed = markdown !== state.saved || (title !== null && title !== state.title)
+        const bookTitle = readBookTitle()
+        const changed = markdown !== state.saved || (title !== null && title !== state.title) || (bookTitle !== null && bookTitle !== state.bookTitle)
         if (readOnlyNow.current) {
           // Another window writes this piece now: what was not saved here waits, with Save a copy.
-          if (changed) unsaved.keep(entry(markdown, title), since)
+          if (changed) unsaved.keep(entry(markdown, title, bookTitle), since)
           return
         }
         try {
@@ -131,6 +140,10 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
             if (piece.kind === 'essay') await rename(deps, state.piece, title)
             else await renameSection(deps, state.piece, sectionId, title)
             state.title = title
+          }
+          if (bookTitle !== null && bookTitle !== state.bookTitle) {
+            await rename(deps, state.piece, bookTitle)
+            state.bookTitle = bookTitle
           }
           // Clears only these words: newer ones kept meanwhile (the page hid) stay.
           unsaved.saved(sectionId, markdown, title)
@@ -143,7 +156,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
         } catch (error) {
           // The words stay; say so, and keep trying while this page is open (0010).
           // A closed page hands them on and never writes again.
-          unsaved.keep(entry(markdown, title), since)
+          unsaved.keep(entry(markdown, title, bookTitle), since)
           if (!closed) {
             setFailed((failedNow = true))
             clearTimeout(retry)
@@ -286,7 +299,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     restorePlace(editor.view, piece.place, sectionId)
     void document.fonts.ready.then(() => {
       relayout()
-      if (piece.place?.sectionId === sectionId) showCaret(editor.view, pager)
+      if (piece.place?.sectionId === sectionId) showCaret(editor.view, pager, true)
     })
     // A font arriving late, for a script first used now, moves the breaks too.
     const fontsLoaded = () => pager.measure()
@@ -298,7 +311,9 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
       if (closed || readOnlyNow.current) return
       const markdown = editor.markdown()
       const title = piece.kind === 'journal' ? null : (titleEl.current?.textContent ?? state.title)
-      if (markdown !== state.saved || (title !== null && title !== state.title)) unsaved.keep(entry(markdown, title))
+      const bookTitle = readBookTitle()
+      if (markdown !== state.saved || (title !== null && title !== state.title) || (bookTitle !== null && bookTitle !== state.bookTitle))
+        unsaved.keep(entry(markdown, title, bookTitle))
     }
     const onHide = (e: Event) => {
       if (e.type === 'pagehide' || document.visibilityState === 'hidden') {
@@ -375,7 +390,8 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
       if (!first) void live.current?.flush()
     } else if (opened.fresh && !opened.focused && !readOnly) {
       opened.focused = true
-      if (titleEditable) titleEl.current?.focus()
+      if (titlePage) bookTitleEl.current?.focus()
+      else if (titleEditable) titleEl.current?.focus()
       else live.current?.editor.focus()
     }
   }, [covered, readOnly])
@@ -513,18 +529,40 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
         <button type="button" className="library-link" onClick={onLibrary}>
           Library
         </button>
-        {page > 0 && <div className="running-head">{heading}</div>}
+        {page > (titlePage ? 1 : 0) && <div className="running-head">{heading}</div>}
       </div>
 
       <div ref={viewport} className="pager">
         <div ref={flow} className="flow" lang={piece.lang}>
+          {titlePage && (
+            <h1
+              ref={bookTitleEl}
+              className="title book-title"
+              contentEditable={readOnly ? undefined : 'plaintext-only'}
+              aria-label={readOnly ? undefined : 'Book title'}
+              data-placeholder="Untitled"
+              spellcheck
+              onFocus={() => live.current?.pager.turnTo(0)}
+              onInput={() => {
+                live.current?.save.touch()
+                live.current?.moment.touch()
+              }}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter') return
+                // Return goes on to chapter 1's title, on the next page.
+                e.preventDefault()
+                titleEl.current?.focus()
+              }}
+            />
+          )}
           <h1
             ref={titleEl}
-            className="title"
+            className={titlePage ? 'title chapter-opening' : 'title'}
             contentEditable={titleEditable ? 'plaintext-only' : undefined}
             aria-label={titleEditable ? 'Title' : undefined}
             data-placeholder={piece.kind === 'book' ? 'Chapter title' : 'Untitled'}
             spellcheck
+            onFocus={(e) => live.current?.pager.show((e.currentTarget as HTMLElement).getBoundingClientRect().left)}
             onInput={() => {
               setHeading(titleEl.current?.textContent ?? '')
               live.current?.save.touch()
@@ -643,7 +681,12 @@ function caretToTop(view: EditorView, viewport: HTMLElement) {
 /** Marks a selection the page set itself, already on the page in view. */
 const PAGED = 'elbowpatch-paged'
 
-function showCaret(view: EditorView, pager: Pager) {
+/**
+ * Shows the page the text's caret is on, while writing in the text. Not when the writer is
+ * in a title field or reading: then the page stays. `place` forces it, to open at their place.
+ */
+function showCaret(view: EditorView, pager: Pager, place = false) {
+  if (!place && !view.hasFocus()) return
   const rect = caretRect(view)
   if (rect) pager.show(rect.left)
 }
