@@ -57,7 +57,7 @@ test('a long text pages instead of scrolling, and the caret stays in view', asyn
   const caret = await page.evaluate(() => {
     const r = window.getSelection()!.getRangeAt(0).getBoundingClientRect()
     const col = document.querySelector('.pager')!.getBoundingClientRect()
-    return r.left >= col.left - 1 && r.right <= col.right + 1 && r.top >= col.top && r.bottom <= col.bottom + 1
+    return r.left >= col.left - 1 && r.right <= col.right + 1 && r.top >= col.top - 1 && r.bottom <= col.bottom + 1
   })
   expect(caret).toBe(true)
 
@@ -248,6 +248,34 @@ test('↓ and ↑ walk every line, across pages and back, and the caret is alway
     else expect(before.at).toBe('1. 0')
   }
   expect(pages.size).toBeGreaterThan(1)
+  // From the right edge, ↓ aims past the ends of shorter lines. It never stops after a line's last
+  // space where the line wraps, placed on that line: it is also the next line's start, and Firefox
+  // paints it there.
+  const first = (await page.locator('.body p').first().boundingBox())!
+  await page.mouse.click(first.x + first.width - 2, first.y + 8)
+  const atWrap = () =>
+    page.evaluate(() => {
+      const s = getSelection()!
+      const t = s.focusNode!
+      const o = s.focusOffset
+      if (t.nodeType !== 3 || o === 0 || o >= t.textContent!.length || !/\s/.test(t.textContent![o - 1] ?? '')) return false
+      const r = document.createRange()
+      r.setStart(t, o - 1)
+      r.setEnd(t, o)
+      const a = r.getBoundingClientRect()
+      r.setStart(t, o)
+      r.setEnd(t, o + 1)
+      const b = r.getBoundingClientRect()
+      if (Math.abs(a.top - b.top) < 4 && Math.abs(a.left - b.left) < 600) return false
+      // Where the browser places it: on the line before (a wrap's end), or the next (its start).
+      const rects = s.getRangeAt(0).getClientRects()
+      const caret = rects[rects.length - 1]
+      return !!caret && Math.abs(caret.top - a.top) < 4 && Math.abs(caret.left - a.right) < 8
+    })
+  for (let i = 0; i < 40; i++) {
+    await page.keyboard.press('ArrowDown')
+    expect(await atWrap(), `↓ ${i} from the right edge`).toBe(false)
+  }
   await expect(page.locator('.body')).toBeFocused()
 })
 

@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test'
 
-// Real layout, in WebKit and Chromium at phone and desktop sizes, and Firefox on desktop (docs/decisions/0007).
+// Real layout, in Chromium, WebKit and Firefox at phone and desktop sizes (docs/decisions/0007).
 const phone = { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: false }
 const desktop = { viewport: { width: 1440, height: 900 } }
 
@@ -20,6 +20,7 @@ export default defineConfig({
     { name: 'chromium-desktop', use: { ...devices['Desktop Chrome'], ...desktop } },
     { name: 'webkit-phone', use: { ...devices['Desktop Safari'], ...phone } },
     { name: 'webkit-desktop', use: { ...devices['Desktop Safari'], ...desktop } },
+    { name: 'firefox-phone', use: { ...devices['Desktop Firefox'], ...phone } },
     { name: 'firefox-desktop', use: { ...devices['Desktop Firefox'], ...desktop } },
   ],
 })

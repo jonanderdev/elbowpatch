@@ -956,6 +956,14 @@ function placeOn(view: EditorView, pos: number, line: Line, edge: number, pager:
     else if (after && at > 0) at--
     else break
   }
+  // At a line's end where it wraps, after its last space, the position is also the next line's
+  // start, and Firefox paints the caret there: just before that space is on this line only.
+  const $at = view.state.doc.resolve(at)
+  if ($at.parent.isTextblock && $at.parentOffset > 0 && at < $at.end() && /\s/.test(view.state.doc.textBetween(at - 1, at))) {
+    const a = view.coordsAtPos(at, -1)
+    const b = view.coordsAtPos(at, 1)
+    if (Math.abs(a.left - b.left) > 1 && Math.abs(a.top - b.top) > 1 && Math.abs(a.top - line.top) < Math.abs(b.top - line.top)) at--
+  }
   view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(at))).setMeta(PAGED, true))
 }
 
