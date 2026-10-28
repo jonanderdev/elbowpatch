@@ -188,7 +188,10 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
   if (!ready) return null
   // shortcut: Save a copy here holds the unsaved section only, not the whole piece.
   const inSettings = route.startsWith('/settings')
-  const inLibrary = (route === '/' || !opened) && !inSettings
+  // The library stays over the page until the piece asked for is the one open: never a frame
+  // of the piece open before it.
+  const wanted = route.startsWith('/p/') ? route.slice(3) : null
+  const inLibrary = (!wanted || opened?.piece.id !== wanted) && !inSettings
   const last = pieces.find((p) => p.id === readLast() && p.place)
 
   return (

@@ -371,3 +371,38 @@ test('a click in the margin turns the page, but not beside the text', async ({ p
   await page.mouse.up()
   await expect(page.locator('.page-button')).toHaveText(String(before - 1))
 })
+
+test('a piece opens straight at the place it was left, with no frame of page 1 first', async ({ page }) => {
+  await newEssay(page, 'Long one')
+  await fill(page, 12)
+  await saved(page, PARAGRAPH.slice(0, 20))
+  const left = await page.locator('.page-button').textContent()
+  expect(Number(left)).toBeGreaterThan(1)
+  await page.locator('.head .word-button').click()
+  await page.getByRole('button', { name: 'New piece' }).click()
+  await page.getByRole('toolbar', { name: 'New piece' }).getByRole('button', { name: 'Essay' }).click()
+  await expect(page.locator('.title')).toBeFocused()
+  await page.keyboard.type('Short one')
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('A line.')
+  await saved(page, 'A line.')
+  await page.locator('.head .word-button').click()
+  await expect(page.locator('.page-screen')).toHaveAttribute('aria-hidden', 'true')
+  // Every frame from the click on, once the page is in view: the piece and the page shown.
+  await page.evaluate(() => {
+    const w = window as unknown as { shown: string[] }
+    w.shown = []
+    const t0 = performance.now()
+    const tick = () => {
+      if (document.querySelector('.page-screen')?.getAttribute('aria-hidden') === 'false')
+        w.shown.push(`${document.querySelector('.title')?.textContent} ${document.querySelector('.page-button')?.textContent}`)
+      if (performance.now() - t0 < 800) requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+  })
+  await page.locator('.row', { hasText: 'Long one' }).click()
+  await page.waitForTimeout(900)
+  const shown = await page.evaluate(() => (window as unknown as { shown: string[] }).shown)
+  expect(shown.length).toBeGreaterThan(0)
+  expect(new Set(shown)).toEqual(new Set([`Long one ${left}`]))
+})

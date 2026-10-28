@@ -107,7 +107,9 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     setHeading(title)
   }, [opened])
 
-  useEffect(() => {
+  // Before the first paint, so a piece opens on its text at the writer's place, never a frame
+  // of page 1 or of an empty page first.
+  useLayoutEffect(() => {
     moved.current = false
     // Words kept for this section and newer than what is stored start this page, and it saves them.
     const waiting = keptFor(opened)
@@ -193,7 +195,10 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
       if (failedNow || readOnlyNow.current) return
       await takeMoment(deps, piece.id).catch(() => {})
       // Only a place the writer reached here: opening a piece and leaving it untouched moves nothing.
+      // Once kept, it stays until they move again: a later save, as the page closes behind the
+      // library, would read a page no longer laid out as they left it.
       const place = moved.current ? placeOf(editor.view, sectionId, pager.page, viewport.current) : undefined
+      moved.current = false
       if (place) await savePlace(deps, piece.id, place).catch(() => {})
       const stored = await openPiece(deps, piece.id).catch(() => undefined)
       if (stored) onChange(stored.piece)
@@ -327,6 +332,8 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     // Lay out once the fonts are in, so page breaks do not move after load (0011).
     relayout()
     restorePlace(editor.view, piece.place, sectionId)
+    // Their page now, with the fonts there are; again once all have loaded.
+    if (piece.place?.sectionId === sectionId) showCaret(editor.view, pager, true)
     void document.fonts.ready.then(() => {
       relayout()
       if (piece.place?.sectionId === sectionId) showCaret(editor.view, pager, true)
