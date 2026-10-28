@@ -479,13 +479,22 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
       else p.previous()
       // At the first or last page nothing turns, and the caret stays put.
       const view = live.current?.editor.view
+      if (p.page === from || !view || readOnlyNow.current) return
+      // Ready to type at once: while writing, and on desktop also while reading. Not taken from
+      // the tools or a sheet; on a phone a swipe does not raise the keyboard, and a tap places it.
+      const writing = view.hasFocus()
+      const active = document.activeElement
+      if (!writing && (!matchMedia('(pointer: fine)').matches || active?.closest('.sheet, .foot'))) return
+      // Placed before the text takes focus, so the browser never scrolls to the old caret first.
+      if (caretToEnd(view, viewport.current!)) {
+        if (!writing) view.focus()
+        return
+      }
       // A page with no text (a book's title page) takes it into the book's title.
-      if (p.page !== from && view?.hasFocus() && !caretToEnd(view, viewport.current!)) {
-        const title = bookTitleEl.current
-        if (title) {
-          title.focus()
-          getSelection()?.collapse(title, title.childNodes.length)
-        }
+      const title = bookTitleEl.current
+      if (title) {
+        title.focus()
+        getSelection()?.collapse(title, title.childNodes.length)
       }
     }
 
@@ -877,13 +886,11 @@ function caretToEnd(view: EditorView, viewport: HTMLElement): boolean {
     if (pos !== null) break
   }
   if (pos === null) return false
-  // Where the page ends mid-paragraph, the position after its last letter is also the start of
-  // the next page, and a browser may draw it there: back, a letter at a time, to one drawn on this
-  // page. Measured before the caret moves, since a caret drawn out of view makes the browser
-  // scroll to it.
+  // Where the page ends mid-paragraph, the position after its last letter is also the start of the
+  // next page, and a browser may paint the caret there, or at the page's top. Just before that
+  // letter (mostly the space after the last word) is on this page's last line only.
   let at: number = pos
-  const start = Math.max(at - 3, 0)
-  while (at > start && (drawnAt(view, at)?.left ?? r.left) > r.right + 2) at--
+  if (at < view.state.doc.resolve(at).end()) at--
   view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(at), -1)).setMeta(PAGED, true))
   return true
 }

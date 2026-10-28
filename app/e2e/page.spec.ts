@@ -291,6 +291,30 @@ test('turning back while writing takes the caret to the end of the text on the p
   }
 })
 
+test('on desktop a turn always leaves the caret ready to type, even while reading', async ({ page }) => {
+  test.skip(page.viewportSize()!.width < 700, 'on a phone a swipe does not raise the keyboard')
+  await newEssay(page)
+  await fill(page, 10)
+  for (const key of ['PageUp', 'PageUp', 'PageDown']) {
+    // Reading: the text not focused.
+    await page.evaluate(() => (document.activeElement as HTMLElement).blur())
+    const before = Number(await page.locator('.page-button').textContent())
+    await page.keyboard.press(key)
+    await expect(page.locator('.page-button')).toHaveText(String(before + (key === 'PageDown' ? 1 : -1)))
+    await expect(page.locator('.body')).toBeFocused()
+    // A letter typed at once lands on the page shown.
+    await page.keyboard.type('Q')
+    const shown = await page.evaluate(() => {
+      const rects = getSelection()!.getRangeAt(0).getClientRects()
+      const r = rects[rects.length - 1]
+      const col = document.querySelector('.pager')!.getBoundingClientRect()
+      return !!r && r.left >= col.left - 2 && r.left <= col.right + 8
+    })
+    expect(shown).toBe(true)
+    await page.keyboard.press('Backspace')
+  }
+})
+
 test('a piece left while writing opens with the caret where it was, ready to type', async ({ page }) => {
   test.skip(page.viewportSize()!.width < 700, 'on a phone the caret waits for a tap')
   await newEssay(page)
