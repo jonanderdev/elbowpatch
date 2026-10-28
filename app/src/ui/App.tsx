@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Kind, Piece } from '../domain/model'
 import { pieceAsMarkdown } from '../domain/export'
+import { forgetPutAway, thin } from '../domain/thinning'
 import { library, newPiece, openPiece, recover, rename, renameSection, withDay, write, type Deps } from '../domain/pieces'
 import type { Held, WriterLock } from '../domain/ports'
 import { Library } from './Library'
@@ -73,6 +74,9 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
       await document.fonts.ready
       setReady(true)
       document.getElementById('launch')?.setAttribute('hidden', '')
+      // Thinning and the end of put-away pieces' 30 days run afterwards, when idle (0010).
+      const idle = window.requestIdleCallback ?? ((f: () => void) => setTimeout(f, 3000))
+      idle(() => void forgetPutAway(deps).then(() => thin(deps)).catch(() => {}))
     })()
     // Once, at launch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
