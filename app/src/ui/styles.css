@@ -76,6 +76,8 @@ body {
   font-weight: 400;
   -webkit-font-smoothing: antialiased;
   -webkit-text-size-adjust: 100%;
+  /* A sideways swipe past the edge is not the browser's Back here. */
+  overscroll-behavior: none;
 }
 
 #app {

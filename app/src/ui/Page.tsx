@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { TextSelection } from 'prosemirror-state'
+import { type Selection, TextSelection } from 'prosemirror-state'
 import type { EditorView } from 'prosemirror-view'
 import { debounced, moments } from '../adapters/schedule'
 import { pieceAsMarkdown } from '../domain/export'
@@ -212,7 +212,8 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
 
     let shown = -1
     let goalX: number | undefined
-    let skipUntil = 0
+    // The caret the page placed itself (↑, ↓, a turn), already on the page it shows.
+    let placed: Selection | null = null
     let lastVertical = -1
     const pager = new Pager(viewport.current!, flow.current!, (p, c) => {
       setPage(p)
@@ -252,8 +253,9 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
           rect = new DOMRect(Math.min(a.left, b.left), Math.min(a.top, b.top), Math.abs(b.right - a.left), Math.max(a.bottom, b.bottom) - Math.min(a.top, b.top))
         }
         setSelection({ rect, active: editor.active() })
-        // A move the page made itself (↑, ↓, a turn) already shows the right page.
-        if (tr.getMeta(PAGED)) skipUntil = performance.now() + 150
+        // A move the page made itself (↑, ↓, a turn) already shows the right page; any other
+        // move, however soon after, is followed.
+        placed = tr.getMeta(PAGED) ? view.state.selection : null
       },
       editable: () => !readOnlyNow.current,
       // ↑ and ↓ move a line at the same place across, and cross to the next page at a page's
@@ -378,7 +380,8 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     const follow = () => {
       cancelAnimationFrame(following)
       following = requestAnimationFrame(() => {
-        if (performance.now() > skipUntil && editor.view.hasFocus()) showCaret(editor.view, pager)
+        if (placed && editor.view.state.selection.eq(placed)) return
+        if (editor.view.hasFocus()) showCaret(editor.view, pager)
       })
     }
     document.addEventListener('selectionchange', follow)
@@ -456,18 +459,18 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     }
   }, [covered, readOnly])
 
-  // Turning pages: keys, the wheel (one page per gesture), a sideways swipe, the side margins.
+  // Turning pages: keys, a sideways swipe on a phone, the side margins.
   useEffect(() => {
     if (covered) return
     const el = screen.current!
-    // A turn by hand, wheel or key is the writer moving: their place follows.
+    // A turn by hand or key is the writer moving: their place follows.
     const pager = () => {
       moved.current = true
       return live.current?.pager
     }
 
-    // A turn while writing takes the caret along to the top of the new page,
-    // so typing goes on where the writer is looking.
+    // A turn while writing takes the caret along to the end of the text on the new page, where
+    // words are added next (DESIGN.md, Behaviour).
     const turn = (dir: 1 | -1) => {
       const p = pager()
       if (!p) return
@@ -477,7 +480,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
       // At the first or last page nothing turns, and the caret stays put.
       const view = live.current?.editor.view
       // A page with no text (a book's title page) takes it into the book's title.
-      if (p.page !== from && view?.hasFocus() && !caretToTop(view, viewport.current!)) {
+      if (p.page !== from && view?.hasFocus() && !caretToEnd(view, viewport.current!)) {
         const title = bookTitleEl.current
         if (title) {
           title.focus()
@@ -493,21 +496,10 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
       e.preventDefault()
     }
 
-    let lastWheel = 0
+    // Scrolling does not turn pages (DESIGN.md, Behaviour): the page is no scroll, and a sideways
+    // swipe is the browser's Back. Swallowed here, so it does neither.
     const onWheel = (e: WheelEvent) => {
-      if ((e.target as HTMLElement).closest('.sheet')) return
-      e.preventDefault()
-      const now = e.timeStamp
-      const newGesture = now - lastWheel > 220
-      lastWheel = now
-      if (!newGesture) return
-      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY
-      if (Math.abs(delta) < 4) {
-        lastWheel = 0
-        return
-      }
-      if (delta > 0) turn(1)
-      else turn(-1)
+      if (!(e.target as HTMLElement).closest('.sheet')) e.preventDefault()
     }
 
     let start: { x: number; y: number } | undefined
@@ -845,50 +837,54 @@ function stepped(view: EditorView, pos: number, dir: 1 | -1): number | null {
 }
 
 /**
- * The caret to the first letter of text on the page in view: below the title, if the page opens
- * with one. False when the page holds no text. Found from the text's own boxes, not by asking
- * what is at a point, which a browser can answer with the title over the whole page.
+ * The caret to the end of the text on the page in view, where words are added next. False when
+ * the page holds no text. Found from the text's own boxes, not by asking what is at a point,
+ * which a browser can answer with the title over the whole page.
  */
-function caretToTop(view: EditorView, viewport: HTMLElement): boolean {
+function caretToEnd(view: EditorView, viewport: HTMLElement): boolean {
   const r = viewport.getBoundingClientRect()
   const onPage = (b: DOMRect) => b.right > r.left + 1 && b.left < r.right - 1 && b.height > 0
   const range = document.createRange()
+  const blocks: { node: { textContent: string }; offset: number }[] = []
+  view.state.doc.forEach((node, offset) => blocks.push({ node, offset }))
   let pos: number | null = null
-  view.state.doc.forEach((node, offset) => {
-    if (pos !== null) return
+  for (const { node, offset } of blocks.reverse()) {
     const dom = view.nodeDOM(offset)
-    if (!(dom instanceof HTMLElement) || ![...dom.getClientRects()].some(onPage)) return
+    if (!(dom instanceof HTMLElement) || ![...dom.getClientRects()].some(onPage)) continue
     if (!node.textContent) {
       pos = offset + 1
-      return
+      break
     }
+    const texts: Text[] = []
     const walker = document.createTreeWalker(dom, NodeFilter.SHOW_TEXT)
-    for (let t = walker.nextNode() as Text | null; t && pos === null; t = walker.nextNode() as Text | null) {
+    for (let t = walker.nextNode(); t; t = walker.nextNode()) if (t.textContent) texts.push(t as Text)
+    for (const t of texts.reverse()) {
       range.selectNodeContents(t)
       if (![...range.getClientRects()].some(onPage)) continue
-      // The letters before this page sit left of it: the first on it, by halves.
+      // The letters after this page sit right of it: the last on it, by halves.
       let lo = 0
       let hi = t.length - 1
       while (lo < hi) {
-        const mid = (lo + hi) >> 1
+        const mid = (lo + hi + 1) >> 1
         range.setStart(t, mid)
         range.setEnd(t, mid + 1)
-        const b = range.getBoundingClientRect()
-        if (b.left >= r.left - 1) hi = mid
-        else lo = mid + 1
+        if (range.getBoundingClientRect().left < r.right + 1) lo = mid
+        else hi = mid - 1
       }
-      pos = view.posAtDOM(t, lo)
+      pos = view.posAtDOM(t, lo + 1)
+      break
     }
-  })
+    if (pos !== null) break
+  }
   if (pos === null) return false
-  // Where the page starts mid-paragraph, its first position is also the end of the page before
-  // (after a space there), and a browser may draw it there: on, a letter at a time, to one drawn
-  // on this page. Measured before the caret moves, since a caret drawn out of view makes the
-  // browser scroll to it.
+  // Where the page ends mid-paragraph, the position after its last letter is also the start of
+  // the next page, and a browser may draw it there: back, a letter at a time, to one drawn on this
+  // page. Measured before the caret moves, since a caret drawn out of view makes the browser
+  // scroll to it.
   let at: number = pos
-  const end = Math.min(at + 3, view.state.doc.content.size)
-  while (at < end && (drawnAt(view, at)?.left ?? r.left) < r.left - 2) at++
-  view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(at))).setMeta(PAGED, true))
+  const start = Math.max(at - 3, 0)
+  while (at > start && (drawnAt(view, at)?.left ?? r.left) > r.right + 2) at--
+  view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(at), -1)).setMeta(PAGED, true))
   return true
 }
 

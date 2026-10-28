@@ -251,7 +251,7 @@ test('↓ and ↑ walk every line, across pages and back, and the caret is alway
   await expect(page.locator('.body')).toBeFocused()
 })
 
-test('turning back while writing takes the caret to the first line of text, never into the title', async ({ page }) => {
+test('turning back while writing takes the caret to the end of the text on the page, never into the title', async ({ page }) => {
   await page.goto('./')
   await page.locator('.start.book').click()
   await expect(page.locator('.book-title')).toBeFocused()
@@ -272,15 +272,22 @@ test('turning back while writing takes the caret to the first line of text, neve
       const rects = s.getRangeAt(0).getClientRects()
       const r = rects[rects.length - 1] ?? (s.focusNode as Element).parentElement!.getBoundingClientRect()
       const pager = document.querySelector('.pager')!.getBoundingClientRect()
-      const text = [...document.querySelectorAll('.body p')].flatMap((p) => [...p.getClientRects()])
-      const onText = text.some((q) => q.left >= pager.left - 2 && q.right <= pager.right + 2 && r.top >= q.top - 2 && r.bottom <= q.bottom + 2)
-      return onText ? 'text' : `off the text at ${Math.round(r.left)},${Math.round(r.top)}`
+      // The page's text, line by line: the caret is on its last line.
+      const lines = [...document.querySelectorAll('.body p')].flatMap((p) => {
+        const range = document.createRange()
+        range.selectNodeContents(p)
+        // (a line's last space may hang past the column's edge)
+        return [...range.getClientRects()].filter((q) => q.left >= pager.left - 2 && q.left <= pager.right)
+      })
+      const last = Math.max(...lines.map((q) => q.bottom))
+      const onLast = r.left >= pager.left - 2 && r.left <= pager.right + 2 && r.bottom >= last - 2 && r.top < last
+      return onLast ? 'end' : `not at the end, at ${Math.round(r.left)},${Math.round(r.top)} (last line ends ${Math.round(last)})`
     })
-  // Back page by page: each time on the page's text; on the title page, in the book's title.
+  // Back page by page: each time at the end of the page's text; on the title page, in the book's title.
   for (let n = Number(await page.locator('.page-button').textContent()); n > 1; n--) {
     await page.keyboard.press('PageUp')
     await expect(page.locator('.page-button')).toHaveText(String(n - 1))
-    expect(await caret()).toBe(n - 1 === 1 ? 'book-title' : 'text')
+    expect(await caret()).toBe(n - 1 === 1 ? 'book-title' : 'end')
   }
 })
 
@@ -440,7 +447,7 @@ test('Library and the page button: text edge on a phone, frame corners on deskto
   }
 })
 
-test('one scroll turns one page, however long its glide', async ({ page }) => {
+test('scrolling never turns the page', async ({ page }) => {
   test.skip(page.viewportSize()!.width < 700, 'desktop wheel')
   await newEssay(page)
   await fill(page, 12)
@@ -448,16 +455,11 @@ test('one scroll turns one page, however long its glide', async ({ page }) => {
   await expect(page.locator('.page-button')).toHaveText('1')
   const col = (await page.locator('.pager').boundingBox())!
   await page.mouse.move(col.x + col.width / 2, col.y + 200)
-  // A trackpad's glide: fading deltas, wobbling about the smallest at its tail.
-  for (const delta of [40, 30, 20, 12, 8, 5, 3, 4, 3, 4, 2, 1]) {
-    await page.mouse.wheel(0, delta)
-    await page.waitForTimeout(16)
-  }
-  await expect(page.locator('.page-button')).toHaveText('2')
-  // A new scroll, after a pause, turns the next.
+  // Down, up and sideways, short and long.
+  for (const [dx, dy] of [[0, 40], [0, 600], [0, -300], [300, 0], [-300, 0]] as const) await page.mouse.wheel(dx, dy)
   await page.waitForTimeout(300)
-  await page.mouse.wheel(0, 30)
-  await expect(page.locator('.page-button')).toHaveText('3')
+  await expect(page.locator('.page-button')).toHaveText('1')
+  expect(await page.locator('.pager').evaluate((el) => el.scrollLeft)).toBe(0)
 })
 
 test('a click in the margin turns the page, but not beside the text', async ({ page }) => {
