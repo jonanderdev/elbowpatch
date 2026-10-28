@@ -205,6 +205,20 @@ button {
   inset: 0;
   background: var(--page);
 }
+/* In the side margins, the pointer is the way the page turns, drawn as our icons are (1.5 strokes,
+   round ends), in the title colour with a page-coloured edge, so it reads over text too. Only where there is a page to go to. */
+.page-screen[data-turn='back'] {
+  cursor: url('./cursors/turn-back.svg') 12 12, w-resize;
+}
+.page-screen[data-turn='on'] {
+  cursor: url('./cursors/turn-on.svg') 12 12, e-resize;
+}
+[data-theme='night'] .page-screen[data-turn='back'] {
+  cursor: url('./cursors/turn-back-night.svg') 12 12, w-resize;
+}
+[data-theme='night'] .page-screen[data-turn='on'] {
+  cursor: url('./cursors/turn-on-night.svg') 12 12, e-resize;
+}
 
 .head {
   position: absolute;
@@ -310,7 +324,7 @@ button {
   break-after: avoid;
   white-space: pre-wrap;
 }
-.title:empty::before {
+.title[data-empty]::before {
   content: attr(data-placeholder);
   color: var(--secondary);
 }
@@ -1257,8 +1271,8 @@ button {
   position: relative;
   min-height: 1lh;
 }
-.book-title:empty::before,
-.subtitle:empty::before {
+.book-title[data-empty]::before,
+.subtitle[data-empty]::before {
   content: attr(data-placeholder);
   position: absolute;
   inset: 0;

@@ -346,6 +346,18 @@ test('a click in the margin turns the page, but not beside the text', async ({ p
   await fill(page, 12)
   const before = Number(await page.locator('.page-button').textContent())
   const col = (await page.locator('.pager').boundingBox())!
+  // On the last page: the pointer shows the way back, and nothing on; a click there is
+  // swallowed, leaving the caret where it was.
+  const turn = () => page.locator('.page-screen').getAttribute('data-turn')
+  await page.mouse.move(col.x + col.width + 200, col.y + 200)
+  expect(await turn()).toBe('')
+  const caret = await page.evaluate(() => getSelection()!.focusOffset)
+  await page.mouse.click(col.x + col.width + 200, col.y + 200)
+  await expect(page.locator('.page-button')).toHaveText(String(before))
+  await expect(page.locator('.body')).toBeFocused()
+  expect(await page.evaluate(() => getSelection()!.focusOffset)).toBe(caret)
+  await page.mouse.move(col.x - 200, col.y + 200)
+  expect(await turn()).toBe('back')
   // Just beside the text: nothing turns.
   await page.mouse.click(col.x - 30, col.y + 200)
   await expect(page.locator('.page-button')).toHaveText(String(before))

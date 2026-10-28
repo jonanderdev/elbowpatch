@@ -103,6 +103,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     if (titleEl.current) titleEl.current.textContent = title
     if (bookTitleEl.current) bookTitleEl.current.textContent = kept?.bookTitle ?? opened.piece.title
     if (subtitleEl.current) subtitleEl.current.textContent = kept?.subtitle ?? opened.piece.subtitle ?? ''
+    for (const el of [titleEl.current, bookTitleEl.current, subtitleEl.current]) if (el) emptied(el)
     setHeading(title)
   }, [opened])
 
@@ -449,10 +450,12 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     const turn = (dir: 1 | -1) => {
       const p = pager()
       if (!p) return
+      const from = p.page
       if (dir > 0) p.next()
       else p.previous()
+      // At the first or last page nothing turns, and the caret stays put.
       const view = live.current?.editor.view
-      if (view?.hasFocus()) caretToTop(view, viewport.current!)
+      if (p.page !== from && view?.hasFocus()) caretToTop(view, viewport.current!)
     }
 
     const onKey = (e: KeyboardEvent) => {
@@ -498,17 +501,37 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
 
     // A click in the side margins turns the page, but not near the text, where a click is
     // likely aimed at a word, and never after a drag, which is selecting (DESIGN.md, Behaviour).
+    // The margins are for turning: a click there never reaches the text, even with no page to
+    // turn to, and the pointer shows the way while there is one.
+    const side = (e: MouseEvent): 1 | -1 | 0 => {
+      const g = live.current?.pager.g
+      if (!g || g.side < 120 || (e.target as HTMLElement).closest('button, .pager, .sheet, [contenteditable]')) return 0
+      if (e.clientX < g.side - MARGIN_CLEAR) return -1
+      if (e.clientX > g.side + g.measure + MARGIN_CLEAR) return 1
+      return 0
+    }
+    const onMouseMove = (e: MouseEvent) => {
+      const dir = e.buttons ? 0 : side(e)
+      const p = live.current?.pager
+      const can = p && (dir < 0 ? p.page > 0 : dir > 0 && p.page < p.count - 1)
+      el.dataset.turn = can ? (dir < 0 ? 'back' : 'on') : ''
+    }
     let down: { x: number; y: number } | undefined
-    const onMouseDown = (e: MouseEvent) => (down = { x: e.clientX, y: e.clientY })
+    const onMouseDown = (e: MouseEvent) => {
+      down = { x: e.clientX, y: e.clientY }
+      // Keeps the caret where it is, so a turn takes it along as a key does; a selection
+      // is left to clear as usual.
+      if (side(e) && window.getSelection()?.isCollapsed) e.preventDefault()
+    }
     const onClick = (e: MouseEvent) => {
       const from = down
       down = undefined
-      const g = live.current?.pager.g
-      if (!g || g.side < 120 || (e.target as HTMLElement).closest('button, .pager, .sheet, [contenteditable]')) return
+      const dir = side(e)
+      if (!dir) return
       if (from && Math.hypot(e.clientX - from.x, e.clientY - from.y) > 4) return
       if (!window.getSelection()?.isCollapsed) return
-      if (e.clientX < g.side - MARGIN_CLEAR) turn(-1)
-      else if (e.clientX > g.side + g.measure + MARGIN_CLEAR) turn(1)
+      turn(dir)
+      onMouseMove(e)
     }
 
     window.addEventListener('keydown', onKey)
@@ -516,8 +539,11 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     el.addEventListener('touchstart', onTouchStart, { passive: true })
     el.addEventListener('touchend', onTouchEnd)
     el.addEventListener('mousedown', onMouseDown)
+    el.addEventListener('mousemove', onMouseMove)
     el.addEventListener('click', onClick)
     return () => {
+      el.dataset.turn = ''
+      el.removeEventListener('mousemove', onMouseMove)
       window.removeEventListener('keydown', onKey)
       el.removeEventListener('wheel', onWheel)
       el.removeEventListener('touchstart', onTouchStart)
@@ -593,7 +619,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
                 spellcheck
                 onFocus={() => live.current?.pager.turnTo(0)}
                 onInput={(e) => {
-                  cleared(e.currentTarget)
+                  emptied(e.currentTarget)
                   live.current?.save.touch()
                   live.current?.moment.touch()
                 }}
@@ -613,7 +639,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
                 spellcheck
                 onFocus={() => live.current?.pager.turnTo(0)}
                 onInput={(e) => {
-                  cleared(e.currentTarget)
+                  emptied(e.currentTarget)
                   live.current?.save.touch()
                   live.current?.moment.touch()
                 }}
@@ -636,7 +662,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
             spellcheck
             onFocus={(e) => live.current?.pager.show((e.currentTarget as HTMLElement).getBoundingClientRect().left)}
             onInput={(e) => {
-              cleared(e.currentTarget)
+              emptied(e.currentTarget)
               setHeading(titleEl.current?.textContent ?? '')
               live.current?.save.touch()
               live.current?.moment.touch()
@@ -741,9 +767,14 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
   )
 }
 
-/** Typing and deleting leaves a <br> behind: emptied, the field shows its placeholder again. */
-function cleared(el: HTMLElement) {
-  if (el.textContent === '' && el.firstChild) el.replaceChildren()
+/**
+ * An empty field holds one <br> and says so in data-empty, which shows its placeholder.
+ * Without the <br>, Firefox puts the caret at the line's left edge, not where centred words start.
+ */
+function emptied(el: HTMLElement) {
+  const empty = el.textContent === ''
+  if (empty && !(el.childNodes.length === 1 && el.firstChild?.nodeName === 'BR')) el.replaceChildren(document.createElement('br'))
+  el.toggleAttribute('data-empty', empty)
 }
 
 /** Words kept for this section that are newer than what is stored for it. */
