@@ -41,7 +41,8 @@ test('words that could not be saved survive leaving the page, and come back with
   await expect(page.locator('.title')).toHaveText('Kept title')
 })
 
-test('pasted Markdown outside the v1 marks becomes plain paragraphs and stays so', async ({ page }) => {
+test('pasted Markdown outside the v1 marks becomes plain paragraphs and stays so', async ({ page, browserName }) => {
+  test.skip(browserName === 'firefox', 'Firefox ignores a synthetic paste event; a real paste goes through the browser')
   await newEssay(page, 'Paste')
   await page.evaluate(() => {
     const dt = new DataTransfer()

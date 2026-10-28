@@ -50,11 +50,11 @@
 [data-measure='wide'] { --measure: 40rem; }
 
 /* The frame: on desktop the controls sit in the corners of the screen, 20px in, but within
-   a frame at most 1280px wide, centred, so on a very wide screen they never drift far apart
+   a frame at most 2560px wide (an iMac 27"), centred, so on a very wide screen they never drift far apart
    (DESIGN.md, Layout). --frame is how far the frame starts from the screen's left edge. */
 :root { --frame: 0px; }
 @media (min-width: 700px) {
-  :root { --body: 19px; --top: 88px; --bottom: 96px; --edge: 20px; --frame: max(0px, calc((100vw - 1280px) / 2)); }
+  :root { --body: 19px; --top: 88px; --bottom: 96px; --edge: 20px; --frame: max(0px, calc((100vw - 2560px) / 2)); }
   [data-size='s'] { --body: 17px; }
   [data-size='l'] { --body: 21px; }
 }
@@ -1220,12 +1220,17 @@ button {
   font-variant-numeric: lining-nums tabular-nums;
 }
 
-/* A book's title page: its title alone on page 1; chapter 1 opens on the next page. */
+/* A book's title page: its title alone on page 1; chapter 1 opens on the next page.
+   The title page is one page tall, so this holds where column breaks are not supported
+   (Firefox); the breaks stay for the engines that have them. */
 .title.chapter-opening {
   break-before: column;
 }
 .title.book-title {
   break-after: column;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
 }
 
 /* "Your tools are here": on the page, no surface, level with the page button and ending 10px from it. */

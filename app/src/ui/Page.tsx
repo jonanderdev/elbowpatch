@@ -237,6 +237,17 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
       // edge. The browser's own caret moves are unreliable in columns (it can jump into a
       // column out of view), so plain ↑ and ↓ are the page's; with Shift they stay the browser's.
       onKey(view, e) {
+        // ← and → are the browser's, but Firefox will not move the caret into a column out of
+        // view: at a page's edge it stops. When a move left the caret where it was, step it.
+        if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey && !e.isComposing) {
+          const before = view.state.selection
+          requestAnimationFrame(() => {
+            if (!view.state.selection.eq(before) || !before.empty) return
+            const next = stepped(view, before.head, e.key === 'ArrowRight' ? 1 : -1)
+            if (next !== null) view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(next), e.key === 'ArrowRight' ? 1 : -1)))
+          })
+          return false
+        }
         if ((e.key !== 'ArrowUp' && e.key !== 'ArrowDown') || e.shiftKey || e.altKey || e.metaKey || e.ctrlKey) return false
         const caret = caretRect(view)
         if (!caret) return false
@@ -678,6 +689,22 @@ function titleOf(opened: Opened): string {
   if (piece.kind === 'essay') return piece.title
   const section = piece.sections.find((s) => s.sectionId === sectionId)
   return piece.kind === 'journal' ? dayTitle(section?.title ?? '') : (section?.title ?? '')
+}
+
+/** One character on from `pos`, a whole one (an emoji is one), or into the next block; null at the end. */
+function stepped(view: EditorView, pos: number, dir: 1 | -1): number | null {
+  const doc = view.state.doc
+  const $pos = doc.resolve(pos)
+  const inBlock = dir > 0 ? $pos.parentOffset < $pos.parent.content.size : $pos.parentOffset > 0
+  if (!inBlock) {
+    // Across a block edge: the next block's start, or the previous one's end.
+    const target = dir > 0 ? $pos.after() + 1 : $pos.before() - 1
+    return target > 0 && target < doc.content.size ? target : null
+  }
+  const text = dir > 0 ? doc.textBetween(pos, Math.min(pos + 16, $pos.end()), '\ufffc', '\ufffc') : doc.textBetween(Math.max(pos - 16, $pos.start()), pos, '\ufffc', '\ufffc')
+  const parts = [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text)]
+  const step = (dir > 0 ? parts[0] : parts.at(-1))?.segment.length ?? 1
+  return pos + dir * step
 }
 
 /** The caret to the first line on screen. */

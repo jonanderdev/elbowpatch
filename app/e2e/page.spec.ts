@@ -238,6 +238,9 @@ test('a book opens on its title page; chapter 1 begins on the next', async ({ pa
   await page.keyboard.press('Enter')
   await expect(page.locator('.chapter-opening')).toBeFocused()
   await expect(page.locator('.page-button')).toHaveText('2')
+  // Chapter 1 is on its own page, not under the book's title.
+  const [b, c] = await Promise.all([page.locator('.book-title').boundingBox(), page.locator('.chapter-opening').boundingBox()])
+  expect(Math.abs(b!.x - c!.x)).toBeGreaterThan(100)
   await page.keyboard.type('Salt on the windows')
   await page.keyboard.press('Enter')
   await page.keyboard.type('The boats came in.')
@@ -277,14 +280,16 @@ test('Library and the page button: text edge on a phone, frame corners on deskto
   if (width < 700) {
     expect(Math.round(library.x)).toBe(Math.round(text.x))
   } else {
-    const frame = Math.max(0, (width - 1280) / 2)
+    const frame = Math.max(0, (width - 2560) / 2)
     expect(Math.round(library.x)).toBe(Math.round(frame + 20))
     expect(Math.round(width - (button.x + button.width))).toBe(Math.round(frame + 20))
   }
-  // On a very wide screen they stay within the frame.
-  await page.setViewportSize({ width: 2560, height: 1200 })
-  await page.waitForTimeout(100)
-  const l = (await page.locator('.head .word-button .word').boundingBox())!
-  const b = (await page.locator('.page-button').boundingBox())!
-  expect(Math.round(b.x + b.width - l.x)).toBe(1280 - 40)
+  // At an iMac 27" (2560 wide) they are at the edges; on anything wider, within the frame.
+  for (const [w, apart] of [[2560, 2560 - 40], [3440, 2560 - 40]] as const) {
+    await page.setViewportSize({ width: w, height: 1200 })
+    await page.waitForTimeout(100)
+    const l = (await page.locator('.head .word-button .word').boundingBox())!
+    const b = (await page.locator('.page-button').boundingBox())!
+    expect(Math.round(b.x + b.width - l.x)).toBe(apart)
+  }
 })
