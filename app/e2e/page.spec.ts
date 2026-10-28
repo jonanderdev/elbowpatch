@@ -293,3 +293,23 @@ test('Library and the page button: text edge on a phone, frame corners on deskto
     expect(Math.round(b.x + b.width - l.x)).toBe(apart)
   }
 })
+
+test('a click in the margin turns the page, but not beside the text', async ({ page }) => {
+  test.skip(page.viewportSize()!.width < 700, 'desktop margins')
+  await newEssay(page)
+  await fill(page, 12)
+  const before = Number(await page.locator('.page-button').textContent())
+  const col = (await page.locator('.pager').boundingBox())!
+  // Just beside the text: nothing turns.
+  await page.mouse.click(col.x - 30, col.y + 200)
+  await expect(page.locator('.page-button')).toHaveText(String(before))
+  // Well into the margin: back a page.
+  await page.mouse.click(col.x - 200, col.y + 200)
+  await expect(page.locator('.page-button')).toHaveText(String(before - 1))
+  // A drag in the margin is not a click to turn.
+  await page.mouse.move(col.x - 200, col.y + 100)
+  await page.mouse.down()
+  await page.mouse.move(col.x - 150, col.y + 300)
+  await page.mouse.up()
+  await expect(page.locator('.page-button')).toHaveText(String(before - 1))
+})

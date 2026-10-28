@@ -45,6 +45,8 @@ interface Props {
 }
 
 const MIN_SIDE = 24
+/** How far beside the text a click in the margin must be to turn the page. */
+const MARGIN_CLEAR = 80
 
 export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, covered, onLibrary, onChange }: Props) {
   const settings = useSettings()
@@ -470,23 +472,33 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
       else turn(-1)
     }
 
+    // A click in the side margins turns the page, but not near the text, where a click is
+    // likely aimed at a word, and never after a drag, which is selecting (DESIGN.md, Behaviour).
+    let down: { x: number; y: number } | undefined
+    const onMouseDown = (e: MouseEvent) => (down = { x: e.clientX, y: e.clientY })
     const onClick = (e: MouseEvent) => {
-      const g = pager()?.g
+      const from = down
+      down = undefined
+      const g = live.current?.pager.g
       if (!g || g.side < 120 || (e.target as HTMLElement).closest('button, .pager, .sheet, [contenteditable]')) return
-      if (e.clientX < g.side) turn(-1)
-      else if (e.clientX > g.side + g.measure) turn(1)
+      if (from && Math.hypot(e.clientX - from.x, e.clientY - from.y) > 4) return
+      if (!window.getSelection()?.isCollapsed) return
+      if (e.clientX < g.side - MARGIN_CLEAR) turn(-1)
+      else if (e.clientX > g.side + g.measure + MARGIN_CLEAR) turn(1)
     }
 
     window.addEventListener('keydown', onKey)
     el.addEventListener('wheel', onWheel, { passive: false })
     el.addEventListener('touchstart', onTouchStart, { passive: true })
     el.addEventListener('touchend', onTouchEnd)
+    el.addEventListener('mousedown', onMouseDown)
     el.addEventListener('click', onClick)
     return () => {
       window.removeEventListener('keydown', onKey)
       el.removeEventListener('wheel', onWheel)
       el.removeEventListener('touchstart', onTouchStart)
       el.removeEventListener('touchend', onTouchEnd)
+      el.removeEventListener('mousedown', onMouseDown)
       el.removeEventListener('click', onClick)
     }
   }, [covered])
