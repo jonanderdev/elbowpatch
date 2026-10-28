@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Kind, Piece } from '../domain/model'
 import { pieceAsMarkdown } from '../domain/export'
 import { forgetPutAway, thin } from '../domain/thinning'
-import { library, newPiece, openPiece, putAway, recover, rename, renameSection, restore, withDay, write, type Deps } from '../domain/pieces'
+import { library, newPiece, openPiece, putAway, recover, rename, renameSection, restore, setSubtitle, withDay, write, type Deps } from '../domain/pieces'
 import type { Held, WriterLock } from '../domain/ports'
 import { Library } from './Library'
 import { download } from './download'
@@ -328,7 +328,10 @@ async function replayJournal(deps: Deps, lock: WriterLock) {
   for (const u of unsaved.all()) {
     const stored = await deps.store.transaction(async (tx) => ({ working: await tx.working(u.sectionId), piece: await tx.piece(u.pieceId) }))
     const sameText = stored.working?.content === u.markdown
-    const sameTitle = (u.title === null || titleIn(stored.piece, u.sectionId) === u.title) && (!u.bookTitle || stored.piece?.title === u.bookTitle)
+    const sameTitle =
+      (u.title === null || titleIn(stored.piece, u.sectionId) === u.title) &&
+      (!u.bookTitle || stored.piece?.title === u.bookTitle) &&
+      (u.subtitle == null || (stored.piece?.subtitle ?? '') === u.subtitle)
     if (sameText && sameTitle) {
       unsaved.saved(u.sectionId)
       continue
@@ -346,6 +349,7 @@ async function replayJournal(deps: Deps, lock: WriterLock) {
           else await renameSection(deps, u.piece, u.sectionId, u.title)
         }
         if (u.bookTitle) await rename(deps, u.piece, u.bookTitle)
+        if (u.subtitle != null) await setSubtitle(deps, u.piece, u.subtitle)
       }
       unsaved.saved(u.sectionId)
     } finally {

@@ -236,6 +236,10 @@ test('a book opens on its title page; chapter 1 begins on the next', async ({ pa
   await expect(page.locator('.book-title')).toBeInViewport()
   await page.keyboard.type('The Long Winter')
   await page.keyboard.press('Enter')
+  // The subtitle, under the title; its placeholder shows only on the title page.
+  await expect(page.locator('.subtitle')).toBeFocused()
+  await page.keyboard.type('a novel in four seasons')
+  await page.keyboard.press('Enter')
   await expect(page.locator('.chapter-opening')).toBeFocused()
   await expect(page.locator('.page-button')).toHaveText('2')
   // Chapter 1 is on its own page, not under the book's title.
@@ -253,7 +257,18 @@ test('a book opens on its title page; chapter 1 begins on the next', async ({ pa
   await page.goto('./#/')
   await page.locator('.row', { hasText: 'The Long Winter' }).click()
   await expect(page.locator('.book-title')).toHaveText('The Long Winter')
+  await expect(page.locator('.subtitle')).toHaveText('a novel in four seasons')
   await expect(page.locator('.chapter-opening')).toHaveText('Salt on the windows')
+  // Centred across the page, in its upper third (measured on the title page itself, whichever page is in view).
+  const placed = await page.evaluate(() => {
+    const tp = document.querySelector('.title-page')!.getBoundingClientRect()
+    const t = document.querySelector('.book-title')!
+    const r = t.getBoundingClientRect()
+    return { centred: getComputedStyle(t).textAlign === 'center' && Math.abs(r.width - tp.width) < 2, top: (r.top - tp.top) / tp.height }
+  })
+  expect(placed.centred).toBe(true)
+  expect(placed.top).toBeGreaterThan(0.1)
+  expect(placed.top).toBeLessThan(0.4)
 })
 
 test('"Your tools are here" until the tools are first opened, then never again', async ({ page }) => {

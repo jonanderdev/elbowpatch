@@ -21,6 +21,8 @@ export interface Unsaved {
   title: string | null
   /** A book's own title, when it changed on its title page and is not stored yet. */
   bookTitle?: string | null
+  /** A book's subtitle, likewise. */
+  subtitle?: string | null
   at: number
 }
 

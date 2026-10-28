@@ -1220,17 +1220,54 @@ button {
   font-variant-numeric: lining-nums tabular-nums;
 }
 
-/* A book's title page: its title alone on page 1; chapter 1 opens on the next page.
-   The title page is one page tall, so this holds where column breaks are not supported
-   (Firefox); the breaks stay for the engines that have them. */
+/* A book's title page, as in a printed book: the title and subtitle centred across the page,
+   in the upper third (the optical centre); chapter 1 opens on the next page. The title page is
+   one page tall, so this holds where column breaks are not supported (Firefox). */
+.title-page {
+  height: 100%;
+  overflow: hidden;
+  break-after: column;
+  padding-top: 22%;
+  text-align: center;
+}
+.book-title {
+  margin: 0;
+  font-size: calc(var(--body) * 2.4);
+  font-weight: 300;
+  font-variation-settings: 'opsz' 60;
+  line-height: 1.12;
+  letter-spacing: -0.012em;
+  color: var(--title);
+  white-space: pre-wrap;
+  hyphens: manual;
+}
+.subtitle {
+  margin: 0.9em 0 0;
+  font-size: calc(var(--body) * 1.15);
+  font-style: italic;
+  line-height: 1.35;
+  color: var(--text);
+  white-space: pre-wrap;
+  hyphens: manual;
+}
+.book-title:empty::before,
+.subtitle:empty::before {
+  content: attr(data-placeholder);
+  color: var(--secondary);
+}
+/* An empty subtitle shows only while the writer is on the title page. */
+.subtitle:empty::before {
+  visibility: hidden;
+}
+.title-page:focus-within .subtitle:empty::before {
+  visibility: visible;
+}
+.book-title:focus-visible,
+.subtitle:focus-visible {
+  outline: none;
+}
 .title.chapter-opening {
   break-before: column;
-}
-.title.book-title {
-  break-after: column;
-  height: 100%;
-  margin: 0;
-  overflow: hidden;
 }
 
 /* "Your tools are here": on the page, no surface, level with the page button and ending 10px from it. */

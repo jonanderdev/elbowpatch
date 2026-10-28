@@ -5,7 +5,7 @@ import { debounced, moments } from '../adapters/schedule'
 import { pieceAsMarkdown } from '../domain/export'
 import { countWords } from '../domain/markdown'
 import type { Piece, Place } from '../domain/model'
-import { openPiece, rename, renameSection, savePlace, takeMoment, write, type Deps } from '../domain/pieces'
+import { openPiece, rename, renameSection, savePlace, setSubtitle, takeMoment, write, type Deps } from '../domain/pieces'
 import { dayTitle, words as wordsLine } from '../domain/words'
 import { createEditor, type Editor } from '../page/editor'
 import { geometry, Pager } from '../page/pager'
@@ -69,6 +69,8 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
   const titleEl = useRef<HTMLHeadingElement>(null)
   /** A book's own title, on its title page before chapter 1. */
   const bookTitleEl = useRef<HTMLHeadingElement>(null)
+  /** Its subtitle, under the title on the title page. */
+  const subtitleEl = useRef<HTMLParagraphElement>(null)
   const mount = useRef<HTMLDivElement>(null)
   const pageButton = useRef<HTMLButtonElement>(null)
   /** The writer typed, clicked into the text or turned a page since this section opened. */
@@ -99,6 +101,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     const title = kept?.title ?? titleOf(opened)
     if (titleEl.current) titleEl.current.textContent = title
     if (bookTitleEl.current) bookTitleEl.current.textContent = kept?.bookTitle ?? opened.piece.title
+    if (subtitleEl.current) subtitleEl.current.textContent = kept?.subtitle ?? opened.piece.subtitle ?? ''
     setHeading(title)
   }, [opened])
 
@@ -106,14 +109,16 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     moved.current = false
     // Words kept for this section and newer than what is stored start this page, and it saves them.
     const waiting = keptFor(opened)
-    const state = { piece, title: titleOf(opened), bookTitle: piece.title, saved: opened.content }
+    const state = { piece, title: titleOf(opened), bookTitle: piece.title, subtitle: piece.subtitle ?? '', saved: opened.content }
     let failedNow = false
     let closed = false
     let retry: ReturnType<typeof setTimeout> | undefined
     /** What this page holds that is not stored: a title only when it changed. */
     const readBookTitle = () => (bookTitleEl.current ? (bookTitleEl.current.textContent ?? state.bookTitle) : null)
-    const entry = (markdown: string, title: string | null, bookTitle: string | null = readBookTitle()) => ({
+    const readSubtitle = () => (subtitleEl.current ? (subtitleEl.current.textContent ?? state.subtitle) : null)
+    const entry = (markdown: string, title: string | null, bookTitle: string | null = readBookTitle(), subtitle: string | null = readSubtitle()) => ({
       bookTitle: bookTitle !== null && bookTitle !== state.bookTitle ? bookTitle : null,
+      subtitle: subtitle !== null && subtitle !== state.subtitle ? subtitle : null,
       piece: state.piece,
       pieceId: piece.id,
       sectionId,
@@ -129,10 +134,15 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
         const markdown = editor.markdown()
         const title = piece.kind === 'journal' ? null : (titleEl.current?.textContent ?? state.title)
         const bookTitle = readBookTitle()
-        const changed = markdown !== state.saved || (title !== null && title !== state.title) || (bookTitle !== null && bookTitle !== state.bookTitle)
+        const subtitle = readSubtitle()
+        const changed =
+          markdown !== state.saved ||
+          (title !== null && title !== state.title) ||
+          (bookTitle !== null && bookTitle !== state.bookTitle) ||
+          (subtitle !== null && subtitle !== state.subtitle)
         if (readOnlyNow.current) {
           // Another window writes this piece now: what was not saved here waits, with Save a copy.
-          if (changed) unsaved.keep(entry(markdown, title, bookTitle), since)
+          if (changed) unsaved.keep(entry(markdown, title, bookTitle, subtitle), since)
           return
         }
         try {
@@ -148,6 +158,10 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
             await rename(deps, state.piece, bookTitle)
             state.bookTitle = bookTitle
           }
+          if (subtitle !== null && subtitle !== state.subtitle) {
+            await setSubtitle(deps, state.piece, subtitle)
+            state.subtitle = subtitle
+          }
           // Clears only these words: newer ones kept meanwhile (the page hid) stay.
           unsaved.saved(sectionId, markdown, title)
           const stored = await openPiece(deps, piece.id)
@@ -159,7 +173,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
         } catch (error) {
           // The words stay; say so, and keep trying while this page is open (0010).
           // A closed page hands them on and never writes again.
-          unsaved.keep(entry(markdown, title, bookTitle), since)
+          unsaved.keep(entry(markdown, title, bookTitle, subtitle), since)
           if (!closed) {
             setFailed((failedNow = true))
             clearTimeout(retry)
@@ -326,8 +340,14 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
       const markdown = editor.markdown()
       const title = piece.kind === 'journal' ? null : (titleEl.current?.textContent ?? state.title)
       const bookTitle = readBookTitle()
-      if (markdown !== state.saved || (title !== null && title !== state.title) || (bookTitle !== null && bookTitle !== state.bookTitle))
-        unsaved.keep(entry(markdown, title, bookTitle))
+      const subtitle = readSubtitle()
+      if (
+        markdown !== state.saved ||
+        (title !== null && title !== state.title) ||
+        (bookTitle !== null && bookTitle !== state.bookTitle) ||
+        (subtitle !== null && subtitle !== state.subtitle)
+      )
+        unsaved.keep(entry(markdown, title, bookTitle, subtitle))
     }
     const onHide = (e: Event) => {
       if (e.type === 'pagehide' || document.visibilityState === 'hidden') {
@@ -557,25 +577,48 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
       <div ref={viewport} className="pager">
         <div ref={flow} className="flow" lang={piece.lang}>
           {titlePage && (
-            <h1
-              ref={bookTitleEl}
-              className="title book-title"
-              contentEditable={readOnly ? undefined : 'plaintext-only'}
-              aria-label={readOnly ? undefined : 'Book title'}
-              data-placeholder="Untitled"
-              spellcheck
-              onFocus={() => live.current?.pager.turnTo(0)}
-              onInput={() => {
-                live.current?.save.touch()
-                live.current?.moment.touch()
-              }}
-              onKeyDown={(e) => {
-                if (e.key !== 'Enter') return
-                // Return goes on to chapter 1's title, on the next page.
-                e.preventDefault()
-                titleEl.current?.focus()
-              }}
-            />
+            // The title page, as in a printed book: the title and its subtitle, centred, in the
+            // upper third; chapter 1 begins on the next page (DESIGN.md, Books and chapters).
+            <div className="title-page">
+              <h1
+                ref={bookTitleEl}
+                className="book-title"
+                contentEditable={readOnly ? undefined : 'plaintext-only'}
+                aria-label={readOnly ? undefined : 'Book title'}
+                data-placeholder="Untitled"
+                spellcheck
+                onFocus={() => live.current?.pager.turnTo(0)}
+                onInput={() => {
+                  live.current?.save.touch()
+                  live.current?.moment.touch()
+                }}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter') return
+                  // Return goes on to the subtitle.
+                  e.preventDefault()
+                  subtitleEl.current?.focus()
+                }}
+              />
+              <p
+                ref={subtitleEl}
+                className="subtitle"
+                contentEditable={readOnly ? undefined : 'plaintext-only'}
+                aria-label={readOnly ? undefined : 'Subtitle'}
+                data-placeholder="Subtitle"
+                spellcheck
+                onFocus={() => live.current?.pager.turnTo(0)}
+                onInput={() => {
+                  live.current?.save.touch()
+                  live.current?.moment.touch()
+                }}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter') return
+                  // Return goes on to chapter 1's title, on the next page.
+                  e.preventDefault()
+                  titleEl.current?.focus()
+                }}
+              />
+            </div>
           )}
           <h1
             ref={titleEl}

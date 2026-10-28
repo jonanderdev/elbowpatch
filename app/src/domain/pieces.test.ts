@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { memoryStore } from '../adapters/memory-store'
-import { history, library, newPiece, openPiece, putAway, recover, rename, restore, takeMoment, totalWords, withDay, write } from './pieces'
+import { history, library, newPiece, openPiece, putAway, recover, rename, restore, setSubtitle, takeMoment, totalWords, withDay, write } from './pieces'
 
 function setup(start = 1_000_000) {
   let t = start
@@ -137,6 +137,18 @@ describe('pieces', () => {
     await restore(deps, piece.id)
     expect((await library(deps)).map((p) => p.id)).toEqual([piece.id])
     expect((await openPiece(deps, piece.id))?.piece.putAwayAt).toBeUndefined()
+  })
+
+  it("a book's subtitle is kept in its outline, like the title", async () => {
+    const { deps, store } = setup()
+    const book = newPiece(deps, 'book', 'en')
+    await write(deps, book, book.sections[0]!.sectionId, 'Text.')
+    await setSubtitle(deps, book, 'a novel in four seasons')
+    await takeMoment(deps, book.id)
+    await setSubtitle(deps, book, 'a novel')
+    expect(await takeMoment(deps, book.id)).toBe(1)
+    const outlines = (await store.transaction((tx) => tx.outlinesOf(book.id))).sort((a, b) => a.seq - b.seq)
+    expect(outlines.map((o) => o.subtitle)).toEqual(['a novel in four seasons', 'a novel'])
   })
 
   it('an empty section with no history gives no version', async () => {

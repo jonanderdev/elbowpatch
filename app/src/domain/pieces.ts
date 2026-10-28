@@ -66,6 +66,15 @@ export function rename(deps: Pick<Deps, 'store' | 'clock'>, draft: Piece, title:
   })
 }
 
+/** A book's subtitle, on its title page; kept in the outline like the title. */
+export function setSubtitle(deps: Pick<Deps, 'store' | 'clock'>, draft: Piece, subtitle: string): Promise<void> {
+  return deps.store.transaction(async (tx) => {
+    const stored = await tx.piece(draft.id)
+    if ((stored?.subtitle ?? '') === subtitle) return
+    await tx.putPiece({ ...(stored ?? draft), subtitle, updatedAt: deps.clock.now() })
+  })
+}
+
 /** A chapter's title: a field, kept in the outline (0005). */
 export function renameSection(deps: Pick<Deps, 'store' | 'clock'>, draft: Piece, sectionId: string, title: string): Promise<void> {
   return deps.store.transaction(async (tx) => {
@@ -113,7 +122,8 @@ export function takeMoment(deps: Deps, pieceId: string, opts: { kept?: boolean }
       if (!unchanged || (opts.kept && parent)) changes.push({ working, parent })
     }
     const outline = piece.outlineId ? await tx.outline(piece.outlineId) : undefined
-    const outlineChanged = !outline || outline.title !== piece.title || !sameSections(outline.sections, piece.sections)
+    const outlineChanged =
+      !outline || outline.title !== piece.title || (outline.subtitle ?? '') !== (piece.subtitle ?? '') || !sameSections(outline.sections, piece.sections)
     if (changes.length === 0 && !outlineChanged) return 0
 
     // One timestamp for the moment, never earlier than anything it follows: clocks jump.
@@ -145,6 +155,7 @@ export function takeMoment(deps: Deps, pieceId: string, opts: { kept?: boolean }
         seq: (outline?.seq ?? 0) + 1,
         createdAt: at,
         title: piece.title,
+        ...(piece.subtitle ? { subtitle: piece.subtitle } : {}),
         sections: piece.sections.map((s) => ({ ...s })),
       }
       await tx.putOutline(next)

@@ -16,6 +16,8 @@ export interface Piece {
   updatedAt: number
   /** The current title and sections, saved as you type; a moment turns a change into an outline version. */
   title: string
+  /** A book's subtitle, on its title page under the title. */
+  subtitle?: string
   sections: OutlineSection[]
   /** The outline version the current title and sections were last kept as. */
   outlineId: string | null
@@ -64,6 +66,7 @@ export interface Outline {
   seq: number
   createdAt: number
   title: string
+  subtitle?: string
   sections: OutlineSection[]
 }
 
