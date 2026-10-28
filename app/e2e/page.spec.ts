@@ -266,3 +266,25 @@ test('"Your tools are here" until the tools are first opened, then never again',
   await expect(page.locator('.page-button')).toBeVisible()
   await expect(wayIn).toHaveCount(0)
 })
+
+test('Library and the page button: text edge on a phone, frame corners on desktop', async ({ page, isMobile }) => {
+  await newEssay(page)
+  await page.keyboard.type('Words.')
+  const width = page.viewportSize()!.width
+  const library = (await page.locator('.head .word-button .word').boundingBox())!
+  const button = (await page.locator('.page-button').boundingBox())!
+  const text = (await page.locator('.pager').boundingBox())!
+  if (width < 700) {
+    expect(Math.round(library.x)).toBe(Math.round(text.x))
+  } else {
+    const frame = Math.max(0, (width - 1280) / 2)
+    expect(Math.round(library.x)).toBe(Math.round(frame + 20))
+    expect(Math.round(width - (button.x + button.width))).toBe(Math.round(frame + 20))
+  }
+  // On a very wide screen they stay within the frame.
+  await page.setViewportSize({ width: 2560, height: 1200 })
+  await page.waitForTimeout(100)
+  const l = (await page.locator('.head .word-button .word').boundingBox())!
+  const b = (await page.locator('.page-button').boundingBox())!
+  expect(Math.round(b.x + b.width - l.x)).toBe(1280 - 40)
+})

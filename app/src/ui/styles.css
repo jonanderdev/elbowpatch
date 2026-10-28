@@ -49,8 +49,12 @@
 [data-leading='loose'] { --leading: 1.72; }
 [data-measure='wide'] { --measure: 40rem; }
 
+/* The frame: on desktop the controls sit in the corners of the screen, 20px in, but within
+   a frame at most 1280px wide, centred, so on a very wide screen they never drift far apart
+   (DESIGN.md, Layout). --frame is how far the frame starts from the screen's left edge. */
+:root { --frame: 0px; }
 @media (min-width: 700px) {
-  :root { --body: 19px; --top: 88px; --bottom: 96px; --edge: 20px; }
+  :root { --body: 19px; --top: 88px; --bottom: 96px; --edge: 20px; --frame: max(0px, calc((100vw - 1280px) / 2)); }
   [data-size='s'] { --body: 17px; }
   [data-size='l'] { --body: 21px; }
 }
@@ -210,7 +214,8 @@ button {
   height: var(--top);
   display: flex;
   align-items: center;
-  /* Library's outline, not its word, sits on the text's left edge (DESIGN.md, Control). */
+  /* On a phone, Library's outline sits on the text's left edge; on desktop, in the frame's
+     top-left corner, as the page button sits in its bottom-right (DESIGN.md, Layout). */
   padding: 0 var(--side);
   z-index: 2;
 }
@@ -412,7 +417,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  padding-right: var(--edge);
+  padding-right: calc(var(--frame) + var(--edge));
   pointer-events: none;
 }
 .foot > * {
@@ -448,7 +453,7 @@ button {
 
 .line {
   position: absolute;
-  left: var(--edge);
+  left: calc(var(--frame) + var(--edge));
   bottom: calc((var(--bottom) - 44px) / 2);
   max-width: calc(100% - 2 * var(--edge) - 56px);
   min-height: 44px;
@@ -488,7 +493,7 @@ button {
   color: var(--title);
 }
 @media (min-width: 700px) {
-  .sheet { left: auto; right: var(--edge); width: 300px; }
+  .sheet { left: auto; right: calc(var(--frame) + var(--edge)); width: 300px; }
   .sheet[aria-label='Export'] { width: 366px; }
 }
 
@@ -920,7 +925,7 @@ button {
 
 .library-lines {
   position: fixed;
-  left: var(--edge);
+  left: calc(var(--frame) + var(--edge));
   bottom: calc((92px - 44px) / 2);
   max-width: calc(100% - 2 * var(--edge) - 56px);
   display: flex;
@@ -1231,4 +1236,14 @@ button {
   line-height: 1;
   color: var(--secondary);
   pointer-events: none;
+}
+
+@media (min-width: 700px) {
+  .head {
+    padding: 0 calc(var(--frame) + var(--edge));
+  }
+  .settings-head {
+    max-width: none;
+    padding-left: calc(var(--frame) + var(--edge) - 12px);
+  }
 }
