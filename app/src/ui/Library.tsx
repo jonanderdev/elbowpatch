@@ -1,16 +1,10 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Kind, Piece } from '../domain/model'
 import { totalWords } from '../domain/pieces'
 import { dayTitle, number, ordinal, shortDate, words } from '../domain/words'
 import { ExportSheet } from './Export'
 import { Icon, IconButton } from './Icon'
-import startBook from './icons/start-book.svg'
-import startBookNight from './icons/start-book-night.svg'
-import startEssay from './icons/start-essay.svg'
-import startEssayNight from './icons/start-essay-night.svg'
-import startJournal from './icons/start-journal.svg'
-import startJournalNight from './icons/start-journal-night.svg'
-import { theme, update, useSettings } from './settings'
+import { update, useSettings } from './settings'
 import { download } from './download'
 import { lastExport } from './everything'
 import { unsaved, useUnsaved } from './unsaved'
@@ -275,13 +269,35 @@ function NewPiece({ today, onNew }: { today: string; onNew(kind: Kind): void }) 
   )
 }
 
+/**
+ * The start objects: the kinds' shelf shapes, drawn with a dashed line (DESIGN.md,
+ * The library). Drawn here in the current colour, so one drawing serves paper and night.
+ */
+const OUTLINES: Record<Kind, ReactNode> = {
+  // A book: squarer corners on the spine side, and the spine line near it.
+  book: (
+    <>
+      <path d="M2.5 0.5H93.5Q99.5 0.5 99.5 6.5V133.5Q99.5 139.5 93.5 139.5H2.5Q0.5 139.5 0.5 137.5V2.5Q0.5 0.5 2.5 0.5Z" />
+      <path d="M10.5 0.5V139.5" />
+    </>
+  ),
+  // A journal: rounded all round, with a band down the right.
+  journal: (
+    <>
+      <rect x="0.5" y="0.5" width="99" height="139" rx="10" />
+      <path d="M86.5 0.5V139.5" />
+    </>
+  ),
+  // An essay: a sheet with its top-right corner folded.
+  essay: (
+    <>
+      <path d="M2.5 0.5H83.5L99.5 16.5V137.5Q99.5 139.5 97.5 139.5H2.5Q0.5 139.5 0.5 137.5V2.5Q0.5 0.5 2.5 0.5Z" />
+      <path d="M83.5 0.5V16.5H99.5" />
+    </>
+  ),
+}
+
 function Empty({ today, onNew, firstRun }: { today: string; onNew(kind: Kind): void; firstRun: boolean }) {
-  const night = theme(useSettings()) === 'night'
-  const outlines = {
-    book: night ? startBookNight : startBook,
-    journal: night ? startJournalNight : startJournal,
-    essay: night ? startEssayNight : startEssay,
-  }
   const words = { book: 'Start a book', journal: 'Start a journal', essay: 'Start an essay' }
   return (
     <div className="empty-library">
@@ -291,13 +307,10 @@ function Empty({ today, onNew, firstRun }: { today: string; onNew(kind: Kind): v
       <p className="empty-line">Begin anywhere.</p>
       <div className="starts">
         {(['book', 'journal', 'essay'] as const).map((kind) => (
-          <button
-            key={kind}
-            type="button"
-            className={`start ${kind}`}
-            style={{ '--start-outline': `url("${outlines[kind]}")` } as CSSProperties}
-            onClick={() => onNew(kind)}
-          >
+          <button key={kind} type="button" className={`start ${kind}`} onClick={() => onNew(kind)}>
+            <svg className="start-outline" viewBox="0 0 100 140" width="100" height="140" aria-hidden="true">
+              {OUTLINES[kind]}
+            </svg>
             {words[kind]}
             <KindMark kind={kind} today={today} />
           </button>

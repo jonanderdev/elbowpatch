@@ -7,6 +7,12 @@ describe('paging maths', () => {
     expect(geometry(1440, 544, 24)).toEqual({ measure: 544, side: 448, stride: 1440 })
   })
 
+  it("the journal's margin rule gets room on the left of a phone page", () => {
+    expect(geometry(390, 544, 24, 44)).toEqual({ measure: 322, side: 44, stride: 390 })
+    // On a desktop the centred column already has more than enough.
+    expect(geometry(1440, 544, 24, 44)).toEqual({ measure: 544, side: 448, stride: 1440 })
+  })
+
   it('stays in whole pixels on an odd width', () => {
     const g = geometry(391, 544, 24)
     expect(Number.isInteger(g.measure) && Number.isInteger(g.side)).toBe(true)

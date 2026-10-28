@@ -12,6 +12,8 @@ import { Settings } from './SettingsView'
 import { unsaved } from './unsaved'
 
 const LAST = 'elbowpatch.last'
+/** The least time the launch screen shows, from the page's start, in ms. */
+const MIN_LAUNCH = 1000
 
 /** URLs use the hash, so any static host works (0011): #/ is the library, #/p/<id> a piece. */
 function useRoute(): [string, (to: string) => void] {
@@ -79,6 +81,8 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
       const wanted = route.startsWith('/p/') ? route.slice(3) : readLast()
       if (wanted) setOpened(await open(wanted).catch(() => null))
       await document.fonts.ready
+      // The launch screen stays a moment even when everything is ready at once: a flash reads as a glitch.
+      await new Promise((r) => setTimeout(r, Math.max(0, MIN_LAUNCH - performance.now())))
       setReady(true)
       document.getElementById('launch')?.setAttribute('hidden', '')
       // Thinning and the end of put-away pieces' 30 days run afterwards, when idle (0010).

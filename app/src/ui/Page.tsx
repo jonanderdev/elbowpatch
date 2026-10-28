@@ -6,7 +6,7 @@ import { pieceAsMarkdown } from '../domain/export'
 import { countWords } from '../domain/markdown'
 import type { Piece, Place } from '../domain/model'
 import { openPiece, rename, renameSection, savePlace, takeMoment, write, type Deps } from '../domain/pieces'
-import { dayTitle } from '../domain/words'
+import { dayTitle, words as wordsLine } from '../domain/words'
 import { createEditor, type Editor } from '../page/editor'
 import { geometry, Pager } from '../page/pager'
 import { download } from './download'
@@ -174,6 +174,8 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     }
 
     let shown = -1
+    let goalX: number | undefined
+    let lastVertical = -1
     const pager = new Pager(viewport.current!, flow.current!, (p, c) => {
       setPage(p)
       setCount(c)
@@ -203,7 +205,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
           void flush()
         }
       },
-      onSelection(view) {
+      onSelection(view, tr) {
         const { from, to, empty } = view.state.selection
         let rect: DOMRect | null = null
         if (!empty && view.hasFocus()) {
@@ -212,14 +214,55 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
           rect = new DOMRect(Math.min(a.left, b.left), Math.min(a.top, b.top), Math.abs(b.right - a.left), Math.max(a.bottom, b.bottom) - Math.min(a.top, b.top))
         }
         setSelection({ rect, active: editor.active() })
+        // The caret moved while writing (a click, a jump): show its page. A move the page made
+        // itself already shows the right one; measuring now would read the caret before it is drawn.
+        if (view.hasFocus() && !tr.getMeta(PAGED)) showCaret(view, pager)
       },
       editable: () => !readOnlyNow.current,
+      // ↑ and ↓ move a line at the same place across, and cross to the next page at a page's
+      // edge. The browser's own caret moves are unreliable in columns (it can jump into a
+      // column out of view), so plain ↑ and ↓ are the page's; with Shift they stay the browser's.
+      onKey(view, e) {
+        if ((e.key !== 'ArrowUp' && e.key !== 'ArrowDown') || e.shiftKey || e.altKey || e.metaKey || e.ctrlKey) return false
+        const caret = caretRect(view)
+        if (!caret) return false
+        const box = viewport.current!.getBoundingClientRect()
+        const line = caret.height || 20
+        const down = e.key === 'ArrowDown'
+        // Keep the place across while moving up and down, as text fields do.
+        goalX = e.repeat || lastVertical === view.state.selection.head ? (goalX ?? caret.left) : caret.left
+        const x = Math.min(Math.max(goalX, box.left + 1), box.right - 1)
+        // Step past paragraph gaps until a different line answers.
+        let hit: { pos: number } | null = null
+        for (let y = down ? caret.bottom + 2 : caret.top - 2; y >= box.top && y <= box.bottom; y += down ? 3 : -3) {
+          const h = view.posAtCoords({ left: x, top: y })
+          if (!h) continue
+          const top = view.coordsAtPos(h.pos, 1).top
+          if (down ? top > caret.top + 2 : top < caret.top - 2) {
+            hit = h
+            break
+          }
+        }
+        if (!hit) {
+          // No line left on this page that way: the next page's first line, or the previous one's last.
+          if (down ? pager.page >= pager.count - 1 : pager.page === 0) return true
+          if (down) pager.next()
+          else pager.previous()
+          hit = view.posAtCoords({ left: x, top: down ? box.top + line / 2 : lastLineTop(view, box) })
+        }
+        if (hit) {
+          view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(hit.pos))).setMeta(PAGED, true))
+          lastVertical = view.state.selection.head
+        }
+        return true
+      },
     })
 
     const relayout = () => {
       const root = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
       const max = (document.documentElement.dataset.measure === 'wide' ? 40 : 34) * root
-      const g = geometry(document.documentElement.clientWidth, max, MIN_SIDE)
+      // The journal's margin rule sits 24px in on a phone, with the text at 44px (DESIGN.md, The journal).
+      const g = geometry(document.documentElement.clientWidth, max, MIN_SIDE, piece.kind === 'journal' ? 44 : MIN_SIDE)
       screen.current!.style.setProperty('--side', `${g.side}px`)
       screen.current!.style.setProperty('--measure-px', `${g.measure}px`)
       pager.layout(g)
@@ -334,9 +377,20 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
       return live.current?.pager
     }
 
+    // A turn while writing takes the caret along to the top of the new page,
+    // so typing goes on where the writer is looking.
+    const turn = (dir: 1 | -1) => {
+      const p = pager()
+      if (!p) return
+      if (dir > 0) p.next()
+      else p.previous()
+      const view = live.current?.editor.view
+      if (view?.hasFocus()) caretToTop(view, viewport.current!)
+    }
+
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'PageDown' || (e.altKey && e.key === 'ArrowRight')) pager()?.next()
-      else if (e.key === 'PageUp' || (e.altKey && e.key === 'ArrowLeft')) pager()?.previous()
+      if (e.key === 'PageDown' || (e.altKey && e.key === 'ArrowRight')) turn(1)
+      else if (e.key === 'PageUp' || (e.altKey && e.key === 'ArrowLeft')) turn(-1)
       else return
       e.preventDefault()
     }
@@ -354,8 +408,8 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
         lastWheel = 0
         return
       }
-      if (delta > 0) pager()?.next()
-      else pager()?.previous()
+      if (delta > 0) turn(1)
+      else turn(-1)
     }
 
     let start: { x: number; y: number } | undefined
@@ -371,15 +425,15 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
       start = undefined
       if (Math.abs(dx) < 50 || Math.abs(dx) < 1.5 * Math.abs(dy)) return
       if (!window.getSelection()?.isCollapsed) return
-      if (dx < 0) pager()?.next()
-      else pager()?.previous()
+      if (dx < 0) turn(1)
+      else turn(-1)
     }
 
     const onClick = (e: MouseEvent) => {
       const g = pager()?.g
       if (!g || g.side < 120 || (e.target as HTMLElement).closest('button, .pager, .sheet, [contenteditable]')) return
-      if (e.clientX < g.side) pager()?.previous()
-      else if (e.clientX > g.side + g.measure) pager()?.next()
+      if (e.clientX < g.side) turn(-1)
+      else if (e.clientX > g.side + g.measure) turn(1)
     }
 
     window.addEventListener('keydown', onKey)
@@ -421,6 +475,8 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
   }, [line])
 
   const closeTools = () => {
+    // Closing the tools closes what was opened from them.
+    setSheet(null)
     setTools(false)
     requestAnimationFrame(() => pageButton.current?.focus())
   }
@@ -439,7 +495,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
   }
 
   return (
-    <div ref={screen} className="page-screen" inert={covered} aria-hidden={covered}>
+    <div ref={screen} className={piece.kind === 'journal' ? 'page-screen journal' : 'page-screen'} inert={covered} aria-hidden={covered}>
       <div className="head">
         <button type="button" className="library-link" onClick={onLibrary}>
           Library
@@ -484,6 +540,8 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
       )}
 
       <div className={keyboard > 0 ? 'foot raised' : 'foot'} style={keyboard > 0 ? { bottom: keyboard } : undefined}>
+        {/* The day's words, at the text's left edge, level with the page button. */}
+        {piece.kind === 'journal' && !tools && <span className="day-words">{wordsLine(words)}</span>}
         {tools ? (
           <ToolsBar
             page={page + 1}
@@ -561,13 +619,52 @@ function titleOf(opened: Opened): string {
   return piece.kind === 'journal' ? dayTitle(section?.title ?? '') : (section?.title ?? '')
 }
 
+/** The caret to the first line on screen. */
+function caretToTop(view: EditorView, viewport: HTMLElement) {
+  const r = viewport.getBoundingClientRect()
+  const hit = view.posAtCoords({ left: r.left + 2, top: r.top + 4 })
+  if (!hit) return
+  view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(hit.pos))).setMeta(PAGED, true))
+}
+
+/** Marks a selection the page set itself, already on the page in view. */
+const PAGED = 'elbowpatch-paged'
+
 function showCaret(view: EditorView, pager: Pager) {
-  const { head } = view.state.selection
-  try {
-    pager.show(view.coordsAtPos(head).left)
-  } catch {
-    // Not laid out yet.
+  const rect = caretRect(view)
+  if (rect) pager.show(rect.left)
+}
+
+/**
+ * Where the caret is drawn. At a soft line break the same position is the end
+ * of one line and the start of the next; the browser's own caret says which.
+ */
+function caretRect(view: EditorView): DOMRect | null {
+  if (view.hasFocus()) {
+    const selection = view.dom.ownerDocument.getSelection()
+    if (selection?.rangeCount) {
+      const range = selection.getRangeAt(0).cloneRange()
+      range.collapse(selection.focusNode === range.endContainer && selection.focusOffset === range.endOffset)
+      const rects = range.getClientRects()
+      const r = rects[rects.length - 1] ?? range.getBoundingClientRect()
+      if (r && (r.width || r.height)) return r
+    }
   }
+  try {
+    const c = view.coordsAtPos(view.state.selection.head, 1)
+    return new DOMRect(c.left, c.top, 0, c.bottom - c.top)
+  } catch {
+    return null // not laid out yet
+  }
+}
+
+/** The top of the last line of text on the page in view, to land the caret on it. */
+function lastLineTop(view: EditorView, box: DOMRect): number {
+  for (let y = box.bottom - 4; y > box.top; y -= 6) {
+    const hit = view.posAtCoords({ left: box.left + 2, top: y })
+    if (hit && hit.inside >= 0) return y
+  }
+  return box.bottom - 10
 }
 
 /** Where the writer is: the caret if writing, as a paragraph, an offset and its opening words. */

@@ -162,3 +162,39 @@ test('formatting from the selection menu, without Markdown', async ({ page, isMo
   await page.reload()
   await expect(page.locator('.body blockquote.pull strong em, .body blockquote.pull em strong')).toHaveCount(1)
 })
+
+test('the caret and the pages move together', async ({ page }) => {
+  await newEssay(page)
+  await fill(page, 8)
+  await page.keyboard.type('The end.')
+  const lastPage = Number(await page.locator('.page-button').textContent())
+  expect(lastPage).toBeGreaterThan(1)
+
+  // Page Up takes the caret along: typing lands where the writer is looking, and stays in view.
+  // (A word typed at a line's start may fit on the line before, and the page follows it there.)
+  await page.keyboard.press('PageUp')
+  await expect(page.locator('.page-button')).toHaveText(String(lastPage - 1))
+  await page.keyboard.type('HERE ')
+  const inView = () =>
+    page.evaluate(() => {
+      const col = document.querySelector('.pager')!.getBoundingClientRect()
+      const caret = getSelection()!.getRangeAt(0).getBoundingClientRect()
+      const word = [...document.querySelectorAll('.body p')].find((p) => p.textContent!.includes('HERE'))!
+      const range = document.createRange()
+      const node = [...word.childNodes].find((n) => n.textContent!.includes('HERE'))!
+      const at = node.textContent!.indexOf('HERE')
+      range.setStart(node, at)
+      range.setEnd(node, at + 4)
+      const w = range.getBoundingClientRect()
+      const inside = (r: DOMRect) => r.left >= col.left - 1 && r.right <= col.right + 1
+      return inside(caret) && inside(w)
+    })
+  expect(await inView()).toBe(true)
+  expect(Number(await page.locator('.page-button').textContent())).toBeGreaterThanOrEqual(lastPage - 2)
+
+  // Arrow keys walk the caret across a page edge, and the page follows.
+  for (let i = 0; i < 60; i++) await page.keyboard.press('ArrowDown')
+  await expect(page.locator('.page-button')).toHaveText(String(lastPage))
+  for (let i = 0; i < 80; i++) await page.keyboard.press('ArrowUp')
+  await expect.poll(async () => Number(await page.locator('.page-button').textContent())).toBeLessThan(lastPage)
+})

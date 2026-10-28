@@ -3,7 +3,7 @@ import { history, redo, undo } from 'prosemirror-history'
 import { InputRule, inputRules, textblockTypeInputRule, undoInputRule } from 'prosemirror-inputrules'
 import { keymap } from 'prosemirror-keymap'
 import { Fragment, Slice, type MarkType } from 'prosemirror-model'
-import { EditorState, Plugin, TextSelection, type Command } from 'prosemirror-state'
+import { EditorState, Plugin, TextSelection, type Command, type Transaction } from 'prosemirror-state'
 import { Decoration, DecorationSet, EditorView } from 'prosemirror-view'
 import { parse, serialize, type Block } from '../domain/markdown'
 import { schema, toBlocks, toDoc } from './schema'
@@ -18,7 +18,9 @@ export interface EditorOptions {
   /** False while another window writes this piece. */
   editable?(): boolean
   /** The selection moved or changed: the selection menu follows it. */
-  onSelection?(view: EditorView): void
+  onSelection?(view: EditorView, tr: Transaction): void
+  /** A key the page handles first (arrows at a page's edge); true when it did. */
+  onKey?(view: EditorView, event: KeyboardEvent): boolean
 }
 
 export interface Editor {
@@ -63,6 +65,7 @@ export function createEditor(mount: HTMLElement, options: EditorOptions): Editor
     clipboardTextParser: (text) => new Slice(Fragment.from(toDoc(parse(text).map(plainIfRaw)).content), 0, 0),
     clipboardTextSerializer: (slice) => serialize(toBlocks(schema.nodes.doc.create(null, slice.content.size ? slice.content : undefined))),
     // The pager turns to the caret; nothing scrolls by itself.
+    handleKeyDown: (v, e) => options.onKey?.(v, e) ?? false,
     handleScrollToSelection: (v) => {
       options.onCaret(v)
       return true
@@ -75,7 +78,7 @@ export function createEditor(mount: HTMLElement, options: EditorOptions): Editor
       const next = view.state.apply(tr)
       view.updateState(next)
       if (tr.docChanged) options.onChange(serialize(toBlocks(next.doc)))
-      if (tr.selectionSet || tr.docChanged || tr.storedMarksSet) options.onSelection?.(view)
+      if (tr.selectionSet || tr.docChanged || tr.storedMarksSet) options.onSelection?.(view, tr)
     },
   })
 

@@ -7,16 +7,22 @@
 export interface Geometry {
   /** The text column, in whole pixels. */
   measure: number
-  /** The margin either side of it. */
+  /** The margin left of it. */
   side: number
+  /** Screen width: page k starts at k × stride. */
   stride: number
 }
 
-/** Whole pixels, so page 300 lands where page 1 does. */
-export function geometry(screenWidth: number, maxMeasure: number, minSide: number): Geometry {
-  const measure = Math.floor(Math.min(maxMeasure, screenWidth - 2 * minSide))
-  const side = Math.floor((screenWidth - measure) / 2)
-  return { measure, side, stride: measure + 2 * side }
+/**
+ * Whole pixels, so page 300 lands where page 1 does. The column is centred,
+ * with at least `minSide` either side and `minLeft` on the left (the journal's
+ * margin rule wants more room there).
+ */
+export function geometry(screenWidth: number, maxMeasure: number, minSide: number, minLeft = minSide): Geometry {
+  const width = Math.floor(screenWidth)
+  const measure = Math.floor(Math.min(maxMeasure, width - minSide - minLeft))
+  const side = Math.max(minLeft, Math.floor((width - measure) / 2))
+  return { measure, side, stride: width }
 }
 
 export function pageCount(scrollWidth: number, g: Geometry): number {
@@ -25,7 +31,7 @@ export function pageCount(scrollWidth: number, g: Geometry): number {
 
 /** The page holding a point, given its distance from the start of the flow. */
 export function pageAt(offset: number, g: Geometry): number {
-  return Math.max(0, Math.floor((offset + g.side) / g.stride))
+  return Math.max(0, Math.floor((offset + (g.stride - g.measure) / 2) / g.stride))
 }
 
 export class Pager {
@@ -51,7 +57,7 @@ export class Pager {
   layout(g: Geometry) {
     this.g = g
     this.flow.style.columnWidth = `${g.measure}px`
-    this.flow.style.columnGap = `${2 * g.side}px`
+    this.flow.style.columnGap = `${g.stride - g.measure}px`
     this.measure()
   }
 
