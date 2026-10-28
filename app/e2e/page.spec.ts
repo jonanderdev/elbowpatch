@@ -315,6 +315,40 @@ test('on desktop a turn always leaves the caret ready to type, even while readin
   }
 })
 
+test('← and → across a page break never leave the caret where it is painted at the page\'s top', async ({ page }) => {
+  await newEssay(page)
+  await fill(page, 10)
+  // The caret is wrong when it sits where a page breaks mid-paragraph, after the earlier page's
+  // last space, and is drawn on that earlier page: Firefox paints it at the page's top there.
+  const atBadBreak = () =>
+    page.evaluate(() => {
+      const s = getSelection()!
+      const t = s.focusNode
+      if (!t || t.nodeType !== 3 || s.focusOffset === 0 || s.focusOffset >= t.textContent!.length) return false
+      if (!/\s/.test(t.textContent![s.focusOffset - 1] ?? '')) return false
+      const r = document.createRange()
+      const page = (x: number) => Math.floor((x - document.querySelector('.flow')!.getBoundingClientRect().left + 40) / innerWidth)
+      r.setStart(t, s.focusOffset - 1)
+      r.setEnd(t, s.focusOffset)
+      const before = page(r.getBoundingClientRect().left)
+      r.setStart(t, s.focusOffset)
+      r.setEnd(t, s.focusOffset + 1)
+      if (before === page(r.getBoundingClientRect().left)) return false
+      const rects = s.getRangeAt(0).getClientRects()
+      const caret = rects[rects.length - 1]
+      return !!caret && page(caret.left) === before
+    })
+  // To page 2's first letter, from the end of page 1, a letter at a time, and back.
+  for (let i = 0; i < 12; i++) await page.keyboard.press('PageUp')
+  await expect(page.locator('.page-button')).toHaveText('1')
+  await page.keyboard.press('PageDown')
+  await page.keyboard.press('PageUp') // the end of page 1's text
+  for (const key of ['ArrowRight', 'ArrowRight', 'ArrowRight', 'ArrowLeft', 'ArrowLeft', 'ArrowLeft', 'ArrowLeft']) {
+    await page.keyboard.press(key)
+    await expect.poll(atBadBreak, { message: `after ${key}` }).toBe(false)
+  }
+})
+
 test('a piece left while writing opens with the caret where it was, ready to type', async ({ page }) => {
   test.skip(page.viewportSize()!.width < 700, 'on a phone the caret waits for a tap')
   await newEssay(page)

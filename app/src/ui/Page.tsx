@@ -262,6 +262,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
       // edge. The browser's own caret moves are unreliable in columns (it can jump into a
       // column out of view), so plain ↑ and ↓ are the page's; with Shift they stay the browser's.
       onKey(view, e) {
+        lastMove = e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowRight' ? 1 : 0
         // ← and → are the browser's, but Firefox will not move the caret into a column out of
         // view: at a page's edge it stops. When a move left the caret where it was, step it.
         if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey && !e.isComposing) {
@@ -377,13 +378,27 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     // find in page), once the browser has drawn it, show the page it is drawn on. One rule
     // in one place, since the browser's own moves can land in a column out of view.
     let following = 0
+    // The last caret move by hand: -1 back (← or a click), 1 on (→), 0 anything else (typing).
+    let lastMove = 0
     const follow = () => {
       cancelAnimationFrame(following)
       following = requestAnimationFrame(() => {
         if (placed && editor.view.state.selection.eq(placed)) return
-        if (editor.view.hasFocus()) showCaret(editor.view, pager)
+        if (!editor.view.hasFocus()) return
+        // Left, by ← → or a click, where a page breaks mid-paragraph and drawn on the earlier page
+        // (as Firefox does), the caret is painted at that page's top: a letter on, the way it went.
+        const at = lastMove ? drawnBeforeBreak(editor.view, pager, flow.current!) : null
+        if (at !== null) {
+          const view = editor.view
+          view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, at + (lastMove > 0 ? 1 : -1))))
+          return
+        }
+        showCaret(editor.view, pager)
       })
     }
+    // A click places the caret like ←: at a page's end, kept on that page.
+    const onPointer = () => (lastMove = -1)
+    mount.current!.addEventListener('mousedown', onPointer)
     document.addEventListener('selectionchange', follow)
     document.addEventListener('visibilitychange', onHide)
     window.addEventListener('pagehide', onHide)
@@ -391,6 +406,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
 
     return () => {
       document.removeEventListener('selectionchange', follow)
+      mount.current?.removeEventListener('mousedown', onPointer)
       cancelAnimationFrame(following)
       document.removeEventListener('visibilitychange', onHide)
       window.removeEventListener('pagehide', onHide)
@@ -941,6 +957,23 @@ function placeOn(view: EditorView, pos: number, line: Line, edge: number, pager:
     else break
   }
   view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(at))).setMeta(PAGED, true))
+}
+
+/**
+ * The caret's position when it sits where a page breaks mid-paragraph, after the earlier page's
+ * last space (also the next page's first position), and is drawn on the earlier page: there a
+ * browser (Firefox) paints it at that page's top. Null anywhere else.
+ */
+function drawnBeforeBreak(view: EditorView, pager: Pager, flow: HTMLElement): number | null {
+  const { empty, head, $head } = view.state.selection
+  if (!empty || $head.parentOffset === 0 || $head.parentOffset === $head.parent.content.size) return null
+  if (!/\s/.test(view.state.doc.textBetween(head - 1, head))) return null
+  const start = flow.getBoundingClientRect().left
+  const page = (x: number) => pageAt(x - start, pager.g)
+  const before = page(view.coordsAtPos(head, -1).left)
+  if (before === page(view.coordsAtPos(head, 1).left)) return null
+  const caret = caretRect(view)
+  return caret && page(caret.left) === before ? head : null
 }
 
 /** Where a caret at `pos` would be drawn, without moving the caret there. */
