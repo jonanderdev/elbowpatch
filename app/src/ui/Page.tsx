@@ -91,8 +91,9 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
   const readOnlyNow = useRef(readOnly)
   readOnlyNow.current = readOnly
   const titleEditable = piece.kind !== 'journal' && !readOnly
-  // A book opens on its title page: its own title, then chapter 1 on the next page (DESIGN.md, Books and chapters).
-  const titlePage = piece.kind === 'book' && piece.sections[0]?.sectionId === sectionId
+  // A book or a journal opens on its title page: its own name, then chapter 1 or the first day
+  // on the next page (DESIGN.md, Books and chapters; The journal).
+  const titlePage = piece.kind !== 'essay' && piece.sections[0]?.sectionId === sectionId
 
   // The title field is the page's own text (uncontrolled), set each time a section opens:
   // a rename from the library, or Write here, opens it again with the title as stored.
@@ -424,8 +425,11 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
       if (!first) void live.current?.flush()
     } else if (opened.fresh && !opened.focused && !readOnly) {
       opened.focused = true
-      if (titlePage) bookTitleEl.current?.focus()
-      else if (titleEditable) titleEl.current?.focus()
+      if (titlePage) {
+        bookTitleEl.current?.focus()
+        // A new journal is called "Journal": selected, so typing names it.
+        if (piece.kind === 'journal') getSelection()?.selectAllChildren(bookTitleEl.current!)
+      } else if (titleEditable) titleEl.current?.focus()
       else live.current?.editor.focus()
     }
   }, [covered, readOnly])
@@ -584,11 +588,12 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
                 ref={bookTitleEl}
                 className="book-title"
                 contentEditable={readOnly ? undefined : 'plaintext-only'}
-                aria-label={readOnly ? undefined : 'Book title'}
+                aria-label={readOnly ? undefined : piece.kind === 'book' ? 'Book title' : 'Journal name'}
                 data-placeholder="Untitled"
                 spellcheck
                 onFocus={() => live.current?.pager.turnTo(0)}
-                onInput={() => {
+                onInput={(e) => {
+                  cleared(e.currentTarget)
                   live.current?.save.touch()
                   live.current?.moment.touch()
                 }}
@@ -607,15 +612,17 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
                 data-placeholder="Subtitle"
                 spellcheck
                 onFocus={() => live.current?.pager.turnTo(0)}
-                onInput={() => {
+                onInput={(e) => {
+                  cleared(e.currentTarget)
                   live.current?.save.touch()
                   live.current?.moment.touch()
                 }}
                 onKeyDown={(e) => {
                   if (e.key !== 'Enter') return
-                  // Return goes on to chapter 1's title, on the next page.
+                  // Return goes on to chapter 1's title, or the first day's text, on the next page.
                   e.preventDefault()
-                  titleEl.current?.focus()
+                  if (titleEditable) titleEl.current?.focus()
+                  else live.current?.editor.focus()
                 }}
               />
             </div>
@@ -628,7 +635,8 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
             data-placeholder={piece.kind === 'book' ? 'Chapter title' : 'Untitled'}
             spellcheck
             onFocus={(e) => live.current?.pager.show((e.currentTarget as HTMLElement).getBoundingClientRect().left)}
-            onInput={() => {
+            onInput={(e) => {
+              cleared(e.currentTarget)
               setHeading(titleEl.current?.textContent ?? '')
               live.current?.save.touch()
               live.current?.moment.touch()
@@ -731,6 +739,11 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
       </div>
     </div>
   )
+}
+
+/** Typing and deleting leaves a <br> behind: emptied, the field shows its placeholder again. */
+function cleared(el: HTMLElement) {
+  if (el.textContent === '' && el.firstChild) el.replaceChildren()
 }
 
 /** Words kept for this section that are newer than what is stored for it. */

@@ -233,7 +233,7 @@ test('a book opens on its title page; chapter 1 begins on the next', async ({ pa
   await page.locator('.start.book').click()
   await expect(page.locator('.book-title')).toBeFocused()
   // Both fields say what they are while empty.
-  for (const [field, word] of [['.book-title', 'Untitled'], ['.subtitle', 'Subtitle']]) {
+  for (const [field, word] of [['.book-title', 'Untitled'], ['.subtitle', 'Subtitle']] as const) {
     const shown = await page.locator(field).evaluate((el) => {
       const before = getComputedStyle(el, '::before')
       return before.content.replace(/"/g, '') + '|' + before.visibility
@@ -244,8 +244,12 @@ test('a book opens on its title page; chapter 1 begins on the next', async ({ pa
   await expect(page.locator('.book-title')).toBeInViewport()
   await page.keyboard.type('The Long Winter')
   await page.keyboard.press('Enter')
-  // The subtitle, under the title; its placeholder shows only on the title page.
+  // The subtitle, under the title.
   await expect(page.locator('.subtitle')).toBeFocused()
+  // Typed and deleted, it says what it is again (browsers leave a <br> behind).
+  await page.keyboard.type('a no')
+  for (let i = 0; i < 4; i++) await page.keyboard.press('Backspace')
+  expect(await page.locator('.subtitle').evaluate((el) => getComputedStyle(el, '::before').content)).toBe('"Subtitle"')
   await page.keyboard.type('a novel in four seasons')
   await page.keyboard.press('Enter')
   await expect(page.locator('.chapter-opening')).toBeFocused()
@@ -277,6 +281,25 @@ test('a book opens on its title page; chapter 1 begins on the next', async ({ pa
   expect(placed.centred).toBe(true)
   expect(placed.top).toBeGreaterThan(0.1)
   expect(placed.top).toBeLessThan(0.4)
+})
+
+test('a journal opens on its title page, named there; the first day begins on the next', async ({ page }) => {
+  await page.goto('./')
+  await page.locator('.start.journal').click()
+  // Called "Journal" until named: selected, so typing names it.
+  await expect(page.locator('.book-title')).toBeFocused()
+  await expect(page.locator('.book-title')).toHaveText('Journal')
+  await page.keyboard.type('Dream journal')
+  await page.keyboard.press('Enter')
+  await expect(page.locator('.subtitle')).toBeFocused()
+  await page.keyboard.press('Enter')
+  // The day's date is its title, not a field: Return goes on to the text.
+  await expect(page.locator('.body')).toBeFocused()
+  await expect(page.locator('.page-button')).toHaveText('2')
+  await page.keyboard.type('I dreamt of the sea.')
+  await saved(page, 'I dreamt of the sea.')
+  await page.locator('.head .word-button').click()
+  await expect(page.locator('.row', { hasText: 'Dream journal' })).toBeVisible()
 })
 
 test('"Your tools are here" until the tools are first opened, then never again', async ({ page }) => {
