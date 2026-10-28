@@ -15,6 +15,8 @@ export interface EditorOptions {
   /** The editor wants the caret seen: the pager turns to its page. */
   onCaret(view: EditorView): void
   onFocusChange?(focused: boolean): void
+  /** False while another window writes this piece. */
+  editable?(): boolean
 }
 
 export interface Editor {
@@ -50,6 +52,7 @@ export function createEditor(mount: HTMLElement, options: EditorOptions): Editor
 
   const view = new EditorView(mount, {
     state,
+    editable: () => options.editable?.() ?? true,
     attributes: { class: 'body', lang: options.lang, spellcheck: 'true', 'aria-label': 'Text', 'aria-multiline': 'true', role: 'textbox' },
     // Pasted plain text is read as Markdown, with the same rules as typing (0003).
     clipboardTextParser: (text) => new Slice(Fragment.from(toDoc(parse(text)).content), 0, 0),

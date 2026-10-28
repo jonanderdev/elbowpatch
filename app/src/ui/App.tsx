@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Kind, Piece } from '../domain/model'
 import { library, newPiece, openPiece, recover, withDay, type Deps } from '../domain/pieces'
+import type { Held, WriterLock } from '../domain/ports'
 import { Library } from './Library'
 import { Page, type Opened } from './Page'
 
@@ -22,7 +23,7 @@ function useRoute(): [string, (to: string) => void] {
   return [route, go]
 }
 
-export function App({ deps }: { deps: Deps }) {
+export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
   const [route, go] = useRoute()
   const [ready, setReady] = useState(false)
   const [pieces, setPieces] = useState<Piece[]>([])
@@ -90,6 +91,52 @@ export function App({ deps }: { deps: Deps }) {
     if (opened) writeLast(opened.piece.id)
   }, [opened?.piece.id])
 
+  // One window writes a piece (0010). The lock follows the piece, not the page,
+  // so reopening the same piece never locks this window out.
+  // Waiting for the lock, writing, or another window writes it.
+  const [writer, setWriter] = useState<'waiting' | 'here' | 'elsewhere'>('waiting')
+  const held = useRef<Held | null>(null)
+  const flushPage = useRef<(() => Promise<void>) | null>(null)
+  const pieceId = opened?.piece.id
+  const onAsked = useCallback(async () => {
+    await flushPage.current?.()
+    setWriter('elsewhere')
+  }, [])
+  const follow = useCallback((h: Held) => {
+    held.current = h
+    setWriter('here')
+    void h.lost.then(() => {
+      if (held.current === h) {
+        held.current = null
+        setWriter('elsewhere')
+      }
+    })
+  }, [])
+  useEffect(() => {
+    if (!pieceId) return
+    let alive = true
+    setWriter('waiting')
+    void lock.hold(pieceId, onAsked).then((h) => {
+      if (!alive) return h?.release()
+      if (h) follow(h)
+      else setWriter('elsewhere')
+    })
+    return () => {
+      alive = false
+      held.current?.release()
+      held.current = null
+    }
+  }, [pieceId])
+
+  const writeHere = async () => {
+    if (!pieceId) return
+    const h = await lock.take(pieceId, onAsked)
+    // The other window has saved: start from what it left.
+    const fresh = await open(pieceId)
+    follow(h)
+    if (fresh) setOpened(fresh)
+  }
+
   const startNew = (kind: Kind) => {
     let piece = newPiece(deps, kind, navigator.language || 'en')
     let sectionId = piece.sections[0]?.sectionId ?? ''
@@ -109,9 +156,15 @@ export function App({ deps }: { deps: Deps }) {
           key={`${opened.piece.id}:${opened.sectionId}`}
           deps={deps}
           opened={opened}
+          writer={writer}
+          onWriteHere={() => void writeHere()}
+          flushRef={flushPage}
           covered={inLibrary}
           onLibrary={() => go('/')}
-          onChange={(piece) => setPieces((all) => (all.some((p) => p.id === piece.id) ? all.map((p) => (p.id === piece.id ? piece : p)) : [piece, ...all]))}
+          onChange={(piece) => {
+            askToPersist()
+            setPieces((all) => (all.some((p) => p.id === piece.id) ? all.map((p) => (p.id === piece.id ? piece : p)) : [piece, ...all]))
+          }}
         />
       )}
       {inLibrary && (
@@ -152,4 +205,15 @@ function writeLast(id: string) {
   try {
     localStorage.setItem(LAST, id)
   } catch {}
+}
+
+/**
+ * Asks the browser to keep this site's storage, once there is something to keep.
+ * Not at launch: some browsers ask the writer, and a first visit is no time for it (0010).
+ */
+let asked = false
+function askToPersist() {
+  if (asked) return
+  asked = true
+  void navigator.storage?.persist?.().catch(() => {})
 }

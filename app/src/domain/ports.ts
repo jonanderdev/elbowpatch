@@ -35,3 +35,17 @@ export interface Tx {
   outline(id: string): Promise<Outline | undefined>
   putOutline(outline: Outline): Promise<void>
 }
+
+/** One window at a time writes a piece (docs/decisions/0010). */
+export interface WriterLock {
+  /** Holds the piece if no other window does; null when another window writes it. */
+  hold(pieceId: string, onAsked: () => Promise<void>): Promise<Held | null>
+  /** "Write here": asks the window that holds it to save and let go, then holds it. */
+  take(pieceId: string, onAsked: () => Promise<void>): Promise<Held>
+}
+
+export interface Held {
+  release(): void
+  /** Settles when another window has taken the piece. */
+  lost: Promise<void>
+}

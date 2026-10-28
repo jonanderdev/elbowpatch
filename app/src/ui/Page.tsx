@@ -26,6 +26,11 @@ export interface Opened {
 interface Props {
   deps: Deps
   opened: Opened
+  /** Who writes this piece (0010): until the lock answers, and while another window writes it, nothing changes here. */
+  writer: 'waiting' | 'here' | 'elsewhere'
+  onWriteHere(): void
+  /** Lets the app ask the page to save now, before another window takes the piece. */
+  flushRef: { current: (() => Promise<void>) | null }
   /** The library shows over the page; the page stays laid out behind it, inert. */
   covered: boolean
   onLibrary(): void
@@ -34,7 +39,7 @@ interface Props {
 
 const MIN_SIDE = 24
 
-export function Page({ deps, opened, covered, onLibrary, onChange }: Props) {
+export function Page({ deps, opened, writer, onWriteHere, flushRef, covered, onLibrary, onChange }: Props) {
   const settings = useSettings()
   const [page, setPage] = useState(0)
   const [count, setCount] = useState(1)
@@ -63,7 +68,10 @@ export function Page({ deps, opened, covered, onLibrary, onChange }: Props) {
   }>(null)
 
   const { piece, sectionId } = opened
-  const titleEditable = piece.kind !== 'journal'
+  const readOnly = writer !== 'here'
+  const readOnlyNow = useRef(readOnly)
+  readOnlyNow.current = readOnly
+  const titleEditable = piece.kind !== 'journal' && !readOnly
 
   useEffect(() => {
     const state = { piece, title: titleOf(opened) }
@@ -72,11 +80,13 @@ export function Page({ deps, opened, covered, onLibrary, onChange }: Props) {
 
     const save = debounced(
       async () => {
+        if (readOnlyNow.current) return
         const markdown = editor.markdown()
         try {
           await write(deps, state.piece, sectionId, markdown)
           const title = titleEl.current?.textContent ?? ''
-          if (titleEditable && title !== state.title) {
+          // A journal day's title is its date, never written here.
+          if (piece.kind !== 'journal' && title !== state.title) {
             if (piece.kind === 'essay') await rename(deps, state.piece, title)
             else await renameSection(deps, state.piece, sectionId, title)
             state.title = title
@@ -101,7 +111,7 @@ export function Page({ deps, opened, covered, onLibrary, onChange }: Props) {
 
     const moment = moments(async () => {
       await save.flush().catch(() => {})
-      if (failedNow) return
+      if (failedNow || readOnlyNow.current) return
       await takeMoment(deps, piece.id).catch(() => {})
       const place = placeOf(editor.view, sectionId, pager.page)
       if (place) await savePlace(deps, piece.id, place).catch(() => {})
@@ -134,6 +144,7 @@ export function Page({ deps, opened, covered, onLibrary, onChange }: Props) {
       onFocusChange(focused) {
         if (!focused) void flush()
       },
+      editable: () => !readOnlyNow.current,
     })
 
     const relayout = () => {
@@ -146,6 +157,7 @@ export function Page({ deps, opened, covered, onLibrary, onChange }: Props) {
     }
 
     live.current = { editor, pager, piece, flush, relayout, save, moment }
+    flushRef.current = flush
 
     // Lay out once the fonts are in, so page breaks do not move after load (0011).
     relayout()
@@ -183,6 +195,7 @@ export function Page({ deps, opened, covered, onLibrary, onChange }: Props) {
       })
       editor.destroy()
       live.current = null
+      if (flushRef.current === flush) flushRef.current = null
     }
     // One editor per opened section.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -198,16 +211,21 @@ export function Page({ deps, opened, covered, onLibrary, onChange }: Props) {
     })
   }, [settings.size, settings.leading, settings.measure, settings.align, settings.dropcap, settings.indent])
 
+  // Another window took the piece: stop writing here at once.
+  useEffect(() => {
+    live.current?.editor.view.setProps({})
+  }, [readOnly])
+
   // Going to the library is switching pieces: keep a moment.
   // Coming to a new piece: the title takes the caret (the text, in a journal).
   useEffect(() => {
     if (covered) void live.current?.flush()
-    else if (opened.fresh && !opened.focused) {
+    else if (opened.fresh && !opened.focused && !readOnly) {
       opened.focused = true
       if (titleEditable) titleEl.current?.focus()
       else live.current?.editor.focus()
     }
-  }, [covered])
+  }, [covered, readOnly])
 
   // Turning pages: keys, the wheel (one page per gesture), a sideways swipe, the side margins.
   useEffect(() => {
@@ -399,7 +417,14 @@ export function Page({ deps, opened, covered, onLibrary, onChange }: Props) {
         />
       )}
 
-      {failed ? (
+      {writer === 'elsewhere' ? (
+        <div className="line surface" role="status">
+          Open in another window ·
+          <button type="button" onClick={onWriteHere}>
+            Write here
+          </button>
+        </div>
+      ) : failed ? (
         <div className="line surface" role="alert">
           Can't save right now. Your words are still here.
           <button type="button" onClick={() => void exportMarkdown()}>

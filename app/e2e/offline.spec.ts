@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { caretToEnd } from './helpers'
 
 test('opens and keeps writing with no network', async ({ page, context }) => {
   await page.goto('./')
@@ -15,8 +16,7 @@ test('opens and keeps writing with no network', async ({ page, context }) => {
   await expect(page.locator('.body')).toContainText('Written on a train.')
   // The fonts came from the app, not the network.
   expect(await page.evaluate(() => document.fonts.check('360 18px Literata'))).toBe(true)
-  await page.locator('.body p').last().click()
-  await page.keyboard.press('End')
+  await caretToEnd(page)
   await page.keyboard.type(' Still writing.')
   await page.waitForTimeout(1300)
   await page.reload()

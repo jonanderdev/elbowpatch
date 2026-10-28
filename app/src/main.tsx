@@ -1,5 +1,6 @@
 import { render } from 'react-dom'
 import { openStore } from './adapters/idb-store'
+import { writerLock } from './adapters/writer-lock'
 import { App } from './ui/App'
 import { apply } from './ui/settings'
 import { watchForUpdates } from './ui/updates'
@@ -14,4 +15,4 @@ const deps = {
 
 apply()
 watchForUpdates()
-render(<App deps={deps} />, document.getElementById('app')!)
+render(<App deps={deps} lock={writerLock()} />, document.getElementById('app')!)
