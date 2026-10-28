@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import type { Kind, Piece } from '../domain/model'
 import { totalWords } from '../domain/pieces'
 import { dayTitle, number, ordinal, shortDate, words } from '../domain/words'
@@ -70,6 +70,25 @@ export function Library({ pieces, last, today, onOpen, onNew, onRename, onExport
       window.removeEventListener('keydown', undo)
     }
   }, [awayNow])
+  /** The piece menu works the same on Continue and on every row (DESIGN.md, The library). */
+  const handlers = (piece: Piece) => ({
+    piece,
+    meta: meta(piece, today, now),
+    menuOpen: menuFor === piece.id,
+    onMenu: (open: boolean) => setMenuFor(open ? piece.id : null),
+    onOpen: () => onOpen(piece),
+    onRename: (title: string) => onRename(piece, title),
+    onExport: () => {
+      setMenuFor(null)
+      setExporting(piece)
+    },
+    onPutAway: async () => {
+      setMenuFor(null)
+      // Never asks first: nothing is lost, and Undo is right there (0006).
+      await onPutAway(piece)
+      setAwayNow(piece)
+    },
+  })
   const undoPutAway = async () => {
     if (!awayNow) return
     const piece = awayNow
@@ -97,15 +116,20 @@ export function Library({ pieces, last, today, onOpen, onNew, onRename, onExport
             {last && (
               <>
                 <div className="continue-heading">Where you left off</div>
-                <button type="button" className="continue surface" onClick={() => onOpen(last)}>
-                  <span className="continue-excerpt">{excerpt(last)}</span>
-                  <span className="continue-foot">
-                    <span className="continue-meta">{continueMeta(last)}</span>
-                    <span className="patch" aria-label={`page ${last.place?.page ?? 1}`}>
-                      {last.place?.page ?? 1}
-                    </span>
-                  </span>
-                </button>
+                <PieceRow
+                  {...handlers(last)}
+                  card={
+                    <>
+                      <span className="continue-excerpt">{excerpt(last)}</span>
+                      <span className="continue-foot">
+                        <span className="continue-meta">{continueMeta(last)}</span>
+                        <span className="patch" aria-label={`page ${last.place?.page ?? 1}`}>
+                          {last.place?.page ?? 1}
+                        </span>
+                      </span>
+                    </>
+                  }
+                />
               </>
             )}
             {KINDS.map(({ kind, group }) => {
@@ -119,25 +143,7 @@ export function Library({ pieces, last, today, onOpen, onNew, onRename, onExport
                   </h2>
                   <ul className="rows">
                     {rows.map((piece) => (
-                      <PieceRow
-                        key={piece.id}
-                        piece={piece}
-                        meta={meta(piece, today, now)}
-                        menuOpen={menuFor === piece.id}
-                        onMenu={(open) => setMenuFor(open ? piece.id : null)}
-                        onOpen={() => onOpen(piece)}
-                        onRename={(title) => onRename(piece, title)}
-                        onExport={() => {
-                          setMenuFor(null)
-                          setExporting(piece)
-                        }}
-                        onPutAway={async () => {
-                          setMenuFor(null)
-                          // Never asks first: nothing is lost, and Undo is right there (0006).
-                          await onPutAway(piece)
-                          setAwayNow(piece)
-                        }}
-                      />
+                      <PieceRow key={piece.id} {...handlers(piece)} />
                     ))}
                   </ul>
                 </section>
@@ -350,10 +356,12 @@ function meta(piece: Piece, today: string, now: number): string {
 }
 
 /**
- * One piece in the list. Press and hold, right-click, or the menu key / Shift
- * + F10 opens the piece menu over it (DESIGN.md, The library).
+ * One piece in the list, or the Continue card. Press and hold, right-click, or
+ * the menu key / Shift + F10 opens the piece menu over it (DESIGN.md, The library).
  */
 function PieceRow(props: {
+  /** The Continue card's body; a list row when absent. */
+  card?: ReactNode
   piece: Piece
   meta: string
   menuOpen: boolean
@@ -363,8 +371,10 @@ function PieceRow(props: {
   onExport(): void
   onPutAway(): void
 }) {
-  const { piece, menuOpen, onMenu } = props
+  const { piece, menuOpen, onMenu, card } = props
   const [renaming, setRenaming] = useState(false)
+  const Wrap = card ? 'div' : 'li'
+  const look = card ? 'continue surface' : 'row'
   const row = useRef<HTMLButtonElement>(null)
   const menu = useRef<HTMLDivElement>(null)
   const input = useRef<HTMLInputElement>(null)
@@ -407,9 +417,9 @@ function PieceRow(props: {
   }
 
   return (
-    <li className="piece">
+    <Wrap className={card ? 'piece continue-piece' : 'piece'}>
       {renaming ? (
-        <div className="row pressed">
+        <div className={`${look} pressed renaming`}>
           <input
             ref={input}
             className="row-title rename"
@@ -428,7 +438,7 @@ function PieceRow(props: {
         <button
           ref={row}
           type="button"
-          className={menuOpen ? 'row pressed' : 'row'}
+          className={menuOpen ? `${look} pressed` : look}
           aria-haspopup="menu"
           onClick={() => {
             if (held.current) held.current = false
@@ -456,8 +466,12 @@ function PieceRow(props: {
           onPointerCancel={() => clearTimeout(hold.current)}
           onPointerMove={() => clearTimeout(hold.current)}
         >
-          <span className="row-title">{piece.title.trim() || 'Untitled'}</span>
-          <span className="row-meta">{props.meta}</span>
+          {card ?? (
+            <>
+              <span className="row-title">{piece.title.trim() || 'Untitled'}</span>
+              <span className="row-meta">{props.meta}</span>
+            </>
+          )}
         </button>
       )}
       {menuOpen && (
@@ -514,6 +528,6 @@ function PieceRow(props: {
           />
         </div>
       )}
-    </li>
+    </Wrap>
   )
 }

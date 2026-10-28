@@ -395,9 +395,13 @@ button {
 }
 
 .page-button {
+  /* A circle: 44 across with its border. Past page 99 the number widens it into a pill. */
   min-width: 44px;
   height: 44px;
-  padding: 0 14px;
+  padding: 0 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 22px;
   font-size: 15px;
   line-height: 1;
@@ -446,7 +450,10 @@ button {
   position: fixed;
   left: 12px;
   right: 12px;
-  bottom: 12px;
+  /* Above the tools bar, which stays in view beneath it (Figma, Text settings). */
+  bottom: calc((var(--bottom) - 44px) / 2 + 44px + 12px);
+  max-height: calc(100dvh - var(--bottom) - 24px);
+  overflow-y: auto;
   z-index: 5;
   display: flex;
   flex-direction: column;
@@ -456,7 +463,7 @@ button {
   color: var(--title);
 }
 @media (min-width: 700px) {
-  .sheet { left: auto; right: var(--edge); bottom: calc((var(--bottom) - 44px) / 2); width: 300px; }
+  .sheet { left: auto; right: var(--edge); width: 300px; }
   .sheet[aria-label='Export'] { width: 366px; }
 }
 
@@ -1048,8 +1055,8 @@ button {
 }
 
 .import-sheet {
+  bottom: 12px;
   max-height: calc(100dvh - 24px);
-  overflow-y: auto;
 }
 @media (min-width: 700px) {
   .import-sheet { width: 366px; }
@@ -1109,4 +1116,20 @@ button {
     visibility: visible;
     transition: opacity 120ms 500ms, visibility 0s 500ms;
   }
+}
+
+/* Continue carries the piece menu too: with one piece, it is the only way to it. */
+.continue-piece {
+  margin: 0 12px 32px;
+}
+.continue-piece > .continue {
+  margin: 0;
+  width: 100%;
+}
+.continue.pressed {
+  background: var(--pressed);
+}
+.continue.renaming {
+  padding-top: 16px;
+  padding-bottom: 16px;
 }

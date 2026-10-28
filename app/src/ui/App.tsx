@@ -207,7 +207,11 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
           }}
           onChange={(piece) => {
             askToPersist()
-            setPieces((all) => (all.some((p) => p.id === piece.id) ? all.map((p) => (p.id === piece.id ? piece : p)) : [piece, ...all]))
+            setPieces((all) => {
+              // A closing page may report a piece just put away: it leaves the library, not comes back.
+              if (piece.putAwayAt !== undefined) return all.filter((p) => p.id !== piece.id)
+              return all.some((p) => p.id === piece.id) ? all.map((p) => (p.id === piece.id ? piece : p)) : [piece, ...all]
+            })
           }}
         />
       )}
@@ -244,8 +248,8 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
             if (opened?.piece.id === piece.id) await flushPage.current?.()
             await putAway(deps, piece.id)
             // The page behind was this piece: it goes with it; Continue moves on.
+            // (Continue still points at it, so Undo brings it back as it was; it cannot be opened meanwhile.)
             if (opened?.piece.id === piece.id) setOpened(null)
-            if (readLast() === piece.id) writeLast('')
             await refresh()
           }}
           onRestore={async (piece) => {
