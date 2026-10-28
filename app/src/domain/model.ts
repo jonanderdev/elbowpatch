@@ -50,6 +50,8 @@ export interface Version {
   createdAt: number
   content: string
   kept?: boolean
+  /** The text a "bring back" replaced: never thinned (0005). */
+  beforeBringBack?: boolean
 }
 
 /** The piece's structure at a moment: its title and its sections' titles. Immutable. */

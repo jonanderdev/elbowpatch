@@ -103,6 +103,11 @@ function txOver(tx: IDBPTransaction<Schema, Stores[], 'readwrite'>): Tx {
     versionsOf: (sectionId) => tx.objectStore('versions').index('sectionId').getAll(sectionId),
     putVersion: async (v) => void (await s('versions').put(v)),
     outline: (id) => tx.objectStore('outlines').get(id),
+    outlinesOf: (pieceId) => tx.objectStore('outlines').index('pieceId').getAll(pieceId),
     putOutline: async (o) => void (await s('outlines').put(o)),
+    deleteVersion: async (id) => void (await s('versions').delete(id)),
+    deleteOutline: async (id) => void (await s('outlines').delete(id)),
+    deleteWorking: async (id) => void (await s('working').delete(id)),
+    deletePiece: async (id) => void (await s('pieces').delete(id)),
   }
 }

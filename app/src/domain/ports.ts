@@ -33,7 +33,14 @@ export interface Tx {
   putVersion(version: Version): Promise<void>
 
   outline(id: string): Promise<Outline | undefined>
+  outlinesOf(pieceId: string): Promise<Outline[]>
   putOutline(outline: Outline): Promise<void>
+
+  // Only thinning (0005) and the end of a put-away piece's 30 days (0006) delete.
+  deleteVersion(id: string): Promise<void>
+  deleteOutline(id: string): Promise<void>
+  deleteWorking(sectionId: string): Promise<void>
+  deletePiece(id: string): Promise<void>
 }
 
 /** One window at a time writes a piece (docs/decisions/0010). */

@@ -56,6 +56,11 @@ function txOver(d: Data): Tx {
     versionsOf: async (sectionId) => copy([...d.versions.values()].filter((v) => v.sectionId === sectionId)),
     putVersion: async (v) => void d.versions.set(v.id, copy(v)),
     outline: async (id) => copy(d.outlines.get(id)),
+    outlinesOf: async (pieceId) => copy([...d.outlines.values()].filter((o) => o.pieceId === pieceId)),
     putOutline: async (o) => void d.outlines.set(o.id, copy(o)),
+    deleteVersion: async (id) => void d.versions.delete(id),
+    deleteOutline: async (id) => void d.outlines.delete(id),
+    deleteWorking: async (id) => void d.working.delete(id),
+    deletePiece: async (id) => void d.pieces.delete(id),
   }
 }
