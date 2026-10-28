@@ -42,7 +42,7 @@ export function write(deps: Pick<Deps, 'store' | 'clock'>, draft: Piece, section
     if (stored && working?.content === content) return
     const piece = stored ?? draft
     // A section new in the draft (today, in a journal) joins the piece with its first words.
-    const sections = piece.sections.some((s) => s.sectionId === sectionId) ? piece.sections : draft.sections
+    const sections = joined(piece, draft, sectionId)
     const words = { ...piece.words, [sectionId]: countWords(content) }
     await tx.putPiece({ ...piece, sections, words, updatedAt: now })
     await tx.putWorking({
@@ -68,9 +68,7 @@ export function rename(deps: Pick<Deps, 'store' | 'clock'>, draft: Piece, title:
 export function renameSection(deps: Pick<Deps, 'store' | 'clock'>, draft: Piece, sectionId: string, title: string): Promise<void> {
   return deps.store.transaction(async (tx) => {
     const piece = (await tx.piece(draft.id)) ?? draft
-    const sections = (piece.sections.some((s) => s.sectionId === sectionId) ? piece.sections : draft.sections).map((s) =>
-      s.sectionId === sectionId ? { ...s, title } : s,
-    )
+    const sections = joined(piece, draft, sectionId).map((s) => (s.sectionId === sectionId ? { ...s, title } : s))
     await tx.putPiece({ ...piece, sections, updatedAt: deps.clock.now() })
   })
 }
@@ -186,6 +184,24 @@ export async function library(deps: Pick<Deps, 'store'>): Promise<Piece[]> {
   return pieces.filter((p) => p.putAwayAt === undefined).sort((a, b) => b.updatedAt - a.updatedAt)
 }
 
+/** Puts a piece away: out of the library, kept whole, for 30 days (0006). Never asks first; `restore` undoes it. */
+export function putAway(deps: Pick<Deps, 'store' | 'clock'>, pieceId: string): Promise<void> {
+  return deps.store.transaction(async (tx) => {
+    const piece = await tx.piece(pieceId)
+    if (piece && piece.putAwayAt === undefined) await tx.putPiece({ ...piece, putAwayAt: deps.clock.now() })
+  })
+}
+
+/** Brings a put-away piece back to the library as it was, with all its moments. */
+export function restore(deps: Pick<Deps, 'store'>, pieceId: string): Promise<void> {
+  return deps.store.transaction(async (tx) => {
+    const piece = await tx.piece(pieceId)
+    if (!piece || piece.putAwayAt === undefined) return
+    const { putAwayAt: _, ...back } = piece
+    await tx.putPiece(back)
+  })
+}
+
 /** A section's versions, oldest first, ordered by their parents and never by the clock. */
 export function history(versions: Version[]): Version[] {
   return [...versions].sort((a, b) => a.seq - b.seq)
@@ -193,6 +209,15 @@ export function history(versions: Version[]): Version[] {
 
 export function latest(versions: Version[]): Version | undefined {
   return history(versions).at(-1)
+}
+
+/** The stored sections, with this one added from the draft if it is new; journal days in date order. */
+function joined(stored: Piece, draft: Piece, sectionId: string): Piece['sections'] {
+  if (stored.sections.some((s) => s.sectionId === sectionId)) return stored.sections
+  const added = draft.sections.find((s) => s.sectionId === sectionId)
+  if (!added) return stored.sections
+  const sections = [...stored.sections, added]
+  return stored.kind === 'journal' ? sections.sort((a, b) => a.title.localeCompare(b.title)) : sections
 }
 
 function sameSections(a: Piece['sections'], b: Piece['sections']): boolean {

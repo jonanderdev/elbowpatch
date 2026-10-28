@@ -44,7 +44,8 @@ export function debounced(task: () => Promise<void>, idle: number, max: number):
       const now = Date.now()
       firstChange ??= now
       clearTimeout(timer)
-      timer = setTimeout(run, Math.max(0, Math.min(idle, firstChange + max - now)))
+      // A run the timer starts reports its own failure (the caller's task does); nothing is left unhandled.
+      timer = setTimeout(() => void run().catch(() => {}), Math.max(0, Math.min(idle, firstChange + max - now)))
     },
     flush: run,
     cancel() {
@@ -78,7 +79,7 @@ export function moments(take: () => Promise<unknown>, idle = 3000, every = 5 * 6
       pending = true
       clearTimeout(timer)
       const wait = Math.max(idle, last + every - Date.now())
-      timer = setTimeout(run, wait)
+      timer = setTimeout(() => void run().catch(() => {}), wait)
     },
     flush: run,
     cancel() {

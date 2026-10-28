@@ -5,7 +5,7 @@ import { keymap } from 'prosemirror-keymap'
 import { Fragment, Slice, type MarkType } from 'prosemirror-model'
 import { EditorState, Plugin, TextSelection, type Command } from 'prosemirror-state'
 import { Decoration, DecorationSet, EditorView } from 'prosemirror-view'
-import { parse, serialize } from '../domain/markdown'
+import { parse, serialize, type Block } from '../domain/markdown'
 import { schema, toBlocks, toDoc } from './schema'
 
 export interface EditorOptions {
@@ -59,7 +59,8 @@ export function createEditor(mount: HTMLElement, options: EditorOptions): Editor
     editable: () => options.editable?.() ?? true,
     attributes: { class: 'body', lang: options.lang, spellcheck: 'true', 'aria-label': 'Text', 'aria-multiline': 'true', role: 'textbox' },
     // Pasted plain text is read as Markdown, with the same rules as typing (0003).
-    clipboardTextParser: (text) => new Slice(Fragment.from(toDoc(parse(text)).content), 0, 0),
+    // Markdown outside the v1 marks, headings included, arrives as plain paragraphs.
+    clipboardTextParser: (text) => new Slice(Fragment.from(toDoc(parse(text).map(plainIfRaw)).content), 0, 0),
     clipboardTextSerializer: (slice) => serialize(toBlocks(schema.nodes.doc.create(null, slice.content.size ? slice.content : undefined))),
     // The pager turns to the caret; nothing scrolls by itself.
     handleScrollToSelection: (v) => {
@@ -108,9 +109,23 @@ function markActive(state: EditorState, type: MarkType): boolean {
   return state.doc.rangeHasMark(from, to, type)
 }
 
+/**
+ * A line break inside a paragraph. Markdown cannot hold one at a paragraph's
+ * start or two in a row (they would read back as a new paragraph), so those
+ * are refused. One left at the end with nothing after it is only space.
+ */
 const insertBreak: Command = (state, dispatch) => {
+  const { $from, $to } = state.selection
+  if ($from.parent.type === schema.nodes.raw) return false
+  const before = $from.nodeBefore
+  const after = $to.nodeAfter
+  if (!before || before.type === schema.nodes.hard_break || after?.type === schema.nodes.hard_break) return true
   dispatch?.(state.tr.replaceSelectionWith(schema.nodes.hard_break.create()).scrollIntoView())
   return true
+}
+
+function plainIfRaw(block: Block): Block {
+  return block.type === 'raw' ? { type: 'paragraph', spans: [{ text: block.text, marks: [] }] } : block
 }
 
 const toggleQuote: Command = (state, dispatch) => {
@@ -141,6 +156,8 @@ function markdownRules(): InputRule[] {
 /** `*word*` becomes italic as you type the closing star. */
 function markRule(pattern: RegExp, type: MarkType): InputRule {
   return new InputRule(pattern, (state, match, start, end) => {
+    // Markdown kept as written stays as written.
+    if (state.doc.resolve(start).parent.type === schema.nodes.raw) return null
     const inner = match[1]!
     const tr = state.tr.replaceWith(start, end, schema.text(inner, [...state.doc.resolve(start).marks(), type.create()]))
     return tr.removeStoredMark(type)

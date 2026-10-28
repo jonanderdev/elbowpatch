@@ -18,8 +18,9 @@ export function ToolsBar(props: { page: number; count: number; words: number; on
   const short = typeof window !== 'undefined' && window.innerWidth < 400 && full.length > 22
   return (
     <div ref={ref} className="bar surface tools" role="toolbar" aria-label="Tools">
-      <span className="count" aria-label={`Page ${props.page} of ${props.count}, ${number(props.words)} words`}>
-        {short ? `${props.page} of ${props.count}  ·  ${number(props.words)}` : full}
+      <span className="count">
+        <span aria-hidden="true">{short ? `${props.page} of ${props.count}  ·  ${number(props.words)}` : full}</span>
+        <span className="visually-hidden">{`Page ${props.page} of ${props.count}, ${number(props.words)} words`}</span>
       </span>
       <span className="bar-separator" />
       <IconButton icon="export" label="Export" onClick={props.onExport} />

@@ -7,6 +7,8 @@ const desktop = { viewport: { width: 1440, height: 900 } }
 export default defineConfig({
   testDir: 'e2e',
   fullyParallel: true,
+  // More workers than this once stalled the run on this machine; the cause was not pinned down.
+  workers: 4,
   reporter: 'list',
   // The built app, service worker included.
   use: { baseURL: 'http://localhost:5198/' },

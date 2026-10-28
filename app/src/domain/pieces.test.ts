@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { memoryStore } from '../adapters/memory-store'
-import { history, library, newPiece, openPiece, recover, rename, takeMoment, totalWords, withDay, write } from './pieces'
+import { history, library, newPiece, openPiece, putAway, recover, rename, restore, takeMoment, totalWords, withDay, write } from './pieces'
 
 function setup(start = 1_000_000) {
   let t = start
@@ -121,6 +121,22 @@ describe('pieces', () => {
     const open = await openPiece(deps, journal.id)
     expect(open!.sections.map((s) => [s.title, s.content])).toEqual([['2026-10-26', 'Monday.'], ['2026-10-27', 'Tuesday.']])
     expect(totalWords(open!.piece)).toBe(2)
+  })
+
+  it('puts a piece away whole, and brings it back as it was', async () => {
+    const { deps, store } = setup()
+    const piece = newPiece(deps, 'essay', 'en')
+    const section = piece.sections[0]!.sectionId
+    await write(deps, piece, section, 'Kept.')
+    await takeMoment(deps, piece.id)
+    await putAway(deps, piece.id)
+    expect(await library(deps)).toEqual([])
+    // Nothing is lost while it waits.
+    expect((await openPiece(deps, piece.id))?.sections[0]?.content).toBe('Kept.')
+    expect(await store.transaction((tx) => tx.versionsOf(section))).toHaveLength(1)
+    await restore(deps, piece.id)
+    expect((await library(deps)).map((p) => p.id)).toEqual([piece.id])
+    expect((await openPiece(deps, piece.id))?.piece.putAwayAt).toBeUndefined()
   })
 
   it('an empty section with no history gives no version', async () => {

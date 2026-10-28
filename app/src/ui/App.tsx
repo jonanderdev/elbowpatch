@@ -3,7 +3,9 @@ import type { Kind, Piece } from '../domain/model'
 import { library, newPiece, openPiece, recover, withDay, type Deps } from '../domain/pieces'
 import type { Held, WriterLock } from '../domain/ports'
 import { Library } from './Library'
+import { download } from './download'
 import { Page, type Opened } from './Page'
+import { useUnsaved } from './unsaved'
 
 const LAST = 'elbowpatch.last'
 
@@ -29,6 +31,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
   const [pieces, setPieces] = useState<Piece[]>([])
   const [opened, setOpened] = useState<Opened | null>(null)
   const today = isoDay(new Date())
+  const waiting = useUnsaved()
 
   const refresh = useCallback(async () => setPieces(await library(deps)), [deps])
 
@@ -97,6 +100,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
   const [writer, setWriter] = useState<'waiting' | 'here' | 'elsewhere'>('waiting')
   const held = useRef<Held | null>(null)
   const flushPage = useRef<(() => Promise<void>) | null>(null)
+  const closing = useRef<Promise<void>>(Promise.resolve())
   const pieceId = opened?.piece.id
   const onAsked = useCallback(async () => {
     await flushPage.current?.()
@@ -123,8 +127,11 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
     })
     return () => {
       alive = false
-      held.current?.release()
+      const h = held.current
       held.current = null
+      // Let go only after the closing page's last save, so no other window writes alongside it.
+      // (A timeout: the page's own cleanup, which sets `closing`, runs after this one.)
+      setTimeout(() => void closing.current.finally(() => h?.release()), 0)
     }
   }, [pieceId])
 
@@ -146,6 +153,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
   }
 
   if (!ready) return null
+  // shortcut: Save a copy here holds the unsaved section only, not the whole piece.
   const inLibrary = route === '/' || !opened
   const last = pieces.find((p) => p.id === readLast() && p.place)
 
@@ -159,6 +167,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
           writer={writer}
           onWriteHere={() => void writeHere()}
           flushRef={flushPage}
+          closingRef={closing}
           covered={inLibrary}
           onLibrary={() => go('/')}
           onChange={(piece) => {
@@ -166,6 +175,14 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
             setPieces((all) => (all.some((p) => p.id === piece.id) ? all.map((p) => (p.id === piece.id ? piece : p)) : [piece, ...all]))
           }}
         />
+      )}
+      {inLibrary && waiting.length > 0 && (
+        <div className="line surface library-line" role="alert">
+          Can't save right now. Your words are still here.
+          <button type="button" onClick={() => waiting.forEach((u) => download(u.name, u.markdown))}>
+            Save a copy
+          </button>
+        </div>
       )}
       {inLibrary && (
         <Library

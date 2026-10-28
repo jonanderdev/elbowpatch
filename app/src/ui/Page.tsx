@@ -12,6 +12,7 @@ import { geometry, Pager } from '../page/pager'
 import { download } from './download'
 import { ExportSheet } from './Export'
 import { useSettings } from './settings'
+import { unsaved } from './unsaved'
 import { TextSettings, ToolsBar } from './Tools'
 import { SelectionMenu, useKeyboard, WritingBar } from './Writing'
 
@@ -32,6 +33,8 @@ interface Props {
   onWriteHere(): void
   /** Lets the app ask the page to save now, before another window takes the piece. */
   flushRef: { current: (() => Promise<void>) | null }
+  /** The closing page's last save, so the app lets go of the piece only after it. */
+  closingRef: { current: Promise<void> }
   /** The library shows over the page; the page stays laid out behind it, inert. */
   covered: boolean
   onLibrary(): void
@@ -40,7 +43,7 @@ interface Props {
 
 const MIN_SIDE = 24
 
-export function Page({ deps, opened, writer, onWriteHere, flushRef, covered, onLibrary, onChange }: Props) {
+export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, covered, onLibrary, onChange }: Props) {
   const settings = useSettings()
   const [page, setPage] = useState(0)
   const [count, setCount] = useState(1)
@@ -79,23 +82,37 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, covered, onL
   const titleEditable = piece.kind !== 'journal' && !readOnly
 
   useEffect(() => {
-    const state = { piece, title: titleOf(opened) }
+    // Words a closed page could not save start this one, and are saved by it,
+    // unless something newer was stored since (another window); they still wait for Save a copy.
+    const kept = unsaved.get(sectionId)
+    const waiting = kept && kept.at > piece.updatedAt ? kept : undefined
+    const state = { piece, title: titleOf(opened), saved: opened.content }
     let failedNow = false
+    let closed = false
     let retry: ReturnType<typeof setTimeout> | undefined
+    const fileName = () => pieceAsMarkdown(state.piece, []).name
 
     const save = debounced(
       async () => {
-        if (readOnlyNow.current) return
+        // Read everything before the first await: the page may close while this runs.
         const markdown = editor.markdown()
+        const title = piece.kind === 'journal' ? null : (titleEl.current?.textContent ?? state.title)
+        const changed = markdown !== state.saved || (title !== null && title !== state.title)
+        if (readOnlyNow.current) {
+          // Another window writes this piece now: what was not saved here waits, with Save a copy.
+          if (changed) unsaved.keep({ pieceId: piece.id, sectionId, name: fileName(), markdown, title })
+          return
+        }
         try {
           await write(deps, state.piece, sectionId, markdown)
-          const title = titleEl.current?.textContent ?? ''
+          state.saved = markdown
           // A journal day's title is its date, never written here.
-          if (piece.kind !== 'journal' && title !== state.title) {
+          if (title !== null && title !== state.title) {
             if (piece.kind === 'essay') await rename(deps, state.piece, title)
             else await renameSection(deps, state.piece, sectionId, title)
             state.title = title
           }
+          unsaved.saved(sectionId)
           const stored = await openPiece(deps, piece.id)
           if (stored) {
             state.piece = stored.piece
@@ -103,10 +120,14 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, covered, onL
           }
           if (failedNow) setFailed((failedNow = false))
         } catch (error) {
-          // The text stays in the editor; say so, and keep trying (0010).
-          setFailed((failedNow = true))
-          clearTimeout(retry)
-          retry = setTimeout(() => save.touch(), 5000)
+          // The words stay; say so, and keep trying while this page is open (0010).
+          // A closed page hands them on and never writes again.
+          unsaved.keep({ pieceId: piece.id, sectionId, name: fileName(), markdown, title })
+          if (!closed) {
+            setFailed((failedNow = true))
+            clearTimeout(retry)
+            retry = setTimeout(() => save.touch(), 5000)
+          }
           throw error
         }
       },
@@ -118,7 +139,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, covered, onL
       await save.flush().catch(() => {})
       if (failedNow || readOnlyNow.current) return
       await takeMoment(deps, piece.id).catch(() => {})
-      const place = placeOf(editor.view, sectionId, pager.page)
+      const place = placeOf(editor.view, sectionId, pager.page, viewport.current)
       if (place) await savePlace(deps, piece.id, place).catch(() => {})
       const stored = await openPiece(deps, piece.id).catch(() => undefined)
       if (stored) onChange(stored.piece)
@@ -130,14 +151,18 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, covered, onL
       await moment.flush()
     }
 
+    let shown = -1
     const pager = new Pager(viewport.current!, flow.current!, (p, c) => {
       setPage(p)
       setCount(c)
-      setAnnounce(`Page ${p + 1} of ${c}`)
+      // A turn is announced; a page added by typing is not (DESIGN.md, Behaviour).
+      if (p !== shown && shown !== -1) setAnnounce(`Page ${p + 1} of ${c}`)
+      shown = p
     })
+    pager.onDrift = () => showCaret(editor.view, pager)
 
     const editor = createEditor(mount.current!, {
-      content: opened.content,
+      content: waiting?.markdown ?? opened.content,
       lang: piece.lang,
       onChange(markdown) {
         setWords(countWords(markdown))
@@ -186,6 +211,10 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, covered, onL
 
     live.current = { editor, pager, piece, flush, keep, relayout, save, moment }
     flushRef.current = flush
+    if (waiting) {
+      if (waiting.title !== null && titleEl.current) titleEl.current.textContent = waiting.title
+      save.touch()
+    }
 
     // Lay out once the fonts are in, so page breaks do not move after load (0011).
     relayout()
@@ -217,10 +246,14 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, covered, onL
       window.removeEventListener('resize', onResize)
       document.fonts.removeEventListener('loadingdone', fontsLoaded)
       clearTimeout(retry)
-      void flush().finally(() => {
+      // The last save runs on what the page holds now; it never retries after this.
+      const last = flush().finally(() => {
+        closed = true
         save.cancel()
         moment.cancel()
       })
+      closed = true
+      closingRef.current = last
       editor.destroy()
       live.current = null
       if (flushRef.current === flush) flushRef.current = null
@@ -246,9 +279,14 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, covered, onL
 
   // Going to the library is switching pieces: keep a moment.
   // Coming to a new piece: the title takes the caret (the text, in a journal).
+  const firstCover = useRef(true)
   useEffect(() => {
-    if (covered) void live.current?.flush()
-    else if (opened.fresh && !opened.focused && !readOnly) {
+    const first = firstCover.current
+    firstCover.current = false
+    // At launch the last piece is laid out behind the library: nothing to save yet, and its place must stay.
+    if (covered) {
+      if (!first) void live.current?.flush()
+    } else if (opened.fresh && !opened.focused && !readOnly) {
       opened.focused = true
       if (titleEditable) titleEl.current?.focus()
       else live.current?.editor.focus()
@@ -380,7 +418,8 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, covered, onL
             ref={(el) => {
               titleEl.current = el
               if (el && el.dataset.ready !== opened.sectionId) {
-                el.textContent = titleOf(opened)
+                const kept = unsaved.get(opened.sectionId)
+                el.textContent = (kept && kept.at > opened.piece.updatedAt ? kept.title : null) ?? titleOf(opened)
                 el.dataset.ready = opened.sectionId
               }
             }}
@@ -498,8 +537,14 @@ function showCaret(view: EditorView, pager: Pager) {
 }
 
 /** Where the writer is: the caret if writing, as a paragraph, an offset and its opening words. */
-function placeOf(view: EditorView, sectionId: string, page: number): Place | undefined {
-  const $head = view.state.selection.$head
+function placeOf(view: EditorView, sectionId: string, page: number, viewport: HTMLElement | null): Place | undefined {
+  // Writing: the caret. Reading: the first line on screen (DESIGN.md, Behaviour).
+  let pos = view.state.selection.head
+  if (!view.hasFocus() && viewport) {
+    const r = viewport.getBoundingClientRect()
+    pos = view.posAtCoords({ left: r.left + 2, top: r.top + 2 })?.pos ?? pos
+  }
+  const $head = view.state.doc.resolve(pos)
   const paragraph = $head.index(0)
   const node = view.state.doc.maybeChild(paragraph)
   if (!node) return undefined

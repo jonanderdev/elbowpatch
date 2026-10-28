@@ -32,16 +32,19 @@ export class Pager {
   page = 0
   count = 1
   g: Geometry = { measure: 0, side: 0, stride: 1 }
+  /** Called when the browser scrolled on its own: the page shows the caret's page again. */
+  onDrift?: () => void
 
   constructor(
     readonly viewport: HTMLElement,
     readonly flow: HTMLElement,
     readonly onChange: (page: number, count: number) => void,
   ) {
-    // The browser may scroll the viewport itself to show the caret; settle it back on a page.
+    // The browser may scroll the viewport itself to show the caret; settle it on the caret's page.
     viewport.addEventListener('scroll', () => {
-      const page = Math.round(viewport.scrollLeft / this.g.stride)
-      if (viewport.scrollLeft !== page * this.g.stride) this.turnTo(page)
+      if (viewport.scrollLeft === this.page * this.g.stride) return
+      if (this.onDrift) this.onDrift()
+      else this.turnTo(Math.round(viewport.scrollLeft / this.g.stride))
     })
   }
 
