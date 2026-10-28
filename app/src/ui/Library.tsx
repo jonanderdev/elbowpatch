@@ -10,6 +10,7 @@ import startEssayNight from './icons/start-essay-night.svg'
 import startJournal from './icons/start-journal.svg'
 import startJournalNight from './icons/start-journal-night.svg'
 import { theme, update, useSettings } from './settings'
+import { useUpdateWaiting } from './updates'
 
 interface Props {
   pieces: Piece[]
@@ -88,6 +89,21 @@ export function Library({ pieces, last, today, onOpen, onNew }: Props) {
         )}
       </div>
       <NewPiece today={today} onNew={onNew} />
+      <UpdateLine />
+    </div>
+  )
+}
+
+/** Only in the library, never on the page: restarting here cannot cut off a sentence (0010). */
+function UpdateLine() {
+  const restart = useUpdateWaiting()
+  if (!restart) return null
+  return (
+    <div className="line surface library-line" role="status">
+      A new version is ready ·
+      <button type="button" onClick={restart}>
+        Restart
+      </button>
     </div>
   )
 }

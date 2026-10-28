@@ -871,3 +871,8 @@ button {
 .library-foot {
   position: fixed;
 }
+
+.library-line {
+  position: fixed;
+  bottom: calc((92px - 44px) / 2);
+}

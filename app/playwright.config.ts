@@ -8,8 +8,9 @@ export default defineConfig({
   testDir: 'e2e',
   fullyParallel: true,
   reporter: 'list',
-  use: { baseURL: 'http://localhost:5199/' },
-  webServer: { command: 'npx vite --port 5199 --strictPort', url: 'http://localhost:5199/', reuseExistingServer: true },
+  // The built app, service worker included.
+  use: { baseURL: 'http://localhost:5198/' },
+  webServer: { command: 'npx vite build && npx vite preview --port 5198 --strictPort', url: 'http://localhost:5198/', reuseExistingServer: false, timeout: 120_000 },
   projects: [
     { name: 'chromium-phone', use: { ...devices['Desktop Chrome'], ...phone } },
     { name: 'chromium-desktop', use: { ...devices['Desktop Chrome'], ...desktop } },
