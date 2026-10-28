@@ -251,6 +251,54 @@ test('↓ and ↑ walk every line, across pages and back, and the caret is alway
   await expect(page.locator('.body')).toBeFocused()
 })
 
+test('turning back while writing takes the caret to the first line of text, never into the title', async ({ page }) => {
+  await page.goto('./')
+  await page.locator('.start.book').click()
+  await expect(page.locator('.book-title')).toBeFocused()
+  await page.keyboard.type('The Long Winter')
+  await page.keyboard.press('Enter')
+  await page.keyboard.press('Enter')
+  await expect(page.locator('.chapter-opening')).toBeFocused()
+  await page.keyboard.type('Salt')
+  await page.keyboard.press('Enter')
+  await expect(page.locator('.body')).toBeFocused()
+  await fill(page, 8)
+  const caret = () =>
+    page.evaluate(() => {
+      const s = getSelection()!
+      if (!document.querySelector('.body')!.contains(s.focusNode)) return document.activeElement!.className
+      // Where a line wraps the caret's position has two boxes, the line's end and the next one's
+      // start; it is drawn at the last.
+      const rects = s.getRangeAt(0).getClientRects()
+      const r = rects[rects.length - 1] ?? (s.focusNode as Element).parentElement!.getBoundingClientRect()
+      const pager = document.querySelector('.pager')!.getBoundingClientRect()
+      const text = [...document.querySelectorAll('.body p')].flatMap((p) => [...p.getClientRects()])
+      const onText = text.some((q) => q.left >= pager.left - 2 && q.right <= pager.right + 2 && r.top >= q.top - 2 && r.bottom <= q.bottom + 2)
+      return onText ? 'text' : `off the text at ${Math.round(r.left)},${Math.round(r.top)}`
+    })
+  // Back page by page: each time on the page's text; on the title page, in the book's title.
+  for (let n = Number(await page.locator('.page-button').textContent()); n > 1; n--) {
+    await page.keyboard.press('PageUp')
+    await expect(page.locator('.page-button')).toHaveText(String(n - 1))
+    expect(await caret()).toBe(n - 1 === 1 ? 'book-title' : 'text')
+  }
+})
+
+test('a piece left while writing opens with the caret where it was, ready to type', async ({ page }) => {
+  test.skip(page.viewportSize()!.width < 700, 'on a phone the caret waits for a tap')
+  await newEssay(page)
+  await fill(page, 3)
+  // Into the middle of the second paragraph, and a word there.
+  await page.locator('.body p').nth(1).click()
+  await page.keyboard.type('HERE')
+  await saved(page, 'HERE')
+  await page.locator('.head .word-button').click()
+  await page.locator('.continue').click()
+  await expect(page.locator('.body')).toBeFocused()
+  await page.keyboard.type('NOW')
+  await expect(page.locator('.body p').nth(1)).toContainText('HERENOW')
+})
+
 test('→ at the last letter of a page turns to the next, and ← turns back', async ({ page }) => {
   await newEssay(page)
   await fill(page, 8)

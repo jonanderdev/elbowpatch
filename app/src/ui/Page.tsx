@@ -263,10 +263,15 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
         // ← and → are the browser's, but Firefox will not move the caret into a column out of
         // view: at a page's edge it stops. When a move left the caret where it was, step it.
         if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey && !e.isComposing) {
-          const before = view.state.selection
+          // The browser's own caret, not the editor's, which may not have caught up with it yet.
+          const dom = getSelection()
+          const node = dom?.focusNode
+          const offset = dom?.focusOffset
+          if (!view.state.selection.empty || !node) return false
           requestAnimationFrame(() => {
-            if (!view.state.selection.eq(before) || !before.empty) return
-            const next = stepped(view, before.head, e.key === 'ArrowRight' ? 1 : -1)
+            const now = getSelection()
+            if (!now?.isCollapsed || now.focusNode !== node || now.focusOffset !== offset) return
+            const next = stepped(view, view.posAtDOM(node, offset ?? 0), e.key === 'ArrowRight' ? 1 : -1)
             if (next !== null) view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(next), e.key === 'ArrowRight' ? 1 : -1)))
           })
           return false
@@ -421,14 +426,21 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
   }, [readOnly])
 
   // Going to the library is switching pieces: keep a moment.
-  // Coming to a new piece: the title takes the caret (the text, in a journal).
+  // Coming to a new piece: the title takes the caret (the text, in a journal). Coming back to
+  // one left while writing: the caret is where it was, ready to type (DESIGN.md, Behaviour);
+  // on a phone it waits for a tap, so the keyboard does not cover the page unasked.
   const firstCover = useRef(true)
+  const writingWhenCovered = useRef(false)
   useEffect(() => {
     const first = firstCover.current
     firstCover.current = false
     // At launch the last piece is laid out behind the library: nothing to save yet, and its place must stay.
     if (covered) {
       if (!first) void live.current?.flush()
+    } else if (writingWhenCovered.current && !readOnly) {
+      // Back from the library to the piece being written: the caret where it was.
+      writingWhenCovered.current = false
+      if (matchMedia('(pointer: fine)').matches) live.current?.editor.focus()
     } else if (opened.fresh && !opened.focused && !readOnly) {
       opened.focused = true
       if (titlePage) {
@@ -437,6 +449,10 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
         if (piece.kind === 'journal') getSelection()?.selectAllChildren(bookTitleEl.current!)
       } else if (titleEditable) titleEl.current?.focus()
       else live.current?.editor.focus()
+    } else if (!opened.fresh && !opened.focused && !readOnly) {
+      opened.focused = true
+      const place = piece.place
+      if (place?.caret && place.sectionId === sectionId && matchMedia('(pointer: fine)').matches) live.current?.editor.focus()
     }
   }, [covered, readOnly])
 
@@ -460,7 +476,14 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
       else p.previous()
       // At the first or last page nothing turns, and the caret stays put.
       const view = live.current?.editor.view
-      if (p.page !== from && view?.hasFocus()) caretToTop(view, viewport.current!)
+      // A page with no text (a book's title page) takes it into the book's title.
+      if (p.page !== from && view?.hasFocus() && !caretToTop(view, viewport.current!)) {
+        const title = bookTitleEl.current
+        if (title) {
+          title.focus()
+          getSelection()?.collapse(title, title.childNodes.length)
+        }
+      }
     }
 
     const onKey = (e: KeyboardEvent) => {
@@ -605,7 +628,15 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
   return (
     <div ref={screen} className={piece.kind === 'journal' ? 'page-screen journal' : 'page-screen'} inert={covered} aria-hidden={covered}>
       <div className="head">
-        <WordButton word="Library" onClick={onLibrary} />
+        {/* Pressed, it leaves the caret where it is, so the place kept is the caret's. */}
+        <WordButton
+          word="Library"
+          keepFocus
+          onClick={() => {
+            writingWhenCovered.current = !!live.current?.editor.view.hasFocus()
+            onLibrary()
+          }}
+        />
         {page > (titlePage ? 1 : 0) && <div className="running-head">{heading}</div>}
       </div>
 
@@ -811,16 +842,52 @@ function stepped(view: EditorView, pos: number, dir: 1 | -1): number | null {
   return pos + dir * step
 }
 
-/** The caret to the first line on screen. */
-function caretToTop(view: EditorView, viewport: HTMLElement) {
+/**
+ * The caret to the first letter of text on the page in view: below the title, if the page opens
+ * with one. False when the page holds no text. Found from the text's own boxes, not by asking
+ * what is at a point, which a browser can answer with the title over the whole page.
+ */
+function caretToTop(view: EditorView, viewport: HTMLElement): boolean {
   const r = viewport.getBoundingClientRect()
-  const hit = view.posAtCoords({ left: r.left + 2, top: r.top + 4 })
-  if (!hit) return
-  view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(hit.pos))).setMeta(PAGED, true))
-  // The page's first position is also the end of the page before, and a browser may draw it there.
-  const caret = caretRect(view)
-  if (caret && caret.left < r.left - 2 && hit.pos < view.state.doc.content.size)
-    view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(hit.pos + 1))).setMeta(PAGED, true))
+  const onPage = (b: DOMRect) => b.right > r.left + 1 && b.left < r.right - 1 && b.height > 0
+  const range = document.createRange()
+  let pos: number | null = null
+  view.state.doc.forEach((node, offset) => {
+    if (pos !== null) return
+    const dom = view.nodeDOM(offset)
+    if (!(dom instanceof HTMLElement) || ![...dom.getClientRects()].some(onPage)) return
+    if (!node.textContent) {
+      pos = offset + 1
+      return
+    }
+    const walker = document.createTreeWalker(dom, NodeFilter.SHOW_TEXT)
+    for (let t = walker.nextNode() as Text | null; t && pos === null; t = walker.nextNode() as Text | null) {
+      range.selectNodeContents(t)
+      if (![...range.getClientRects()].some(onPage)) continue
+      // The letters before this page sit left of it: the first on it, by halves.
+      let lo = 0
+      let hi = t.length - 1
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1
+        range.setStart(t, mid)
+        range.setEnd(t, mid + 1)
+        const b = range.getBoundingClientRect()
+        if (b.left >= r.left - 1) hi = mid
+        else lo = mid + 1
+      }
+      pos = view.posAtDOM(t, lo)
+    }
+  })
+  if (pos === null) return false
+  // Where the page starts mid-paragraph, its first position is also the end of the page before
+  // (after a space there), and a browser may draw it there: on, a letter at a time, to one drawn
+  // on this page. Measured before the caret moves, since a caret drawn out of view makes the
+  // browser scroll to it.
+  let at: number = pos
+  const end = Math.min(at + 3, view.state.doc.content.size)
+  while (at < end && (drawnAt(view, at)?.left ?? r.left) < r.left - 2) at++
+  view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(at))).setMeta(PAGED, true))
+  return true
 }
 
 /**
@@ -852,19 +919,38 @@ function linesNear(view: EditorView, pos: number, pager: Pager, flow: HTMLElemen
 /**
  * Puts the caret at `pos`, on `line`. Where a line wraps, the same position ends one line and
  * starts the next, and browsers differ in which they draw it on: if it is drawn on the wrong
- * one, it moves a letter onto the line.
+ * one, it moves a letter at a time onto the line.
  */
 function placeOn(view: EditorView, pos: number, line: Line, edge: number, pager: Pager) {
-  const set = (p: number) =>
-    view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(p))).setMeta(PAGED, true))
-  set(pos)
-  const caret = caretRect(view)
-  if (!caret) return
-  const page = pageAt(caret.left - (edge - line.page * pager.g.stride), pager.g)
-  const before = page < line.page || (page === line.page && caret.bottom <= line.top + 1)
-  const after = page > line.page || (page === line.page && caret.top >= line.bottom - 1)
-  if (before && pos < view.state.doc.content.size) set(pos + 1)
-  else if (after && pos > 0) set(pos - 1)
+  const end = view.state.doc.content.size
+  let at = pos
+  // Measured before the caret moves, since a caret drawn out of view makes the browser scroll to it.
+  for (let step = 0; step < 3; step++) {
+    const caret = drawnAt(view, at)
+    if (!caret) break
+    const page = pageAt(caret.left - (edge - line.page * pager.g.stride), pager.g)
+    const before = page < line.page || (page === line.page && caret.bottom <= line.top + 1)
+    const after = page > line.page || (page === line.page && caret.top >= line.bottom - 1)
+    if (before && at < end) at++
+    else if (after && at > 0) at--
+    else break
+  }
+  view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(at))).setMeta(PAGED, true))
+}
+
+/** Where a caret at `pos` would be drawn, without moving the caret there. */
+function drawnAt(view: EditorView, pos: number): DOMRect | null {
+  try {
+    const { node, offset } = view.domAtPos(pos)
+    const range = document.createRange()
+    range.setStart(node, offset)
+    range.collapse(true)
+    const rects = range.getClientRects()
+    const r = rects[rects.length - 1] ?? range.getBoundingClientRect()
+    return r.width || r.height ? r : null
+  } catch {
+    return null
+  }
 }
 
 /** Marks a selection the page set itself, already on the page in view. */
@@ -936,7 +1022,12 @@ function restorePlace(view: EditorView, place: Place | undefined, sectionId: str
   else doc.forEach((node, _, i) => {
     if (index < 0 && key && node.textContent.startsWith(key)) index = i
   })
-  if (index < 0) index = Math.min(place.paragraph, doc.childCount - 1)
+  if (index < 0 && place.paragraph >= doc.childCount) {
+    // Past the end (an empty last paragraph is not stored): the end of the text.
+    view.dispatch(view.state.tr.setSelection(TextSelection.atEnd(doc)))
+    return
+  }
+  if (index < 0) index = place.paragraph
   let pos = 0
   for (let i = 0; i < index; i++) pos += doc.child(i).nodeSize
   const node = doc.child(index)
