@@ -655,9 +655,6 @@ button {
 }
 
 .group-heading {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
   margin: 0;
   padding: 0 0 5px 12px;
   font-size: 15px;
@@ -1246,7 +1243,7 @@ button {
 }
 .book-title {
   margin: 0;
-  font-size: calc(var(--body) * 2.4);
+  font-size: calc(var(--body) * 3);
   font-weight: 300;
   font-variation-settings: 'opsz' 60;
   line-height: 1.12;

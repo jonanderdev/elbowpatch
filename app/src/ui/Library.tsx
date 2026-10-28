@@ -137,7 +137,6 @@ export function Library({ pieces, last, today, onOpen, onNew, onRename, onExport
               return (
                 <section className="group" key={kind} aria-labelledby={`group-${kind}`}>
                   <h2 className="group-heading" id={`group-${kind}`}>
-                    <KindMark kind={kind} today={today} />
                     {group}
                   </h2>
                   <ul className="rows">
