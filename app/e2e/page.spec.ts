@@ -199,6 +199,58 @@ test('the caret and the pages move together', async ({ page }) => {
   await expect.poll(async () => Number(await page.locator('.page-button').textContent())).toBeLessThan(lastPage)
 })
 
+test('↓ and ↑ walk every line, across pages and back, and the caret is always on the page shown', async ({ page }) => {
+  await newEssay(page)
+  await fill(page, 6)
+  // From the very start of the text (again until it holds: the typing may still be settling).
+  await expect
+    .poll(async () => {
+      await page.evaluate(() => {
+        const r = document.createRange()
+        r.setStart(document.querySelector('.body p')!.firstChild!, 0)
+        getSelection()!.removeAllRanges()
+        getSelection()!.addRange(r)
+      })
+      return page.locator('.page-button').textContent()
+    })
+    .toBe('1')
+  const probe = () =>
+    page.evaluate(() => {
+      const s = getSelection()!
+      const pager = document.querySelector('.pager')!.getBoundingClientRect()
+      const range = s.getRangeAt(0).cloneRange()
+      const rects = range.getClientRects()
+      let r = rects[rects.length - 1] ?? range.getBoundingClientRect()
+      if (!r.height) r = (s.focusNode!.nodeType === 1 ? (s.focusNode as Element) : s.focusNode!.parentElement!).getBoundingClientRect()
+      return {
+        at: `${s.focusNode!.textContent!.slice(0, 3)}${s.focusOffset}`,
+        page: Number(document.querySelector('.page-button')!.textContent),
+        top: Math.round(r.top),
+        shown: r.left >= pager.left - 2 && r.left <= pager.right + 2 && r.top >= pager.top - 2 && r.bottom <= pager.bottom + 2,
+      }
+    })
+  const pages = new Set<number>()
+  for (const key of ['ArrowDown', 'ArrowUp']) {
+    let before = await probe()
+    for (let i = 0; i < 200; i++) {
+      await page.keyboard.press(key)
+      const now = await probe()
+      expect(now.shown, `${key} ${i}: on the page shown`).toBe(true)
+      if (now.at === before.at) break // the end of the text that way
+      // A line further that way: lower on the same page, or the next page.
+      if (now.page === before.page) expect(key === 'ArrowDown' ? now.top > before.top : now.top < before.top, `${key} ${i}: one line`).toBe(true)
+      else expect(now.page - before.page, `${key} ${i}: one page`).toBe(key === 'ArrowDown' ? 1 : -1)
+      pages.add(now.page)
+      before = now
+    }
+    // Down to the last page, up to the first letter.
+    if (key === 'ArrowDown') expect(await page.locator('.page-button').getAttribute('aria-label')).toBe(`Page ${before.page} of ${before.page}. Open tools`)
+    else expect(before.at).toBe('1. 0')
+  }
+  expect(pages.size).toBeGreaterThan(1)
+  await expect(page.locator('.body')).toBeFocused()
+})
+
 test('→ at the last letter of a page turns to the next, and ← turns back', async ({ page }) => {
   await newEssay(page)
   await fill(page, 8)

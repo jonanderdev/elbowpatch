@@ -8,7 +8,7 @@ import type { Piece, Place } from '../domain/model'
 import { openPiece, rename, renameSection, savePlace, setSubtitle, takeMoment, write, type Deps } from '../domain/pieces'
 import { dayTitle, words as wordsLine } from '../domain/words'
 import { createEditor, type Editor } from '../page/editor'
-import { geometry, Pager } from '../page/pager'
+import { geometry, linesOf, pageAt, Pager, type Line } from '../page/pager'
 import { download } from './download'
 import { ExportSheet } from './Export'
 import { update, useSettings } from './settings'
@@ -274,34 +274,32 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
         if ((e.key !== 'ArrowUp' && e.key !== 'ArrowDown') || e.shiftKey || e.altKey || e.metaKey || e.ctrlKey) return false
         const caret = caretRect(view)
         if (!caret) return false
-        const box = viewport.current!.getBoundingClientRect()
-        const line = caret.height || 20
         const down = e.key === 'ArrowDown'
+        const head = view.state.selection.head
+        const edge = (page: number) => flow.current!.getBoundingClientRect().left + page * pager.g.stride
+        // The lines of this paragraph and the ones either side, as drawn; the caret's is the one
+        // it is drawn on.
+        const lines = linesNear(view, head, pager, flow.current!)
+        const page = pageAt(caret.left - edge(0), pager.g)
+        const at = lines.findIndex((l) => l.page === page && caret.top < l.bottom - 1 && caret.bottom > l.top + 1)
+        if (at < 0) return false
         // Keep the place across while moving up and down, as text fields do.
-        goalX = e.repeat || lastVertical === view.state.selection.head ? (goalX ?? caret.left) : caret.left
-        const x = Math.min(Math.max(goalX, box.left + 1), box.right - 1)
-        // Step past paragraph gaps until a different line answers.
-        let hit: { pos: number } | null = null
-        for (let y = down ? caret.bottom + 2 : caret.top - 2; y >= box.top && y <= box.bottom; y += down ? 3 : -3) {
-          const h = view.posAtCoords({ left: x, top: y })
-          if (!h) continue
-          const top = view.coordsAtPos(h.pos, 1).top
-          if (down ? top > caret.top + 2 : top < caret.top - 2) {
-            hit = h
-            break
-          }
-        }
-        if (!hit) {
-          // No line left on this page that way: the next page's first line, or the previous one's last.
-          if (down ? pager.page >= pager.count - 1 : pager.page === 0) return true
-          if (down) pager.next()
-          else pager.previous()
-          hit = view.posAtCoords({ left: x, top: down ? box.top + line / 2 : lastLineTop(view, box) })
-        }
-        if (hit) {
-          view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(hit.pos))).setMeta(PAGED, true))
+        if (goalX === undefined || !(e.repeat || lastVertical === head)) goalX = caret.left - edge(page)
+        const target = lines[at + (down ? 1 : -1)]
+        if (!target) {
+          // The first or last line of the text: to its start or end, as text fields do.
+          const doc = view.state.doc
+          view.dispatch(view.state.tr.setSelection(down ? TextSelection.atEnd(doc) : TextSelection.atStart(doc)).setMeta(PAGED, true))
+          showCaret(view, pager)
           lastVertical = view.state.selection.head
+          return true
         }
+        // On another page: turn to it first, so the line is on screen to be found.
+        if (target.page !== pager.page) pager.turnTo(target.page)
+        const x = edge(target.page) + Math.min(Math.max(goalX, target.left + 1), target.right - 1)
+        const hit = view.posAtCoords({ left: x, top: (target.top + target.bottom) / 2 })
+        if (hit) placeOn(view, hit.pos, target, edge(target.page), pager)
+        lastVertical = view.state.selection.head
         return true
       },
     })
@@ -819,6 +817,54 @@ function caretToTop(view: EditorView, viewport: HTMLElement) {
   const hit = view.posAtCoords({ left: r.left + 2, top: r.top + 4 })
   if (!hit) return
   view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(hit.pos))).setMeta(PAGED, true))
+  // The page's first position is also the end of the page before, and a browser may draw it there.
+  const caret = caretRect(view)
+  if (caret && caret.left < r.left - 2 && hit.pos < view.state.doc.content.size)
+    view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(hit.pos + 1))).setMeta(PAGED, true))
+}
+
+/**
+ * The lines of the paragraph holding `pos` and of the paragraphs either side, from the boxes the
+ * browser draws its text in (an empty paragraph is one line).
+ */
+function linesNear(view: EditorView, pos: number, pager: Pager, flow: HTMLElement): Line[] {
+  const index = view.state.doc.resolve(pos).index(0)
+  const boxes: DOMRect[] = []
+  const range = document.createRange()
+  view.state.doc.forEach((_, offset, i) => {
+    if (i < index - 1 || i > index + 1) return
+    const dom = view.nodeDOM(offset)
+    if (!(dom instanceof HTMLElement)) return
+    const walker = document.createTreeWalker(dom, NodeFilter.SHOW_TEXT)
+    let text = false
+    for (let t = walker.nextNode(); t; t = walker.nextNode()) {
+      if (!t.textContent) continue
+      range.selectNodeContents(t)
+      boxes.push(...range.getClientRects())
+      text = true
+    }
+    if (!text) boxes.push(dom.getBoundingClientRect())
+  })
+  const lineHeight = parseFloat(getComputedStyle(view.dom).lineHeight) || 28
+  return linesOf(boxes, pager.g, flow.getBoundingClientRect().left, lineHeight)
+}
+
+/**
+ * Puts the caret at `pos`, on `line`. Where a line wraps, the same position ends one line and
+ * starts the next, and browsers differ in which they draw it on: if it is drawn on the wrong
+ * one, it moves a letter onto the line.
+ */
+function placeOn(view: EditorView, pos: number, line: Line, edge: number, pager: Pager) {
+  const set = (p: number) =>
+    view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(p))).setMeta(PAGED, true))
+  set(pos)
+  const caret = caretRect(view)
+  if (!caret) return
+  const page = pageAt(caret.left - (edge - line.page * pager.g.stride), pager.g)
+  const before = page < line.page || (page === line.page && caret.bottom <= line.top + 1)
+  const after = page > line.page || (page === line.page && caret.top >= line.bottom - 1)
+  if (before && pos < view.state.doc.content.size) set(pos + 1)
+  else if (after && pos > 0) set(pos - 1)
 }
 
 /** Marks a selection the page set itself, already on the page in view. */
@@ -855,15 +901,6 @@ function caretRect(view: EditorView): DOMRect | null {
   } catch {
     return null // not laid out yet
   }
-}
-
-/** The top of the last line of text on the page in view, to land the caret on it. */
-function lastLineTop(view: EditorView, box: DOMRect): number {
-  for (let y = box.bottom - 4; y > box.top; y -= 6) {
-    const hit = view.posAtCoords({ left: box.left + 2, top: y })
-    if (hit && hit.inside >= 0) return y
-  }
-  return box.bottom - 10
 }
 
 /** Where the writer is: the caret if writing, as a paragraph, an offset and its opening words. */

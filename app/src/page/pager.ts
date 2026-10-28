@@ -34,6 +34,43 @@ export function pageAt(offset: number, g: Geometry): number {
   return Math.max(0, Math.floor((offset + (g.stride - g.measure) / 2) / g.stride))
 }
 
+/** A line of text: its page, its top and bottom on screen, and its ends measured from its page's left edge. */
+export interface Line {
+  page: number
+  top: number
+  bottom: number
+  left: number
+  right: number
+}
+
+type Box = { top: number; bottom: number; left: number; right: number }
+
+/**
+ * The lines that boxes of text make, in reading order: page by page, top to bottom. Boxes on the
+ * same page whose tops are within half a line are one line (a word in italic is its own box).
+ * `flowLeft` is where page 1 starts on screen now.
+ */
+export function linesOf(boxes: Box[], g: Geometry, flowLeft: number, lineHeight: number): Line[] {
+  const placed = boxes
+    .filter((b) => b.bottom > b.top)
+    .map((b) => {
+      const page = pageAt(b.left - flowLeft, g)
+      const edge = flowLeft + page * g.stride
+      return { page, top: b.top, bottom: b.bottom, left: b.left - edge, right: b.right - edge }
+    })
+    .sort((a, b) => a.page - b.page || a.top - b.top)
+  const lines: Line[] = []
+  for (const b of placed) {
+    const last = lines.at(-1)
+    if (last && last.page === b.page && Math.abs(b.top - last.top) < lineHeight / 2) {
+      last.left = Math.min(last.left, b.left)
+      last.right = Math.max(last.right, b.right)
+      last.bottom = Math.max(last.bottom, b.bottom)
+    } else lines.push({ ...b })
+  }
+  return lines
+}
+
 export class Pager {
   page = 0
   count = 1

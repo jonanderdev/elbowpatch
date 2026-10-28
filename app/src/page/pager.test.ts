@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { geometry, pageAt, pageCount } from './pager'
+import { geometry, linesOf, pageAt, pageCount } from './pager'
 
 describe('paging maths', () => {
   it('a phone keeps 24px margins; a desktop keeps the reading measure, centred', () => {
@@ -32,5 +32,29 @@ describe('paging maths', () => {
     expect(pageAt(g.measure - 1, g)).toBe(0)
     expect(pageAt(g.stride, g)).toBe(1)
     expect(pageAt(5 * g.stride + 10, g)).toBe(5)
+  })
+
+  it('groups boxes of text into lines, page by page, top to bottom', () => {
+    const g = geometry(390, 544, 24)
+    const flowLeft = 24 - g.stride // page 2 is in view
+    const box = (page: number, top: number, left: number, right: number) => ({
+      top,
+      bottom: top + 28,
+      left: flowLeft + page * g.stride + left,
+      right: flowLeft + page * g.stride + right,
+    })
+    const lines = linesOf(
+      [box(1, 88, 0, 300), box(0, 700, 0, 340), box(1, 88, 300, 330), box(0, 671, 0, 342), box(1, 117, 0, 120)],
+      g,
+      flowLeft,
+      29,
+    )
+    expect(lines.map((l) => [l.page, l.top, l.left, l.right])).toEqual([
+      [0, 671, 0, 342],
+      [0, 700, 0, 340],
+      // A word in italic is its own box on the same line.
+      [1, 88, 0, 330],
+      [1, 117, 0, 120],
+    ])
   })
 })
