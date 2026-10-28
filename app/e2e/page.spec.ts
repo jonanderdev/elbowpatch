@@ -1,0 +1,141 @@
+import { expect, test, type Page } from '@playwright/test'
+
+const PARAGRAPH =
+  'Nobody remembers the first draft. It is written in a hurry, at the kitchen table or on the train, and it is mostly a list of things the writer hopes to say.'
+
+async function newEssay(page: Page, title = 'The second draft') {
+  await page.goto('./')
+  await page.locator('.start.essay').click()
+  await expect(page.locator('.title')).toBeFocused()
+  await page.keyboard.type(title)
+  await page.keyboard.press('Enter')
+  await expect(page.locator('.body')).toBeFocused()
+}
+
+async function fill(page: Page, paragraphs: number) {
+  for (let i = 0; i < paragraphs; i++) {
+    await page.keyboard.insertText(`${i + 1}. ${PARAGRAPH} ${PARAGRAPH}`)
+    await page.keyboard.press('Enter')
+  }
+}
+
+const pageLabel = (page: Page) => page.locator('.page-button').getAttribute('aria-label')
+
+test('what is typed is there after a reload', async ({ page }) => {
+  await newEssay(page)
+  await page.keyboard.type('Some *italic* and **bold** words.')
+  await expect(page.locator('.body em')).toHaveText('italic')
+  await expect(page.locator('.body strong')).toHaveText('bold')
+  await page.waitForTimeout(1300) // the working copy is saved a second after typing stops
+  await page.reload()
+  await expect(page.locator('.title')).toHaveText('The second draft')
+  await expect(page.locator('.body em')).toHaveText('italic')
+  await expect(page.locator('.body strong')).toHaveText('bold')
+})
+
+test('leaving the page saves at once', async ({ page }) => {
+  await newEssay(page)
+  await page.keyboard.type('Written just before leaving.')
+  await page.locator('.library-link').click()
+  await expect(page.locator('.continue')).toContainText('Written just before leaving.')
+  await page.reload()
+  await page.goto('./#/')
+  await expect(page.locator('.continue')).toContainText('Written just before leaving.')
+})
+
+test('a long text pages instead of scrolling, and the caret stays in view', async ({ page }) => {
+  await newEssay(page)
+  await fill(page, 8)
+  await page.keyboard.type('The last line.')
+  const label = await pageLabel(page)
+  const [, current, total] = label!.match(/Page (\d+) of (\d+)/)!.map(Number)
+  expect(total).toBeGreaterThan(1)
+  expect(current).toBe(total) // typing at the end shows the last page
+
+  // The caret's line is on screen, inside the text column.
+  const caret = await page.evaluate(() => {
+    const r = window.getSelection()!.getRangeAt(0).getBoundingClientRect()
+    const col = document.querySelector('.pager')!.getBoundingClientRect()
+    return r.left >= col.left - 1 && r.right <= col.right + 1 && r.top >= col.top && r.bottom <= col.bottom + 1
+  })
+  expect(caret).toBe(true)
+
+  await page.keyboard.press('PageUp')
+  await expect(page.locator('.page-button')).toHaveText(String(current! - 1))
+  await page.keyboard.press('PageDown')
+  await expect(page.locator('.page-button')).toHaveText(String(current))
+
+  // Nothing scrolls vertically: the page is what fits the screen.
+  const scrolls = await page.evaluate(() => document.querySelector('.pager')!.scrollTop)
+  expect(scrolls).toBe(0)
+})
+
+test('the title opens page 1 and becomes the running head after it', async ({ page }) => {
+  await newEssay(page)
+  await fill(page, 8)
+  await expect(page.locator('.running-head')).toHaveText('The second draft')
+  for (let i = 0; i < 10; i++) await page.keyboard.press('PageUp')
+  await expect(page.locator('.page-button')).toHaveText('1')
+  await expect(page.locator('.running-head')).toHaveCount(0)
+  await expect(page.locator('.title')).toBeInViewport()
+})
+
+test("when a save fails the words stay, the page says so, and it recovers", async ({ page }) => {
+  await newEssay(page)
+  await page.keyboard.type('Before.')
+  await page.waitForTimeout(1300)
+  await page.evaluate(() => {
+    const w = window as unknown as { __tx: unknown }
+    w.__tx = IDBDatabase.prototype.transaction
+    IDBDatabase.prototype.transaction = function () {
+      throw new DOMException('The disk is full.', 'QuotaExceededError')
+    }
+  })
+  await page.keyboard.type(' After.')
+  await expect(page.getByRole('alert')).toContainText("Can't save right now. Your words are still here.")
+  await expect(page.getByRole('button', { name: 'Save a copy' })).toBeVisible()
+  await expect(page.locator('.body')).toContainText('Before. After.')
+  await page.evaluate(() => {
+    IDBDatabase.prototype.transaction = (window as unknown as { __tx: typeof IDBDatabase.prototype.transaction }).__tx
+  })
+  await expect(page.getByRole('alert')).toHaveCount(0, { timeout: 8000 })
+  await page.reload()
+  await expect(page.locator('.body')).toContainText('Before. After.')
+})
+
+test('paper and night, remembered', async ({ page }) => {
+  await newEssay(page)
+  await page.keyboard.type('Words.')
+  await page.locator('.page-button').click()
+  const toggle = page.getByRole('button', { name: /^(Night|Paper)$/ })
+  const before = await page.evaluate(() => document.documentElement.dataset.theme)
+  await toggle.click()
+  const after = await page.evaluate(() => document.documentElement.dataset.theme)
+  expect(after).not.toBe(before)
+  await page.reload()
+  await expect(page.locator('html')).toHaveAttribute('data-theme', after!)
+})
+
+test('text settings change the page live', async ({ page }) => {
+  await newEssay(page)
+  await fill(page, 14)
+  const pagesAt = async () => Number((await pageLabel(page))!.match(/of (\d+)/)![1])
+  const medium = await pagesAt()
+  await page.locator('.page-button').click()
+  await page.getByRole('button', { name: 'Text settings' }).click()
+  await page.getByRole('radio', { name: 'Large' }).click()
+  await page.getByRole('radio', { name: 'Loose' }).click()
+  await page.getByRole('button', { name: 'Done' }).click()
+  await page.keyboard.press('Escape')
+  await expect.poll(pagesAt).toBeGreaterThan(medium)
+})
+
+test('a new piece left empty is not kept', async ({ page }) => {
+  await page.goto('./')
+  await page.locator('.start.essay').click()
+  await page.locator('.library-link').click()
+  await expect(page.locator('.empty-library')).toBeVisible()
+  await page.reload()
+  await page.goto('./#/')
+  await expect(page.locator('.empty-library')).toBeVisible()
+})

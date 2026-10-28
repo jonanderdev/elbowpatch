@@ -5,7 +5,7 @@ export function ExportSheet(props: { title: string; onMarkdown(): void; onDone()
   const first = useRef<HTMLButtonElement>(null)
   useEffect(() => first.current?.focus(), [])
   return (
-    <div className="sheet surface" role="dialog" aria-label="Export" onKeyDown={(e) => e.key === 'Escape' && props.onDone()}>
+    <div className="sheet surface" role="dialog" aria-label="Export">
       <div className="sheet-title">
         <span>Export</span>
         <span className="sheet-aside">{props.title}</span>

@@ -17,7 +17,7 @@ export function ToolsBar(props: { page: number; count: number; words: number; on
   // On a narrow phone a long count drops its last word; the label still says it in full.
   const short = typeof window !== 'undefined' && window.innerWidth < 400 && full.length > 22
   return (
-    <div ref={ref} className="bar surface tools" role="toolbar" aria-label="Tools" onKeyDown={(e) => e.key === 'Escape' && props.onClose()}>
+    <div ref={ref} className="bar surface tools" role="toolbar" aria-label="Tools">
       <span className="count" aria-label={`Page ${props.page} of ${props.count}, ${number(props.words)} words`}>
         {short ? `${props.page} of ${props.count}  ·  ${number(props.words)}` : full}
       </span>
@@ -95,7 +95,7 @@ export function TextSettings(props: { onDone(): void }) {
     ;(ref.current?.querySelector('[aria-checked="true"]') as HTMLElement | null)?.focus()
   }, [])
   return (
-    <div ref={ref} className="sheet surface" role="dialog" aria-label="Text settings" onKeyDown={(e) => e.key === 'Escape' && props.onDone()}>
+    <div ref={ref} className="sheet surface" role="dialog" aria-label="Text settings">
       <Segments
         legend="Text size"
         setting="size"

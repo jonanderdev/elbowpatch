@@ -105,6 +105,8 @@ export function Page({ deps, opened, covered, onLibrary, onChange }: Props) {
       await takeMoment(deps, piece.id).catch(() => {})
       const place = placeOf(editor.view, sectionId, pager.page)
       if (place) await savePlace(deps, piece.id, place).catch(() => {})
+      const stored = await openPiece(deps, piece.id).catch(() => undefined)
+      if (stored) onChange(stored.piece)
     })
 
     // Leaving, hiding, closing: save now and keep a moment (0005).
@@ -273,6 +275,23 @@ export function Page({ deps, opened, covered, onLibrary, onChange }: Props) {
       el.removeEventListener('touchend', onTouchEnd)
       el.removeEventListener('click', onClick)
     }
+  }, [covered])
+
+  // Escape closes what is open, innermost first: a sheet, then the tools.
+  const openNow = useRef({ tools, sheet })
+  openNow.current = { tools, sheet }
+  useEffect(() => {
+    if (covered) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      const { tools, sheet } = openNow.current
+      if (sheet) setSheet(null)
+      else if (tools) closeTools()
+      else return
+      e.preventDefault()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
   }, [covered])
 
   // A calm line at the foot for a few seconds.
