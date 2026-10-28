@@ -17,4 +17,17 @@ There are good open editors already. Elbowpatch is for one combination:
 - **Your files.** Plain Markdown, exportable in one click, synced only to a place you connect.
 - **Any device.** An installable web app that works offline, on phones too. Free, and self-hostable.
 
+## Running it
+
+The app is in `app/`, a static site with no server of its own.
+
+```sh
+cd app
+npm install
+npm run dev        # http://localhost:5173
+npm test           # the domain, paging and Markdown, in Vitest
+npm run e2e        # the built app in WebKit and Chromium, phone and desktop
+npm run build      # dist/ — host it on any static host
+```
+
 Open source under the [MIT License](LICENSE). Provided as-is, without warranty of any kind. See [CONTRIBUTING.md](CONTRIBUTING.md) if you would like to help.
