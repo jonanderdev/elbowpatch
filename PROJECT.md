@@ -240,7 +240,7 @@ A narrow contract that providers implement, for example:
 ## 8. Licensing and project stance
 
 - Open source from day one, under the **MIT** license: the simplest to understand, and the widest reuse.
-- Provided as-is, no warranty. Say so in the README and on the first-run screen.
+- Provided as-is, no warranty. Say so in the README and in About & privacy.
 - The maintainer hosts a main instance on a best-effort basis. Self-hosting must always be a real option.
 - Donations (GitHub Sponsors / Ko-fi) are optional and never shown inside the writing view.
 - The repo should not talk about pricing or subscriptions.
