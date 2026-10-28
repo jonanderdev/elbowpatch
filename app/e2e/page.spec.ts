@@ -198,3 +198,32 @@ test('the caret and the pages move together', async ({ page }) => {
   for (let i = 0; i < 80; i++) await page.keyboard.press('ArrowUp')
   await expect.poll(async () => Number(await page.locator('.page-button').textContent())).toBeLessThan(lastPage)
 })
+
+test('→ at the last letter of a page turns to the next, and ← turns back', async ({ page }) => {
+  await newEssay(page)
+  await fill(page, 8)
+  for (let i = 0; i < 6; i++) await page.keyboard.press('PageUp')
+  await expect(page.locator('.page-button')).toHaveText('1')
+  // Walk right until the caret leaves page 1: the page must go with it.
+  // Where the caret is drawn: at a soft line break the range has two rects, the line's end
+  // and the next line's start; the caret is drawn at the latter.
+  const caretInView = () =>
+    page.evaluate(() => {
+      const rects = getSelection()!.getRangeAt(0).getClientRects()
+      const r = rects[rects.length - 1] ?? getSelection()!.getRangeAt(0).getBoundingClientRect()
+      const col = document.querySelector('.pager')!.getBoundingClientRect()
+      return r.left >= col.left - 1 && r.left <= col.right + 1
+    })
+  let turned = false
+  for (let i = 0; i < 3000 && !turned; i++) {
+    await page.keyboard.press('ArrowRight')
+    // The page follows on the next frame, once the caret is drawn.
+    await expect.poll(caretInView, { timeout: 1000 }).toBe(true)
+    if ((await page.locator('.page-button').textContent()) === '2') turned = true
+  }
+  expect(turned).toBe(true)
+  await expect.poll(caretInView).toBe(true)
+  for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowLeft')
+  await expect(page.locator('.page-button')).toHaveText('1')
+  await expect.poll(caretInView).toBe(true)
+})

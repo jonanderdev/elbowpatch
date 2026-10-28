@@ -175,6 +175,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
 
     let shown = -1
     let goalX: number | undefined
+    let skipUntil = 0
     let lastVertical = -1
     const pager = new Pager(viewport.current!, flow.current!, (p, c) => {
       setPage(p)
@@ -214,9 +215,8 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
           rect = new DOMRect(Math.min(a.left, b.left), Math.min(a.top, b.top), Math.abs(b.right - a.left), Math.max(a.bottom, b.bottom) - Math.min(a.top, b.top))
         }
         setSelection({ rect, active: editor.active() })
-        // The caret moved while writing (a click, a jump): show its page. A move the page made
-        // itself already shows the right one; measuring now would read the caret before it is drawn.
-        if (view.hasFocus() && !tr.getMeta(PAGED)) showCaret(view, pager)
+        // A move the page made itself (↑, ↓, a turn) already shows the right page.
+        if (tr.getMeta(PAGED)) skipUntil = performance.now() + 150
       },
       editable: () => !readOnlyNow.current,
       // ↑ and ↓ move a line at the same place across, and cross to the next page at a page's
@@ -310,11 +310,24 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
       relayout()
       showCaret(editor.view, pager)
     }
+    // The page follows the caret: after any caret move (keys, clicks, a phone keyboard,
+    // find in page), once the browser has drawn it, show the page it is drawn on. One rule
+    // in one place, since the browser's own moves can land in a column out of view.
+    let following = 0
+    const follow = () => {
+      cancelAnimationFrame(following)
+      following = requestAnimationFrame(() => {
+        if (performance.now() > skipUntil && editor.view.hasFocus()) showCaret(editor.view, pager)
+      })
+    }
+    document.addEventListener('selectionchange', follow)
     document.addEventListener('visibilitychange', onHide)
     window.addEventListener('pagehide', onHide)
     window.addEventListener('resize', onResize)
 
     return () => {
+      document.removeEventListener('selectionchange', follow)
+      cancelAnimationFrame(following)
       document.removeEventListener('visibilitychange', onHide)
       window.removeEventListener('pagehide', onHide)
       window.removeEventListener('resize', onResize)
