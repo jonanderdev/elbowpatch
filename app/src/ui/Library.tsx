@@ -56,6 +56,9 @@ export function Library({ pieces, last, today, onOpen, onNew, onRename, onExport
     if (!awayNow) return
     const t = setTimeout(() => setAwayNow(null), 6000)
     const undo = (e: KeyboardEvent) => {
+      // In a text field, ⌘/Ctrl + Z is that field's own undo.
+      const t = e.target as HTMLElement
+      if (t.closest('input, textarea, [contenteditable]')) return
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
         e.preventDefault()
         void undoPutAway()

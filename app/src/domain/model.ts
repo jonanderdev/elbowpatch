@@ -23,6 +23,8 @@ export interface Piece {
   place?: Place
   /** Each section's word count as last written, so the library never opens the text. */
   words?: Record<string, number>
+  /** Imported beside a different piece with the same id: which export copy it was (archive). */
+  copyOf?: string
 }
 
 /** Where the writer was: a paragraph, an offset and a few words, so it survives edits made elsewhere. */

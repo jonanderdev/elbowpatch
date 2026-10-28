@@ -46,7 +46,8 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
   const open = useCallback(
     async (pieceId: string): Promise<Opened | null> => {
       const found = await openPiece(deps, pieceId)
-      if (!found) return null
+      // A put-away piece waits in Settings; a URL or the Back button does not open it.
+      if (!found || found.piece.putAwayAt !== undefined) return null
       let piece = found.piece
       let sectionId: string
       if (piece.kind === 'journal') {
@@ -244,6 +245,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
             await putAway(deps, piece.id)
             // The page behind was this piece: it goes with it; Continue moves on.
             if (opened?.piece.id === piece.id) setOpened(null)
+            if (readLast() === piece.id) writeLast('')
             await refresh()
           }}
           onRestore={async (piece) => {
@@ -280,7 +282,7 @@ export function isoDay(d: Date): string {
 
 function readLast(): string | undefined {
   try {
-    return localStorage.getItem(LAST) ?? undefined
+    return localStorage.getItem(LAST) || undefined
   } catch {
     return undefined
   }

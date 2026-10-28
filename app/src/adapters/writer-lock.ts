@@ -4,6 +4,7 @@ import type { Held, WriterLock } from '../domain/ports'
 // piece, and a channel to ask the window that holds it to save and let go.
 
 const ASK_TIMEOUT = 3000
+const HOLD_WAIT = 1500
 
 export function writerLock(): WriterLock {
   const locks = (navigator as Navigator & { locks?: LockManager }).locks
@@ -25,20 +26,24 @@ export function writerLock(): WriterLock {
         lose()
         release()
       }
+      let granted = false
       locks
         .request(name(id), options, async (lock) => {
           if (!lock) return resolve(null)
+          granted = true
           channel.addEventListener('message', onMessage)
           resolve({ release, lost })
           await held
         })
-        .catch(() => lose()) // stolen
+        // Stolen once held; or the wait ran out (or was given up) before it was granted.
+        .catch(() => (granted ? lose() : resolve(null)))
         .finally(() => channel.removeEventListener('message', onMessage))
     })
   }
 
   return {
-    hold: (id, onAsked) => holding(id, { ifAvailable: true }, onAsked),
+    // Waits a moment: a page just reloaded or closed lets go of its locks a little after it goes.
+    hold: (id, onAsked) => holding(id, { signal: AbortSignal.timeout(HOLD_WAIT) }, onAsked),
     async take(id, onAsked) {
       channel.postMessage({ ask: id })
       const waiting = new AbortController()

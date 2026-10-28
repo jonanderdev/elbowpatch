@@ -63,7 +63,9 @@ describe('export and import', () => {
     const b = setup()
     const result = await importArchive(b, files)
     expect(result).toEqual({ ok: true, added: 3, alreadyHere: 0 })
-    expect(await dump(b.store)).toEqual(await dump(a.store))
+    // Identical, except that a put-away piece starts a fresh 30 days where it lands.
+    const away = (d: Awaited<ReturnType<typeof dump>>) => d.map((x) => ({ ...x, piece: { ...x.piece, putAwayAt: x.piece.putAwayAt === undefined ? undefined : 'put away' } }))
+    expect(away(await dump(b.store))).toEqual(away(await dump(a.store)))
   })
 
   it('writes readable files: the whole piece, each day with its year, the history, and an index', async () => {
@@ -89,6 +91,57 @@ describe('export and import', () => {
     expect((await openPiece(a, essay.id))?.sections[0]?.content).toBe('Changed since the export.')
     const titles = (await a.store.transaction((tx) => tx.pieces())).map((p) => p.title).filter((t) => t === 'The second draft')
     expect(titles).toHaveLength(2)
+  })
+
+  it('the same export imported twice adds one copy, not two', async () => {
+    const a = setup()
+    const { essay } = await writeSome(a)
+    const files = await exportAll(a)
+    await write(a, essay, essay.sections[0]!.sectionId, 'Changed since the export.')
+    expect(await importArchive(a, files)).toEqual({ ok: true, added: 1, alreadyHere: 2 })
+    expect(await importArchive(a, files)).toEqual({ ok: true, added: 0, alreadyHere: 3 })
+  })
+
+  it('renamed chapters count as different, so they are not lost', async () => {
+    const a = setup()
+    const book = newPiece(a, 'book', 'en')
+    await write(a, book, book.sections[0]!.sectionId, 'Text.')
+    await takeMoment(a, book.id)
+    const files = await exportAll(a)
+    // Here, the chapter is renamed afterwards: the export's own chapter title must still come in.
+    const { renameSection } = await import('./pieces')
+    await renameSection(a, book, book.sections[0]!.sectionId, 'A new name')
+    expect(await importArchive(a, files)).toEqual({ ok: true, added: 1, alreadyHere: 0 })
+  })
+
+  it('a piece put away when exported waits a fresh 30 days', async () => {
+    const a = setup()
+    const { gone } = await writeSome(a)
+    const files = await exportAll(a)
+    const b = setup(Date.UTC(2027, 0, 1))
+    await importArchive(b, files)
+    expect((await openPiece(b, gone.id))?.piece.putAwayAt).toBe(Date.UTC(2027, 0, 1))
+  })
+
+  it('refuses an export with a file missing, writing nothing', async () => {
+    const a = setup()
+    await writeSome(a)
+    const files = (await exportAll(a)).filter((f) => !f.path.includes('/history/') || !f.path.endsWith('working.md'))
+    const b = setup()
+    expect(await importArchive(b, files)).toEqual({ ok: false, reason: 'incomplete' })
+    expect(await b.store.transaction((tx) => tx.pieces())).toEqual([])
+  })
+
+  it('reads names spelt the other way (NFD) after a zip round trip elsewhere', async () => {
+    const a = setup()
+    const essay = newPiece(a, 'essay', 'es')
+    await rename(a, essay, 'Canción')
+    await write(a, essay, essay.sections[0]!.sectionId, 'Letra.')
+    await takeMoment(a, essay.id)
+    const files = (await exportAll(a)).map((f) => ({ ...f, path: f.path.normalize('NFD') }))
+    const b = setup()
+    expect(await importArchive(b, files)).toMatchObject({ ok: true, added: 1 })
+    expect((await openPiece(b, essay.id))?.sections[0]?.content).toBe('Letra.')
   })
 
   it('refuses a newer format whole, and what is not an export', async () => {

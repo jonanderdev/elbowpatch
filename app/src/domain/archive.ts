@@ -75,12 +75,14 @@ export async function exportAll(deps: Pick<Deps, 'store' | 'clock'>): Promise<Ar
 
 export type ImportResult =
   | { ok: true; added: number; alreadyHere: number }
-  | { ok: false; reason: 'newer-format' | 'not-an-export' }
+  | { ok: false; reason: 'newer-format' | 'not-an-export' | 'incomplete' }
 
 /**
  * Our own export comes back as it was, history included. Never overwrites:
  * a piece already here and identical is skipped; one that differs comes in as
- * a new piece, with new ids.
+ * a new piece, with new ids, once (importing the same zip again adds nothing).
+ * Everything is checked before anything is written: a newer format, or a file
+ * the index names that is missing, refuses the whole import.
  */
 export async function importArchive(deps: Deps, files: ArchiveFile[]): Promise<ImportResult> {
   const indexFile = files.find((f) => f.path === 'index.json' || f.path.endsWith('/index.json'))
@@ -91,24 +93,34 @@ export async function importArchive(deps: Deps, files: ArchiveFile[]): Promise<I
   } catch {
     return { ok: false, reason: 'not-an-export' }
   }
-  if (typeof index.formatVersion !== 'number') return { ok: false, reason: 'not-an-export' }
+  if (typeof index?.formatVersion !== 'number') return { ok: false, reason: 'not-an-export' }
   // A newer format is refused whole, never half-imported.
   if (index.formatVersion > FORMAT_VERSION) return { ok: false, reason: 'newer-format' }
+  if (![index.pieces, index.outlines, index.versions, index.working].every(Array.isArray)) return { ok: false, reason: 'not-an-export' }
 
-  const root = indexFile.path.slice(0, indexFile.path.length - 'index.json'.length)
-  const text = new Map(files.map((f) => [f.path.slice(root.length), f.text]))
+  // Unzipping and zipping again can change how accented names are spelt (NFC/NFD): compare them alike.
+  const key = (path: string) => path.normalize('NFC')
+  const root = key(indexFile.path).slice(0, -'index.json'.length)
+  const text = new Map(files.map((f) => [key(f.path).slice(root.length), f.text]))
+  const named = [...index.versions, ...index.working].map((x) => key(x.file))
+  // A missing file would come in as empty text, without a word: refuse instead.
+  if (named.some((f) => !text.has(f))) return { ok: false, reason: 'incomplete' }
+
   let added = 0
   let alreadyHere = 0
-
+  const now = deps.clock.now()
   for (const incoming of index.pieces) {
     const outlines = index.outlines.filter((o) => o.pieceId === incoming.id)
-    const versions = index.versions.filter((v) => v.pieceId === incoming.id).map((v) => ({ ...v, content: text.get(v.file) ?? '' }))
-    const working = index.working.filter((w) => w.pieceId === incoming.id).map((w) => ({ ...w, content: text.get(w.file) ?? '' }))
+    const versions = index.versions.filter((v) => v.pieceId === incoming.id).map((v) => ({ ...v, content: text.get(key(v.file))! }))
+    const working = index.working.filter((w) => w.pieceId === incoming.id).map((w) => ({ ...w, content: text.get(key(w.file))! }))
+    const print = fingerprint(incoming, versions, working)
     const result = await deps.store.transaction(async (tx) => {
       const here = await tx.piece(incoming.id)
       let ids = (id: string) => id
       if (here) {
-        if (await identical(tx, incoming, versions, working)) return 'skipped'
+        if (await identical(tx, incoming, outlines, versions, working)) return 'skipped'
+        // A copy of this very export was added before.
+        if ((await tx.pieces()).some((p) => p.copyOf === print)) return 'skipped'
         // Different: a new piece beside the one here, with every id new.
         const map = new Map<string, string>()
         ids = (id: string) => map.get(id) ?? (map.set(id, deps.ids.next()), map.get(id)!)
@@ -120,6 +132,9 @@ export async function importArchive(deps: Deps, files: ArchiveFile[]): Promise<I
         sections: incoming.sections.map((s) => ({ ...s, sectionId: ids(s.sectionId) })),
         place: incoming.place && { ...incoming.place, sectionId: ids(incoming.place.sectionId) },
         words: incoming.words && Object.fromEntries(Object.entries(incoming.words).map(([k, n]) => [ids(k), n])),
+        // Put away when it was exported: it waits a fresh 30 days, rather than arriving already due to go.
+        ...(incoming.putAwayAt !== undefined ? { putAwayAt: now } : {}),
+        ...(here ? { copyOf: print } : {}),
       })
       for (const o of outlines)
         await tx.putOutline({ ...o, id: ids(o.id), pieceId: ids(o.pieceId), parentId: o.parentId && ids(o.parentId), sections: o.sections.map((s) => ({ ...s, sectionId: ids(s.sectionId) })) })
@@ -135,16 +150,30 @@ export async function importArchive(deps: Deps, files: ArchiveFile[]): Promise<I
   return { ok: true, added, alreadyHere }
 }
 
+/** Here already, word for word: the same texts, the same title, chapters and order, and every outline. */
 async function identical(
   tx: Parameters<Parameters<Deps['store']['transaction']>[0]>[0],
   incoming: Piece,
+  outlines: Outline[],
   versions: Version[],
   working: Working[],
 ): Promise<boolean> {
+  const here = await tx.piece(incoming.id)
+  if (!here || here.title !== incoming.title) return false
+  const sections = (p: Piece) => p.sections.map((s) => `${s.sectionId}\u0000${s.title}`).join('\u0001')
+  if (sections(here) !== sections(incoming)) return false
+  for (const o of outlines) if (!(await tx.outline(o.id))) return false
   for (const v of versions) if ((await tx.version(v.id))?.content !== v.content) return false
   for (const w of working) if ((await tx.working(w.sectionId))?.content !== w.content) return false
-  const here = await tx.piece(incoming.id)
-  return here?.title === incoming.title
+  return true
+}
+
+/** What a piece in an export is, compactly: so the same export imported twice adds one copy, not two. */
+function fingerprint(piece: Piece, versions: Version[], working: Working[]): string {
+  const all = [piece.id, piece.title, ...piece.sections.map((s) => s.title), ...versions.map((v) => v.id).sort(), ...working.map((w) => w.content)].join('\u0000')
+  let h = 0x811c9dc5
+  for (let i = 0; i < all.length; i++) h = Math.imul(h ^ all.charCodeAt(i), 0x01000193)
+  return `${piece.id}:${(h >>> 0).toString(36)}`
 }
 
 /**
@@ -227,13 +256,15 @@ function lastTitle(outlines: Outline[], sectionId: string): string {
 }
 
 function safe(name: string): string {
-  return name.replace(/[\\/:*?"<>|]/g, '').trim()
+  // No path parts: a title of ".." must not climb out of the export's folder.
+  return name.replace(/[\\/:*?"<>|]/g, '').trim().replace(/^\.+/, '').trim()
 }
 
+/** Unique ignoring case: "Notes" and "notes" are one folder on most disks. */
 function unique(name: string, used: Set<string>): string {
   let candidate = name
-  for (let n = 2; used.has(candidate); n++) candidate = `${name} (${n})`
-  used.add(candidate)
+  for (let n = 2; used.has(candidate.toLowerCase()); n++) candidate = `${name} (${n})`
+  used.add(candidate.toLowerCase())
   return candidate
 }
 

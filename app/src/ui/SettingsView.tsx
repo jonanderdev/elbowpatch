@@ -73,16 +73,17 @@ function List({ pieces, go }: Props) {
 }
 
 /** One row like a place in Backup & sync: a name, its word at the right, a status line. */
-function Row(props: { name: string; action: string; status: string; onAction(): void; busy?: boolean }) {
+function Row(props: { name: string; action: string; status: string; onAction(): void; busy?: boolean; announce?: boolean }) {
   return (
     <div className="area-row">
       <div className="area-top">
         <span className="area-name">{props.name}</span>
-        <button type="button" className="area-action" onClick={props.onAction} disabled={props.busy}>
+        <button type="button" className="area-action" aria-label={`${props.action} ${props.name}`} onClick={props.onAction} disabled={props.busy}>
           {props.action}
         </button>
       </div>
-      <p className="area-status" aria-live="polite">
+      {/* Only a result is announced, not what is already there. */}
+      <p className="area-status" role={props.announce ? 'status' : undefined}>
         {props.status}
       </p>
     </div>
@@ -102,12 +103,20 @@ function ExportImport({ deps, beforeExport, onChanged }: Props) {
   }, [])
 
   const last = readLastExport()
-  const exportLine =
-    exportStatus ?? [used !== null ? size(used) : null, last ? `last exported ${longDate(last, Date.now())}` : 'never exported yet'].filter(Boolean).join(' · ')
+  const exportLine = exportStatus ?? capital([used !== null ? size(used) : null, last ? `last exported ${longDate(last, Date.now())}` : 'never exported yet'].filter(Boolean).join(' · '))
 
   const exportEverything = async () => {
     setBusy(true)
     try {
+      await exportNow()
+    } catch {
+      setExportStatus("Couldn't export just now. Nothing has changed; try again.")
+    } finally {
+      setBusy(false)
+    }
+  }
+  const exportNow = async () => {
+    {
       await beforeExport()
       const now = Date.now()
       const name = `Elbowpatch ${longDate(now, now, true)}`
@@ -124,8 +133,6 @@ function ExportImport({ deps, beforeExport, onChanged }: Props) {
         localStorage.setItem(LAST_EXPORT, String(now))
       } catch {}
       setExportStatus(`Everything is in ${name}.zip.`)
-    } finally {
-      setBusy(false)
     }
   }
 
@@ -134,34 +141,35 @@ function ExportImport({ deps, beforeExport, onChanged }: Props) {
     setBusy(true)
     let added = 0
     let here = 0
+    const refused: string[] = []
     const md: { name: string; text: string; kind: Kind; guess: Kind }[] = []
     try {
       for (const file of [...files]) {
-        const bytes = await file.arrayBuffer()
-        // A zip by its first bytes, not its name: a renamed export is still an export.
-        if (isZip(bytes)) {
-          // Our own export comes in as it was, kinds and history included, with no question.
-          const result = await importArchive(deps, await unzip(bytes))
-          if (!result.ok) {
-            setImportStatus(
-              result.reason === 'newer-format'
-                ? 'This export is from a newer Elbowpatch. Update the app and try again. Nothing was added.'
-                : `${file.name} is not an Elbowpatch export. Nothing was added.`,
-            )
-            return
+        try {
+          const bytes = await file.arrayBuffer()
+          // A zip by its first bytes, not its name: a renamed export is still an export.
+          if (isZip(bytes)) {
+            // Our own export comes in as it was, kinds and history included, with no question.
+            const result = await importArchive(deps, await unzip(bytes))
+            if (result.ok) {
+              added += result.added
+              here += result.alreadyHere
+            } else refused.push(refusal(result.reason, file.name))
+          } else {
+            const text = new TextDecoder().decode(bytes)
+            const guess = guessKind(text)
+            md.push({ name: file.name, text, kind: guess, guess })
           }
-          added += result.added
-          here += result.alreadyHere
-        } else {
-          const text = new TextDecoder().decode(bytes)
-          const guess = guessKind(text)
-          md.push({ name: file.name, text, kind: guess, guess })
+        } catch {
+          refused.push(`${file.name} could not be read. Nothing from it was added.`)
         }
       }
       if (md.length) setLoose(md)
-      else setImportStatus(result(added, here))
-      if (added) await onChanged()
+      const said = added || here || !refused.length ? [result(added, here)] : []
+      setImportStatus([...said, ...refused].join(' '))
     } finally {
+      // Whatever came in shows in the library, even when another file was refused.
+      if (added) await onChanged()
       setBusy(false)
       if (picker.current) picker.current.value = ''
     }
@@ -170,27 +178,42 @@ function ExportImport({ deps, beforeExport, onChanged }: Props) {
   const importLoose = async () => {
     if (!loose) return
     setBusy(true)
+    let n = 0
     try {
-      for (const f of loose) await importMarkdown(deps, f.name, f.text, f.kind, navigator.language || 'en')
-      setImportStatus(result(loose.length, 0))
+      for (const f of loose) {
+        await importMarkdown(deps, f.name, f.text, f.kind, navigator.language || 'en')
+        n++
+      }
+      setImportStatus((s) => [s && !s.startsWith('0 pieces') ? s : null, result(n, 0)].filter(Boolean).join(' '))
       setLoose(null)
-      await onChanged()
+    } catch {
+      setImportStatus(`${result(n, 0)} The rest could not be added.`)
     } finally {
+      if (n) await onChanged()
       setBusy(false)
     }
   }
+  const sheet = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!loose) return
+    ;(sheet.current?.querySelector('[aria-checked="true"]') as HTMLElement | null)?.focus()
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setLoose(null)
+    window.addEventListener('keydown', esc)
+    return () => window.removeEventListener('keydown', esc)
+  }, [!!loose])
 
   return (
     <>
       <p className="settings-lead">Everything you have written, as plain .md files any app can open, with every moment kept and the pieces put away.</p>
       <div className="area-rows">
-        <Row name="Everything" action="Export" status={exportLine} onAction={() => void exportEverything()} busy={busy} />
+        <Row name="Everything" action="Export" status={exportLine} onAction={() => void exportEverything()} busy={busy} announce={!!exportStatus} />
         <Row
           name="Files"
           action="Import"
           status={importStatus ?? 'An Elbowpatch export, or loose .md files. Nothing here is ever replaced.'}
           onAction={() => picker.current?.click()}
           busy={busy}
+          announce={!!importStatus}
         />
       </div>
       <input
@@ -203,7 +226,7 @@ function ExportImport({ deps, beforeExport, onChanged }: Props) {
       />
       <p className="settings-note">To export one piece, use the export button on its page, or press and hold it in the library.</p>
       {loose && (
-        <div className="sheet surface import-sheet" role="dialog" aria-label="Import">
+        <div ref={sheet} className="sheet surface import-sheet" role="dialog" aria-modal="true" aria-label="Import">
           <div className="sheet-title">
             <span>Import</span>
             <span className="sheet-aside">
@@ -224,8 +247,19 @@ function ExportImport({ deps, beforeExport, onChanged }: Props) {
                       type="button"
                       role="radio"
                       aria-checked={f.kind === k}
+                      tabIndex={f.kind === k ? 0 : -1}
                       className="segment"
                       onClick={() => setLoose(loose.map((x, j) => (j === i ? { ...x, kind: k } : x)))}
+                      onKeyDown={(e) => {
+                        const kinds = (['book', 'journal', 'essay'] as const).filter((x) => x !== 'journal' || f.guess === 'journal')
+                        const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0
+                        if (!step) return
+                        e.preventDefault()
+                        const next = kinds[(kinds.indexOf(f.kind) + step + kinds.length) % kinds.length]!
+                        const group = (e.currentTarget as HTMLElement).parentElement
+                        setLoose(loose.map((x, j) => (j === i ? { ...x, kind: next } : x)))
+                        requestAnimationFrame(() => (group?.querySelector('[aria-checked="true"]') as HTMLElement | null)?.focus())
+                      }}
                     >
                       {KIND_WORD[k]}
                     </button>
@@ -249,6 +283,11 @@ function ExportImport({ deps, beforeExport, onChanged }: Props) {
 
 function PutAway({ deps, pieces, onChanged }: Props) {
   const [line, setLine] = useState<string | null>(null)
+  useEffect(() => {
+    if (!line) return
+    const t = setTimeout(() => setLine(null), 4000)
+    return () => clearTimeout(t)
+  }, [line])
   const away = waiting(pieces)
   return (
     <>
@@ -305,6 +344,16 @@ function left(p: Piece): string {
 function goesIn(p: Piece): string {
   const n = daysLeft(p)
   return n <= 1 ? 'in a day' : `in ${n} days`
+}
+
+function refusal(reason: 'newer-format' | 'not-an-export' | 'incomplete', name: string): string {
+  if (reason === 'newer-format') return 'This export is from a newer Elbowpatch. Update the app and try again. Nothing was added.'
+  if (reason === 'incomplete') return `${name} is missing some of its files. Nothing from it was added.`
+  return `${name} is not an Elbowpatch export. Nothing from it was added.`
+}
+
+function capital(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
 function result(added: number, here: number): string {

@@ -92,3 +92,22 @@ test('a loose .md file comes in with its kind chosen first', async ({ page }) =>
   await page.locator('.row', { hasText: 'On walking' }).click()
   await expect(page.locator('.body em')).toHaveText('short')
 })
+
+test('a put-away piece cannot be reopened with the Back button', async ({ page }) => {
+  await essay(page, 'Gone for now', 'Hidden.')
+  await essay(page, 'Here', 'Other.')
+  await page.locator('.row', { hasText: 'Gone for now' }).click()
+  await expect(page.locator('.title')).toHaveText('Gone for now')
+  await page.locator('.library-link').click()
+  await page.locator('.continue').click({ button: 'right' }).catch(() => {})
+  await page.keyboard.press('Escape')
+  // "Gone for now" is in Continue now; open "Here" and come back so it is a row.
+  await page.locator('.row', { hasText: 'Here' }).click()
+  await page.locator('.library-link').click()
+  await page.locator('.row', { hasText: 'Gone for now' }).click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Put away' }).click()
+  await page.goBack()
+  await page.goBack()
+  await expect(page.locator('.library')).toBeVisible()
+  await expect(page.locator('.title', { hasText: 'Gone for now' })).toHaveCount(0)
+})
