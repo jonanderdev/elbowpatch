@@ -28,6 +28,7 @@ The page is paged, not scrolled (DESIGN.md, Behaviour): a page is what fits the 
 - **Markdown outside the v1 marks is kept exactly as written**, shown as plain text with its symbols visible. It is never dropped, rewritten or escaped, so an imported file loses nothing. Escaping applies only to what is typed in the editor.
 - **Pasting** keeps bold and italic; everything else, headings included, becomes plain paragraphs. Pasted plain text is read as Markdown with the same rules as typing.
 - Lists, links, images, tables and code come later.
+- *Updated 2026-10-28:* what Markdown cannot hold is not offered. A line break (Shift + Return) is refused at the start of a paragraph and straight after another; an empty paragraph left as spacing is only space, and is gone on the next open. Words are never touched by either.
 
 ### Language
 - Each piece has a language (`lang`), taken from the browser's when the piece is made, and set on its page. Hyphenation (justified text always hyphenates) and spellcheck follow it, so a Spanish journal is hyphenated as Spanish. Changing it in Aa comes later; the field is there from day one.
