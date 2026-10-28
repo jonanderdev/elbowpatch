@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { saved } from './helpers'
 
 const PARAGRAPH =
   'Nobody remembers the first draft. It is written in a hurry, at the kitchen table or on the train, and it is mostly a list of things the writer hopes to say.'
@@ -26,7 +27,7 @@ test('what is typed is there after a reload', async ({ page }) => {
   await page.keyboard.type('Some *italic* and **bold** words.')
   await expect(page.locator('.body em')).toHaveText('italic')
   await expect(page.locator('.body strong')).toHaveText('bold')
-  await page.waitForTimeout(1300) // the working copy is saved a second after typing stops
+  await saved(page, '**bold**')
   await page.reload()
   await expect(page.locator('.title')).toHaveText('The second draft')
   await expect(page.locator('.body em')).toHaveText('italic')
@@ -83,7 +84,7 @@ test('the title opens page 1 and becomes the running head after it', async ({ pa
 test("when a save fails the words stay, the page says so, and it recovers", async ({ page }) => {
   await newEssay(page)
   await page.keyboard.type('Before.')
-  await page.waitForTimeout(1300)
+  await saved(page, 'Before.')
   await page.evaluate(() => {
     const w = window as unknown as { __tx: unknown }
     w.__tx = IDBDatabase.prototype.transaction
@@ -157,7 +158,7 @@ test('formatting from the selection menu, without Markdown', async ({ page, isMo
   // The selection is still there: the menu never took focus from the text.
   expect(await page.evaluate(() => getSelection()!.toString().length)).toBeGreaterThan(0)
   await menu.getByRole('button', { name: 'Keep this moment' }).click()
-  await page.waitForTimeout(1300)
+  await saved(page, '> ')
   await page.reload()
   await expect(page.locator('.body blockquote.pull strong em, .body blockquote.pull em strong')).toHaveCount(1)
 })

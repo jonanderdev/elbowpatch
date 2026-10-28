@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test'
+import { expect, type Page } from '@playwright/test'
 
 /** Puts the caret at the end of the text. (End scrolls instead on macOS WebKit.) */
 export async function caretToEnd(page: Page) {
@@ -12,4 +12,36 @@ export async function caretToEnd(page: Page) {
     s.removeAllRanges()
     s.addRange(range)
   })
+}
+
+/** Waits until the words are in a stored working copy: the save landed, however busy the machine is. */
+export async function saved(page: Page, words: string) {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          (words) =>
+            new Promise<boolean>((done) => {
+              const open = indexedDB.open('elbowpatch')
+              open.onerror = () => done(false)
+              open.onsuccess = () => {
+                const db = open.result
+                try {
+                  const all = db.transaction('working').objectStore('working').getAll()
+                  all.onsuccess = () => {
+                    db.close()
+                    done((all.result as { content: string }[]).some((w) => w.content.includes(words)))
+                  }
+                  all.onerror = () => done(false)
+                } catch {
+                  db.close()
+                  done(false)
+                }
+              }
+            }),
+          words,
+        ),
+      { timeout: 15000 },
+    )
+    .toBe(true)
 }

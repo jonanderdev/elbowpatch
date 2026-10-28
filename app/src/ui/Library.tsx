@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import type { Kind, Piece } from '../domain/model'
 import { totalWords } from '../domain/pieces'
 import { dayTitle, number, ordinal, shortDate, words } from '../domain/words'
+import { ExportSheet } from './Export'
 import { Icon, IconButton } from './Icon'
 import startBook from './icons/start-book.svg'
 import startBookNight from './icons/start-book-night.svg'
@@ -19,6 +20,9 @@ interface Props {
   today: string
   onOpen(piece: Piece): void
   onNew(kind: Kind): void
+  onRename(piece: Piece, title: string): void
+  /** Downloads the piece as one .md file; gives the file name. */
+  onExport(piece: Piece): Promise<string | undefined>
 }
 
 const KINDS: { kind: Kind; group: string; word: string }[] = [
@@ -27,12 +31,20 @@ const KINDS: { kind: Kind; group: string; word: string }[] = [
   { kind: 'essay', group: 'Essays', word: 'Essay' },
 ]
 
-export function Library({ pieces, last, today, onOpen, onNew }: Props) {
+export function Library({ pieces, last, today, onOpen, onNew, onRename, onExport }: Props) {
   const settings = useSettings()
   const headingRef = useRef<HTMLHeadingElement>(null)
   useEffect(() => headingRef.current?.focus(), [])
   const empty = pieces.length === 0
   const now = Date.now()
+  const [menuFor, setMenuFor] = useState<string | null>(null)
+  const [exporting, setExporting] = useState<Piece | null>(null)
+  const [line, setLine] = useState<string | null>(null)
+  useEffect(() => {
+    if (!line) return
+    const t = setTimeout(() => setLine(null), 4000)
+    return () => clearTimeout(t)
+  }, [line])
 
   return (
     <div className="library" role="main">
@@ -73,12 +85,19 @@ export function Library({ pieces, last, today, onOpen, onNew }: Props) {
                   </h2>
                   <ul className="rows">
                     {rows.map((piece) => (
-                      <li key={piece.id}>
-                        <button type="button" className="row" onClick={() => onOpen(piece)}>
-                          <span className="row-title">{piece.title.trim() || 'Untitled'}</span>
-                          <span className="row-meta">{meta(piece, today, now)}</span>
-                        </button>
-                      </li>
+                      <PieceRow
+                        key={piece.id}
+                        piece={piece}
+                        meta={meta(piece, today, now)}
+                        menuOpen={menuFor === piece.id}
+                        onMenu={(open) => setMenuFor(open ? piece.id : null)}
+                        onOpen={() => onOpen(piece)}
+                        onRename={(title) => onRename(piece, title)}
+                        onExport={() => {
+                          setMenuFor(null)
+                          setExporting(piece)
+                        }}
+                      />
                     ))}
                   </ul>
                 </section>
@@ -90,6 +109,22 @@ export function Library({ pieces, last, today, onOpen, onNew }: Props) {
       </div>
       <NewPiece today={today} onNew={onNew} />
       <UpdateLine />
+      {line && (
+        <div className="line surface library-line" role="status">
+          {line}
+        </div>
+      )}
+      {exporting && (
+        <ExportSheet
+          title={exporting.title.trim() || 'Untitled'}
+          onMarkdown={async () => {
+            const name = await onExport(exporting)
+            setExporting(null)
+            if (name) setLine(`Saved as ${name}.`)
+          }}
+          onDone={() => setExporting(null)}
+        />
+      )}
     </div>
   )
 }
@@ -238,4 +273,146 @@ function meta(piece: Piece, today: string, now: number): string {
   const days = piece.sections.length
   const todayWords = todays ? (piece.words?.[todays.sectionId] ?? 0) : 0
   return `${number(days)} ${days === 1 ? 'day' : 'days'} · ${todayWords ? `${words(todayWords)} today` : 'nothing yet today'}`
+}
+
+/**
+ * One piece in the list. Press and hold, right-click, or the menu key / Shift
+ * + F10 opens the piece menu over it (DESIGN.md, The library).
+ * shortcut: Put away joins the menu with Settings › Put away, its only way back after the Undo line.
+ */
+function PieceRow(props: {
+  piece: Piece
+  meta: string
+  menuOpen: boolean
+  onMenu(open: boolean): void
+  onOpen(): void
+  onRename(title: string): void
+  onExport(): void
+}) {
+  const { piece, menuOpen, onMenu } = props
+  const [renaming, setRenaming] = useState(false)
+  const row = useRef<HTMLButtonElement>(null)
+  const menu = useRef<HTMLDivElement>(null)
+  const input = useRef<HTMLInputElement>(null)
+  const hold = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const held = useRef(false)
+
+  useEffect(() => {
+    if (menuOpen) menu.current?.querySelector('button')?.focus()
+  }, [menuOpen])
+  useEffect(() => {
+    if (!renaming) return
+    input.current?.focus()
+    input.current?.select()
+  }, [renaming])
+  useEffect(() => {
+    if (!menuOpen) return
+    const away = (e: Event) => {
+      if (!menu.current?.contains(e.target as Node)) onMenu(false)
+    }
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      onMenu(false)
+      row.current?.focus()
+    }
+    document.addEventListener('pointerdown', away)
+    window.addEventListener('keydown', esc)
+    return () => {
+      document.removeEventListener('pointerdown', away)
+      window.removeEventListener('keydown', esc)
+    }
+  }, [menuOpen])
+
+  const finishRename = (keep: boolean) => {
+    // Enter commits, then the field leaves and blurs: only the first counts, and a missing field renames nothing.
+    if (!input.current || !renaming) return
+    const title = input.current.value.trim()
+    setRenaming(false)
+    if (keep && title !== piece.title.trim()) props.onRename(title)
+    requestAnimationFrame(() => row.current?.focus())
+  }
+
+  return (
+    <li className="piece">
+      {renaming ? (
+        <div className="row pressed">
+          <input
+            ref={input}
+            className="row-title rename"
+            autoFocus
+            defaultValue={piece.title}
+            aria-label="Title"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') finishRename(true)
+              if (e.key === 'Escape') finishRename(false)
+            }}
+            onBlur={() => finishRename(true)}
+          />
+          <span className="row-meta">{props.meta}</span>
+        </div>
+      ) : (
+        <button
+          ref={row}
+          type="button"
+          className={menuOpen ? 'row pressed' : 'row'}
+          aria-haspopup="menu"
+          onClick={() => {
+            if (held.current) held.current = false
+            else props.onOpen()
+          }}
+          onContextMenu={(e) => {
+            e.preventDefault()
+            onMenu(true)
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
+              e.preventDefault()
+              onMenu(true)
+            }
+          }}
+          onPointerDown={(e) => {
+            if (e.pointerType !== 'touch') return
+            clearTimeout(hold.current)
+            hold.current = setTimeout(() => {
+              held.current = true
+              onMenu(true)
+            }, 500)
+          }}
+          onPointerUp={() => clearTimeout(hold.current)}
+          onPointerCancel={() => clearTimeout(hold.current)}
+          onPointerMove={() => clearTimeout(hold.current)}
+        >
+          <span className="row-title">{piece.title.trim() || 'Untitled'}</span>
+          <span className="row-meta">{props.meta}</span>
+        </button>
+      )}
+      {menuOpen && (
+        <div ref={menu} className="bar surface piece-menu" role="menu" aria-label={piece.title.trim() || 'Untitled'}>
+          <button
+            type="button"
+            role="menuitem"
+            className="menu-item"
+            onClick={() => {
+              onMenu(false)
+              setRenaming(true)
+            }}
+          >
+            Rename
+          </button>
+          <button type="button" role="menuitem" className="menu-item" onClick={props.onExport}>
+            Export
+          </button>
+          <span className="bar-separator" />
+          <IconButton
+            icon="close"
+            label="Close"
+            onClick={() => {
+              onMenu(false)
+              row.current?.focus()
+            }}
+          />
+        </div>
+      )}
+    </li>
+  )
 }

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { caretToEnd } from './helpers'
+import { caretToEnd, saved } from './helpers'
 
 test('opens and keeps writing with no network', async ({ page, context }) => {
   await page.goto('./')
@@ -9,7 +9,7 @@ test('opens and keeps writing with no network', async ({ page, context }) => {
   await page.keyboard.type('Offline')
   await page.keyboard.press('Enter')
   await page.keyboard.type('Written on a train.')
-  await page.waitForTimeout(1300)
+  await saved(page, 'Written on a train.')
 
   await context.setOffline(true)
   await page.reload()
@@ -18,7 +18,7 @@ test('opens and keeps writing with no network', async ({ page, context }) => {
   expect(await page.evaluate(() => document.fonts.check('360 18px Literata'))).toBe(true)
   await caretToEnd(page)
   await page.keyboard.type(' Still writing.')
-  await page.waitForTimeout(1300)
+  await saved(page, 'Still writing.')
   await page.reload()
   await expect(page.locator('.body')).toContainText('Still writing.')
 })

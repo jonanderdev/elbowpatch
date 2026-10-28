@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import type { Piece } from '../domain/model'
 
 // Words that could not be saved yet, kept here, not in a page that may close.
 // While anything waits, the app says so and offers Save a copy (0010); a page
@@ -7,6 +8,8 @@ import { useSyncExternalStore } from 'react'
 // connection does not touch, so a reload or a crash does not lose them.
 
 export interface Unsaved {
+  /** The piece as the page knew it, so a piece never stored yet can be written from this alone. */
+  piece: Piece
   pieceId: string
   sectionId: string
   /** The file name and text for Save a copy. */
@@ -49,6 +52,7 @@ export const unsaved = {
     if (waiting.delete(sectionId)) changed()
   },
   get: (sectionId: string) => waiting.get(sectionId),
+  all: () => [...waiting.values()],
 }
 
 export function useUnsaved(): Unsaved[] {

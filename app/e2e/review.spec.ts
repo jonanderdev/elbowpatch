@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { caretToEnd } from './helpers'
+import { caretToEnd, saved } from './helpers'
 
 async function newEssay(page: Page, title: string) {
   await page.goto('./')
@@ -24,7 +24,7 @@ const mendSaves = (page: Page) =>
 test('words that could not be saved survive leaving the page, and come back with it', async ({ page }) => {
   await newEssay(page, 'Kept title')
   await page.keyboard.type('Saved.')
-  await page.waitForTimeout(1300)
+  await saved(page, 'Saved.')
   await breakSaves(page)
   await page.keyboard.type(' Not yet saved.')
   await expect(page.getByRole('alert')).toBeVisible()
@@ -35,7 +35,7 @@ test('words that could not be saved survive leaving the page, and come back with
   await page.locator('.continue, .row').first().click()
   await expect(page.locator('.body')).toContainText('Saved. Not yet saved.')
   await expect(page.locator('.title')).toHaveText('Kept title')
-  await page.waitForTimeout(1300)
+  await saved(page, 'Not yet saved.')
   await page.reload()
   await expect(page.locator('.body')).toContainText('Saved. Not yet saved.')
   await expect(page.locator('.title')).toHaveText('Kept title')
@@ -49,7 +49,7 @@ test('pasted Markdown outside the v1 marks becomes plain paragraphs and stays so
     document.querySelector('.body')!.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }))
   })
   await expect(page.locator('.body strong')).toHaveText('bold')
-  await page.waitForTimeout(1300)
+  await saved(page, '**bold**')
   await page.reload()
   await expect(page.locator('.body p').first()).toHaveText('# Notes')
   await expect(page.locator('.body p.raw')).toHaveCount(0)
@@ -64,7 +64,7 @@ test('a line break reads back as written', async ({ page }) => {
   await page.keyboard.press('Shift+Enter') // refused: two in a row
   await page.keyboard.type('and the next')
   await expect(page.locator('.body br:not(.ProseMirror-trailingBreak)')).toHaveCount(1)
-  await page.waitForTimeout(1300)
+  await saved(page, 'and the next')
   await page.reload()
   await expect(page.locator('.body p')).toHaveCount(1)
   await expect(page.locator('.body br:not(.ProseMirror-trailingBreak)')).toHaveCount(1)
@@ -88,4 +88,25 @@ test('opening the app keeps the place where you left off', async ({ page }) => {
   await page.locator('.continue').click()
   await expect(page.locator('.page-button')).toHaveText(last!)
   await caretToEnd(page)
+})
+
+test('words typed just before closing are there on the next launch', async ({ page }) => {
+  await newEssay(page, 'Closed quickly')
+  // Make every save slow, so the page closes before the database finishes.
+  await page.evaluate(() => {
+    const original = IDBDatabase.prototype.transaction
+    IDBDatabase.prototype.transaction = function (this: IDBDatabase, ...args: Parameters<typeof original>) {
+      const tx = original.apply(this, args)
+      const block = () => {
+        const until = performance.now() + 50
+        while (performance.now() < until);
+      }
+      tx.addEventListener('complete', block)
+      return tx
+    } as typeof original
+  })
+  await page.keyboard.type('The last words.')
+  await page.reload()
+  await expect(page.locator('.body')).toContainText('The last words.')
+  await expect(page.locator('.title')).toHaveText('Closed quickly')
 })

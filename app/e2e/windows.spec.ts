@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { caretToEnd } from './helpers'
+import { caretToEnd, saved } from './helpers'
 
 test('a second window opens the piece read-only, and Write here hands it over', async ({ page, context }) => {
   await page.goto('./')
@@ -8,7 +8,7 @@ test('a second window opens the piece read-only, and Write here hands it over', 
   await page.keyboard.type('Two windows')
   await page.keyboard.press('Enter')
   await page.keyboard.type('Written in the first.')
-  await page.waitForTimeout(1300) // stored once typing pauses
+  await saved(page, 'Written in the first.')
 
   const second = await context.newPage()
   await second.goto(page.url())
@@ -26,7 +26,7 @@ test('a second window opens the piece read-only, and Write here hands it over', 
 
   await caretToEnd(second)
   await second.keyboard.type(' And in the second.')
-  await second.waitForTimeout(1300)
+  await saved(second, 'And in the second.')
   await second.reload()
   await expect(second.locator('.body')).toContainText('Last words here. And in the second.')
 })

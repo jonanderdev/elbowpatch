@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Kind, Piece } from '../domain/model'
-import { library, newPiece, openPiece, recover, withDay, type Deps } from '../domain/pieces'
+import { pieceAsMarkdown } from '../domain/export'
+import { library, newPiece, openPiece, recover, rename, renameSection, withDay, write, type Deps } from '../domain/pieces'
 import type { Held, WriterLock } from '../domain/ports'
 import { Library } from './Library'
 import { download } from './download'
 import { Page, type Opened } from './Page'
-import { useUnsaved } from './unsaved'
+import { unsaved, useUnsaved } from './unsaved'
 
 const LAST = 'elbowpatch.last'
 
@@ -61,6 +62,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
     void (async () => {
       try {
         await recover(deps)
+        await replayJournal(deps)
       } catch {
         // Nothing to recover is not a reason to stop; a store that cannot open shows on the first save.
       }
@@ -97,11 +99,16 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
   // One window writes a piece (0010). The lock follows the piece, not the page,
   // so reopening the same piece never locks this window out.
   // Waiting for the lock, writing, or another window writes it.
-  const [writer, setWriter] = useState<'waiting' | 'here' | 'elsewhere'>('waiting')
+  // Kept with the piece it is about, so a newly opened piece is never taken for one already held.
+  const [writerOf, setWriterOf] = useState<{ pieceId?: string; state: 'waiting' | 'here' | 'elsewhere' }>({ state: 'waiting' })
   const held = useRef<Held | null>(null)
   const flushPage = useRef<(() => Promise<void>) | null>(null)
   const closing = useRef<Promise<void>>(Promise.resolve())
   const pieceId = opened?.piece.id
+  const writer = writerOf.pieceId === pieceId ? writerOf.state : 'waiting'
+  const setWriter = useCallback((state: 'waiting' | 'here' | 'elsewhere', id = pieceIdNow.current) => setWriterOf({ pieceId: id, state }), [])
+  const pieceIdNow = useRef(pieceId)
+  pieceIdNow.current = pieceId
   const onAsked = useCallback(async () => {
     await flushPage.current?.()
     setWriter('elsewhere')
@@ -169,7 +176,13 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
           flushRef={flushPage}
           closingRef={closing}
           covered={inLibrary}
-          onLibrary={() => go('/')}
+          onLibrary={async () => {
+            // Save first, so the library already lists what was just written; never wait long for it.
+            // The first save also opens the database; a stuck one never holds the writer on the page for long.
+            await Promise.race([flushPage.current?.(), new Promise((r) => setTimeout(r, 1500))])
+            await refresh().catch(() => {})
+            go('/')
+          }}
           onChange={(piece) => {
             askToPersist()
             setPieces((all) => (all.some((p) => p.id === piece.id) ? all.map((p) => (p.id === piece.id ? piece : p)) : [piece, ...all]))
@@ -190,6 +203,24 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
           last={last}
           today={today}
           onNew={startNew}
+          onRename={async (piece, title) => {
+            await rename(deps, piece, title)
+            await refresh()
+            // The page behind holds the old title: open it again, or its next save would put it back.
+            if (opened?.piece.id === piece.id) {
+              await flushPage.current?.()
+              const fresh = await open(piece.id)
+              if (fresh) setOpened(fresh)
+            }
+          }}
+          onExport={async (piece) => {
+            if (opened?.piece.id === piece.id) await flushPage.current?.()
+            const found = await openPiece(deps, piece.id)
+            if (!found) return undefined
+            const file = pieceAsMarkdown(found.piece, found.sections)
+            download(file.name, file.text)
+            return file.name
+          }}
           onOpen={(piece) => {
             // The piece behind the library is already laid out: Continue is instant.
             if (opened?.piece.id === piece.id) go(`/p/${piece.id}`)
@@ -233,4 +264,23 @@ function askToPersist() {
   if (asked) return
   asked = true
   void navigator.storage?.persist?.().catch(() => {})
+}
+
+/**
+ * Words the last session could not store before it closed (see Page, journal)
+ * go into the database first. One older than its section's stored copy was
+ * overtaken by another window: it is not applied, and waits for Save a copy.
+ */
+async function replayJournal(deps: Deps) {
+  for (const u of unsaved.all()) {
+    const working = await deps.store.transaction((tx) => tx.working(u.sectionId))
+    if (working && working.updatedAt > u.at) continue
+    // The journal's piece is only a draft: write() keeps what is stored and adds a section it lacks.
+    await write(deps, u.piece, u.sectionId, u.markdown)
+    if (u.title !== null) {
+      if (u.piece.kind === 'essay') await rename(deps, u.piece, u.title)
+      else await renameSection(deps, u.piece, u.sectionId, u.title)
+    }
+    unsaved.saved(u.sectionId)
+  }
 }

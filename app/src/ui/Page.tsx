@@ -100,7 +100,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
         const changed = markdown !== state.saved || (title !== null && title !== state.title)
         if (readOnlyNow.current) {
           // Another window writes this piece now: what was not saved here waits, with Save a copy.
-          if (changed) unsaved.keep({ pieceId: piece.id, sectionId, name: fileName(), markdown, title })
+          if (changed) unsaved.keep({ piece: state.piece, pieceId: piece.id, sectionId, name: fileName(), markdown, title })
           return
         }
         try {
@@ -122,7 +122,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
         } catch (error) {
           // The words stay; say so, and keep trying while this page is open (0010).
           // A closed page hands them on and never writes again.
-          unsaved.keep({ pieceId: piece.id, sectionId, name: fileName(), markdown, title })
+          unsaved.keep({ piece: state.piece, pieceId: piece.id, sectionId, name: fileName(), markdown, title })
           if (!closed) {
             setFailed((failedNow = true))
             clearTimeout(retry)
@@ -227,8 +227,20 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     const fontsLoaded = () => pager.measure()
     document.fonts.addEventListener('loadingdone', fontsLoaded)
 
-    const onHide = () => {
-      if (document.visibilityState === 'hidden') void flush()
+    // Leaving: the database may not finish while the page unloads, so first put what is
+    // not stored yet in the journal (synchronous), then save; a launch writes the journal first.
+    const journal = () => {
+      if (closed || readOnlyNow.current) return
+      const markdown = editor.markdown()
+      const title = piece.kind === 'journal' ? null : (titleEl.current?.textContent ?? state.title)
+      if (markdown !== state.saved || (title !== null && title !== state.title))
+        unsaved.keep({ piece: state.piece, pieceId: piece.id, sectionId, name: fileName(), markdown, title })
+    }
+    const onHide = (e: Event) => {
+      if (e.type === 'pagehide' || document.visibilityState === 'hidden') {
+        journal()
+        void flush()
+      }
     }
     const onResize = () => {
       relayout()
@@ -236,13 +248,11 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     }
     document.addEventListener('visibilitychange', onHide)
     window.addEventListener('pagehide', onHide)
-    window.addEventListener('blur', onHide)
     window.addEventListener('resize', onResize)
 
     return () => {
       document.removeEventListener('visibilitychange', onHide)
       window.removeEventListener('pagehide', onHide)
-      window.removeEventListener('blur', onHide)
       window.removeEventListener('resize', onResize)
       document.fonts.removeEventListener('loadingdone', fontsLoaded)
       clearTimeout(retry)
