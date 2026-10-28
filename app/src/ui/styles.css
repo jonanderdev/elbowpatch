@@ -1255,13 +1255,6 @@ button {
   content: attr(data-placeholder);
   color: var(--secondary);
 }
-/* An empty subtitle shows only while the writer is on the title page. */
-.subtitle:empty::before {
-  visibility: hidden;
-}
-.title-page:focus-within .subtitle:empty::before {
-  visibility: visible;
-}
 .book-title:focus-visible,
 .subtitle:focus-visible {
   outline: none;

@@ -232,6 +232,14 @@ test('a book opens on its title page; chapter 1 begins on the next', async ({ pa
   await page.goto('./')
   await page.locator('.start.book').click()
   await expect(page.locator('.book-title')).toBeFocused()
+  // Both fields say what they are while empty.
+  for (const [field, word] of [['.book-title', 'Untitled'], ['.subtitle', 'Subtitle']]) {
+    const shown = await page.locator(field).evaluate((el) => {
+      const before = getComputedStyle(el, '::before')
+      return before.content.replace(/"/g, '') + '|' + before.visibility
+    })
+    expect(shown).toBe(`${word}|visible`)
+  }
   await expect(page.locator('.page-button')).toHaveText('1')
   await expect(page.locator('.book-title')).toBeInViewport()
   await page.keyboard.type('The Long Winter')
