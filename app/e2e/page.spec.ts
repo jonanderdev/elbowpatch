@@ -440,6 +440,26 @@ test('Library and the page button: text edge on a phone, frame corners on deskto
   }
 })
 
+test('one scroll turns one page, however long its glide', async ({ page }) => {
+  test.skip(page.viewportSize()!.width < 700, 'desktop wheel')
+  await newEssay(page)
+  await fill(page, 12)
+  for (let i = 0; i < 12; i++) await page.keyboard.press('PageUp')
+  await expect(page.locator('.page-button')).toHaveText('1')
+  const col = (await page.locator('.pager').boundingBox())!
+  await page.mouse.move(col.x + col.width / 2, col.y + 200)
+  // A trackpad's glide: fading deltas, wobbling about the smallest at its tail.
+  for (const delta of [40, 30, 20, 12, 8, 5, 3, 4, 3, 4, 2, 1]) {
+    await page.mouse.wheel(0, delta)
+    await page.waitForTimeout(16)
+  }
+  await expect(page.locator('.page-button')).toHaveText('2')
+  // A new scroll, after a pause, turns the next.
+  await page.waitForTimeout(300)
+  await page.mouse.wheel(0, 30)
+  await expect(page.locator('.page-button')).toHaveText('3')
+})
+
 test('a click in the margin turns the page, but not beside the text', async ({ page }) => {
   test.skip(page.viewportSize()!.width < 700, 'desktop margins')
   await newEssay(page)
@@ -470,6 +490,14 @@ test('a click in the margin turns the page, but not beside the text', async ({ p
   await page.mouse.move(col.x - 150, col.y + 300)
   await page.mouse.up()
   await expect(page.locator('.page-button')).toHaveText(String(before - 1))
+  // Held down, and moved a hair as a hand does, the arrow stays; let go, it is a click.
+  await page.mouse.move(col.x - 200, col.y + 200)
+  expect(await turn()).toBe('back')
+  await page.mouse.down()
+  await page.mouse.move(col.x - 201, col.y + 201)
+  expect(await turn()).toBe('back')
+  await page.mouse.up()
+  await expect(page.locator('.page-button')).toHaveText(String(before - 2))
 })
 
 test('a piece opens straight at the place it was left, with no frame of page 1 first', async ({ page }) => {

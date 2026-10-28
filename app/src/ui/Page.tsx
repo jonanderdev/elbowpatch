@@ -539,7 +539,9 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
       return 0
     }
     const onMouseMove = (e: MouseEvent) => {
-      const dir = e.buttons ? 0 : side(e)
+      // While pressed, the arrow stays as it is: clicking through pages never flickers it.
+      if (e.buttons) return
+      const dir = side(e)
       const p = live.current?.pager
       const can = p && (dir < 0 ? p.page > 0 : dir > 0 && p.page < p.count - 1)
       el.dataset.turn = can ? (dir < 0 ? 'back' : 'on') : ''

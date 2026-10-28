@@ -1295,8 +1295,19 @@ button {
 }
 
 @media (min-width: 700px) {
+  /* In the corners, the same 20px from both edges: Library's outline (30px, in a 44px tap area)
+     from the top and left, the page button (44px) from the bottom and right. The head and the
+     foot move as a whole, so what sits level with them stays level. */
   .head {
+    top: calc(var(--edge) - (var(--top) - 30px) / 2);
     padding: 0 calc(var(--frame) + var(--edge));
+  }
+  .foot {
+    bottom: calc(var(--edge) - (var(--bottom) - 44px) / 2);
+  }
+  .line,
+  .library-lines {
+    bottom: var(--edge);
   }
   .settings-head {
     max-width: none;
