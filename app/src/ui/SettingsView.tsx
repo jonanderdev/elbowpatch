@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { unzip, zip } from '../adapters/zip'
-import { exportAll, guessKind, importArchive, importMarkdown } from '../domain/archive'
+import { unzip } from '../adapters/zip'
+import { guessKind, importArchive, importMarkdown } from '../domain/archive'
+import { downloadEverything, lastExport } from './everything'
 import type { Kind, Piece } from '../domain/model'
 import { restore, type Deps } from '../domain/pieces'
 import { longDate, number, size } from '../domain/words'
@@ -11,7 +12,6 @@ import { longDate, number, size } from '../domain/words'
 
 export type Area = 'list' | 'export' | 'put-away'
 
-const LAST_EXPORT = 'elbowpatch.lastExport'
 const DAY = 86_400_000
 const KIND_WORD: Record<Kind, string> = { book: 'Book', journal: 'Journal', essay: 'Essay' }
 
@@ -51,7 +51,7 @@ export function Settings(props: Props) {
 
 function List({ pieces, go }: Props) {
   const away = waiting(pieces)
-  const last = readLastExport()
+  const last = lastExport()
   return (
     <ul className="rows">
       <li>
@@ -102,7 +102,7 @@ function ExportImport({ deps, beforeExport, onChanged }: Props) {
     void navigator.storage?.estimate?.().then((e) => setUsed(e.usage ?? null)).catch(() => {})
   }, [])
 
-  const last = readLastExport()
+  const last = lastExport()
   const exportLine = exportStatus ?? capital([used !== null ? size(used) : null, last ? `last exported ${longDate(last, Date.now())}` : 'never exported yet'].filter(Boolean).join(' · '))
 
   const exportEverything = async () => {
@@ -116,24 +116,8 @@ function ExportImport({ deps, beforeExport, onChanged }: Props) {
     }
   }
   const exportNow = async () => {
-    {
-      await beforeExport()
-      const now = Date.now()
-      const name = `Elbowpatch ${longDate(now, now, true)}`
-      const blob = await zip(name, await exportAll(deps))
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${name}.zip`
-      document.body.append(a)
-      a.click()
-      a.remove()
-      setTimeout(() => URL.revokeObjectURL(url), 1000)
-      try {
-        localStorage.setItem(LAST_EXPORT, String(now))
-      } catch {}
-      setExportStatus(`Everything is in ${name}.zip.`)
-    }
+    await beforeExport()
+    setExportStatus(`Everything is in ${await downloadEverything(deps)}.`)
   }
 
   const chosen = async (files: FileList | null) => {
@@ -378,12 +362,4 @@ function isZip(bytes: ArrayBuffer): boolean {
   return head[0] === 0x50 && head[1] === 0x4b && head[2] === 0x03 && head[3] === 0x04
 }
 
-function readLastExport(): number | null {
-  try {
-    const v = localStorage.getItem(LAST_EXPORT)
-    return v ? Number(v) : null
-  } catch {
-    return null
-  }
-}
 

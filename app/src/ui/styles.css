@@ -1133,3 +1133,18 @@ button {
   padding-top: 16px;
   padding-bottom: 16px;
 }
+
+/* The export reminder: one quiet line at the library's foot, left of the +'s height. */
+.export-reminder {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  padding: 48px 12px 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--secondary);
+}
+.export-reminder .text-link {
+  padding: 0;
+}

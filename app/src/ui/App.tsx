@@ -6,6 +6,7 @@ import { library, newPiece, openPiece, putAway, recover, rename, renameSection, 
 import type { Held, WriterLock } from '../domain/ports'
 import { Library } from './Library'
 import { download } from './download'
+import { downloadEverything } from './everything'
 import { Page, type Opened } from './Page'
 import { Settings } from './SettingsView'
 import { unsaved } from './unsaved'
@@ -244,6 +245,10 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
             }
           }}
           onSettings={() => go('/settings')}
+          onExportEverything={async () => {
+            await flushPage.current?.()
+            return downloadEverything(deps)
+          }}
           onPutAway={async (piece) => {
             if (opened?.piece.id === piece.id) await flushPage.current?.()
             await putAway(deps, piece.id)

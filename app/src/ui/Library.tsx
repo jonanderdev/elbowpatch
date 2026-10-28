@@ -12,6 +12,7 @@ import startJournal from './icons/start-journal.svg'
 import startJournalNight from './icons/start-journal-night.svg'
 import { theme, update, useSettings } from './settings'
 import { download } from './download'
+import { lastExport } from './everything'
 import { unsaved, useUnsaved } from './unsaved'
 import { useUpdateWaiting } from './updates'
 
@@ -28,6 +29,8 @@ interface Props {
   onPutAway(piece: Piece): Promise<void>
   onRestore(piece: Piece): Promise<void>
   onSettings(): void
+  /** Downloads everything as one zip; gives its file name. */
+  onExportEverything(): Promise<string>
 }
 
 const KINDS: { kind: Kind; group: string; word: string }[] = [
@@ -36,7 +39,7 @@ const KINDS: { kind: Kind; group: string; word: string }[] = [
   { kind: 'essay', group: 'Essays', word: 'Essay' },
 ]
 
-export function Library({ pieces, last, today, onOpen, onNew, onRename, onExport, onPutAway, onRestore, onSettings }: Props) {
+export function Library({ pieces, last, today, onOpen, onNew, onRename, onExport, onPutAway, onRestore, onSettings, onExportEverything }: Props) {
   const settings = useSettings()
   const headingRef = useRef<HTMLHeadingElement>(null)
   useEffect(() => headingRef.current?.focus(), [])
@@ -71,11 +74,12 @@ export function Library({ pieces, last, today, onOpen, onNew, onRename, onExport
     }
   }, [awayNow])
   /** The piece menu works the same on Continue and on every row (DESIGN.md, The library). */
-  const handlers = (piece: Piece) => ({
+  // One menu at a time, by place: the piece in Continue is also in its group.
+  const handlers = (piece: Piece, where: 'continue' | 'row') => ({
     piece,
     meta: meta(piece, today, now),
-    menuOpen: menuFor === piece.id,
-    onMenu: (open: boolean) => setMenuFor(open ? piece.id : null),
+    menuOpen: menuFor === `${where}:${piece.id}`,
+    onMenu: (open: boolean) => setMenuFor(open ? `${where}:${piece.id}` : null),
     onOpen: () => onOpen(piece),
     onRename: (title: string) => onRename(piece, title),
     onExport: () => {
@@ -117,7 +121,7 @@ export function Library({ pieces, last, today, onOpen, onNew, onRename, onExport
               <>
                 <div className="continue-heading">Where you left off</div>
                 <PieceRow
-                  {...handlers(last)}
+                  {...handlers(last, 'continue')}
                   card={
                     <>
                       <span className="continue-excerpt">{excerpt(last)}</span>
@@ -133,7 +137,8 @@ export function Library({ pieces, last, today, onOpen, onNew, onRename, onExport
               </>
             )}
             {KINDS.map(({ kind, group }) => {
-              const rows = pieces.filter((p) => p.kind === kind && p.id !== last?.id)
+              // The piece in Continue stays in its group too: every piece is where its kind is.
+              const rows = pieces.filter((p) => p.kind === kind)
               if (rows.length === 0) return null
               return (
                 <section className="group" key={kind} aria-labelledby={`group-${kind}`}>
@@ -143,13 +148,14 @@ export function Library({ pieces, last, today, onOpen, onNew, onRename, onExport
                   </h2>
                   <ul className="rows">
                     {rows.map((piece) => (
-                      <PieceRow key={piece.id} {...handlers(piece)} />
+                      <PieceRow key={piece.id} {...handlers(piece, 'row')} />
                     ))}
                   </ul>
                 </section>
               )
             })}
-            {!settings.firstRunDone && <FirstRun atFoot />}
+            {!settings.firstRunDone && <SafariNote atFoot />}
+            <ExportReminder pieces={pieces} onExport={onExportEverything} onDone={setLine} />
           </>
         )}
       </div>
@@ -297,20 +303,20 @@ function Empty({ today, onNew, firstRun }: { today: string; onNew(kind: Kind): v
           </button>
         ))}
       </div>
-      {firstRun && <FirstRun />}
+      {firstRun && <SafariNote />}
     </div>
   )
 }
 
-/** The first-run note: where the writing lives, said once (DESIGN.md, The library; 0010). */
-function FirstRun({ atFoot }: { atFoot?: boolean }) {
-  // shortcut: no "Connect" until there is a place to connect (sync comes after dogfooding).
-  const sentence = safariOutsideHomeScreen()
-    ? 'Safari clears this after 7 days away. Add Elbowpatch to your Home Screen, or export now and then.'
-    : 'Your writing lives only in this browser, which can clear it. Export now and then to keep a copy.'
+/**
+ * Safari deletes a site's storage after 7 days away unless it is on the Home
+ * Screen (0010): the one real risk, said once, there only.
+ */
+function SafariNote({ atFoot }: { atFoot?: boolean }) {
+  if (!safariOutsideHomeScreen()) return null
   return (
     <div className={atFoot ? 'first-run at-foot' : 'first-run'}>
-      <p>{sentence}</p>
+      <p>Safari clears this after 7 days away. Add Elbowpatch to your Home Screen.</p>
       <div className="links">
         <button type="button" className="text-link" onClick={() => update({ firstRunDone: true })}>
           Not now
@@ -318,6 +324,67 @@ function FirstRun({ atFoot }: { atFoot?: boolean }) {
       </div>
     </div>
   )
+}
+
+/** A place to keep a copy can be connected (Settings › Backup & sync). Sync comes after dogfooding. */
+const CAN_CONNECT = false
+
+/**
+ * A quiet reminder at the library's foot, only after 30 days without a copy:
+ * "Last exported 5 weeks ago · Export", and "Connect a place" once there is
+ * one to connect (DESIGN.md, The library).
+ */
+function ExportReminder({ pieces, onExport, onDone }: { pieces: Piece[]; onExport(): Promise<string>; onDone(line: string): void }) {
+  const [busy, setBusy] = useState(false)
+  const [, refresh] = useState(0)
+  const now = Date.now()
+  const last = lastExport()
+  const oldest = Math.min(...pieces.map((p) => p.createdAt))
+  const since = last ?? oldest
+  if (pieces.length === 0 || now - since < 30 * DAY) return null
+  return (
+    <div className="export-reminder">
+      <span>{last ? `Last exported ${ago(now - last)}` : 'Not exported yet'}</span>
+      <span aria-hidden="true">·</span>
+      <button
+        type="button"
+        className="text-link strong"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true)
+          try {
+            onDone(`Everything is in ${await onExport()}.`)
+          } catch {
+            onDone("Couldn't export just now. Nothing has changed; try again.")
+          } finally {
+            setBusy(false)
+            refresh((n) => n + 1)
+          }
+        }}
+      >
+        Export
+      </button>
+      {CAN_CONNECT && (
+        <>
+          <span aria-hidden="true">·</span>
+          <a className="text-link strong" href="#/settings/sync">
+            Connect a place
+          </a>
+        </>
+      )}
+    </div>
+  )
+}
+
+const DAY = 86_400_000
+
+/** "12 days ago", "5 weeks ago", "3 months ago". */
+function ago(ms: number): string {
+  const days = Math.floor(ms / DAY)
+  if (days < 14) return `${days} days ago`
+  if (days < 60) return `${Math.floor(days / 7)} weeks ago`
+  const months = Math.floor(days / 30)
+  return months < 24 ? `${months} months ago` : `${Math.floor(days / 365)} years ago`
 }
 
 function safariOutsideHomeScreen(): boolean {

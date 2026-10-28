@@ -8,4 +8,4 @@ Date: 2026-10-27 · Status: accepted
 - Putting away never asks first: the line that follows offers *Undo*, and Settings › Put away lists what waits and brings it back (DESIGN.md). *Updated 2026-10-28.*
 
 ## Consequences
-- The 30 days is our own promise only. Without a connected place, the browser can still clear its storage at any time. The first-run note and one-click export are the answer to that.
+- The 30 days is our own promise only. Without a connected place, the browser can still clear its storage at any time. Persistent storage, the export reminder and one-click export are the answer to that (0010).

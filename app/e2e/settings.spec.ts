@@ -114,7 +114,8 @@ test('a put-away piece cannot be reopened with the Back button', async ({ page }
 
 test('the only piece can be put away from Continue', async ({ page }) => {
   await essay(page, 'The only one', 'Alone.')
-  await expect(page.locator('.row')).toHaveCount(0)
+  // In Continue, and in its group too.
+  await expect(page.locator('.row', { hasText: 'The only one' })).toHaveCount(1)
   await page.locator('.continue').click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Put away' }).click()
   await expect(page.locator('.empty-library')).toBeVisible()
@@ -144,4 +145,20 @@ test('the + and the page button are circles, and text settings sit above the too
   const sheet = await page.getByRole('dialog', { name: 'Text settings' }).boundingBox()
   const bar = await page.getByRole('toolbar', { name: 'Tools' }).boundingBox()
   expect(sheet!.y + sheet!.height).toBeLessThanOrEqual(bar!.y)
+})
+
+test('no storage warning; a quiet export reminder after 30 days without a copy', async ({ page }) => {
+  await essay(page, 'Reminded', 'Words.')
+  await expect(page.getByText(/lives only in this browser/)).toHaveCount(0)
+  await expect(page.locator('.export-reminder')).toHaveCount(0)
+  await page.evaluate(() => localStorage.setItem('elbowpatch.lastExport', String(Date.now() - 40 * 86_400_000)))
+  await page.reload()
+  await page.goto('./#/')
+  const reminder = page.locator('.export-reminder')
+  await expect(reminder).toContainText('Last exported 5 weeks ago')
+  const download = page.waitForEvent('download')
+  await reminder.getByRole('button', { name: 'Export' }).click()
+  expect((await download).suggestedFilename()).toMatch(/^Elbowpatch .*\.zip$/)
+  await expect(page.getByText(/^Everything is in Elbowpatch .*\.zip\.$/)).toBeVisible()
+  await expect(reminder).toHaveCount(0)
 })

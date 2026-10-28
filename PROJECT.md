@@ -95,8 +95,9 @@ the chapters with the page each starts on. Reordering chapters by drag and a bin
 - History is **append-only** from the user's view. Restoring never deletes anything.
 
 ### 4.4 Sync and backup (optional, provider-based)
-- Local storage works with no account. A gentle, non-nagging first-run message explains that the browser
-  can lose data and offers to connect a backup destination or export.
+- Local storage works with no account. No warning on first launch: the app asks the browser to keep its
+  storage, and after 30 days without a copy one quiet line in the library offers to export, or to connect
+  a place once sync exists. Safari outside the Home Screen, the one real risk, is said once (DESIGN.md).
 - Sync is built behind a **provider interface**, not hard-wired to any service. See Architecture.
 - v1 ships exactly **one** provider: GitHub (the user's own private repo, which the app creates for them).
 - **One place at a time.** Connecting another place replaces the current one after one confirmation; the
@@ -125,7 +126,7 @@ escape hatch and the answer to "what if this app disappears" (docs/decisions/000
 - [ ] Automatic snapshots + the Time Machine (look back, bring back, keep a copy); no changes view yet
 - [ ] One-click export (zip of Markdown with history), one piece as Markdown or PDF, import that never
       overwrites
-- [ ] First-run note about storage safety and backup/export
+- [ ] A quiet export reminder, and Safari's 7-day note (DESIGN.md, The library)
 - [ ] Basic settings: theme, font, size, measure
 
 ### After dogfooding (only once the maintainer has used the MVP for ~2-3 weeks)
