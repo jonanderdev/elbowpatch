@@ -7,7 +7,9 @@ const desktop = { viewport: { width: 1440, height: 900 } }
 export default defineConfig({
   testDir: 'e2e',
   fullyParallel: true,
-  // More workers than this once stalled the run on this machine; the cause was not pinned down.
+  // Runs stalled when a stray `vite preview` held the port, when tests waited fixed times
+  // for saves, and when macOS idled the browsers overnight (run with `caffeinate`). Four
+  // workers keep a laptop responsive.
   workers: 4,
   reporter: 'list',
   // The built app, service worker included.
