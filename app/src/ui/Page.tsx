@@ -13,6 +13,7 @@ import { download } from './download'
 import { ExportSheet } from './Export'
 import { useSettings } from './settings'
 import { TextSettings, ToolsBar } from './Tools'
+import { SelectionMenu, useKeyboard, WritingBar } from './Writing'
 
 export interface Opened {
   piece: Piece
@@ -50,6 +51,9 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, covered, onL
   const [line, setLine] = useState<string | null>(null)
   const [heading, setHeading] = useState(() => titleOf(opened))
   const [announce, setAnnounce] = useState('')
+  const [selection, setSelection] = useState<{ rect: DOMRect | null; active: ReturnType<Editor['active']> } | null>(null)
+  const [writing, setWriting] = useState(false)
+  const keyboard = useKeyboard()
 
   const screen = useRef<HTMLDivElement>(null)
   const viewport = useRef<HTMLDivElement>(null)
@@ -62,6 +66,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, covered, onL
     pager: Pager
     piece: Piece
     flush(): Promise<void>
+    keep(): Promise<void>
     relayout(): void
     save: ReturnType<typeof debounced>
     moment: ReturnType<typeof moments>
@@ -142,7 +147,22 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, covered, onL
       },
       onCaret: (view) => showCaret(view, pager),
       onFocusChange(focused) {
-        if (!focused) void flush()
+        setWriting(focused)
+        if (focused) setSelection((s) => s ?? { rect: null, active: editor.active() })
+        else {
+          setSelection(null)
+          void flush()
+        }
+      },
+      onSelection(view) {
+        const { from, to, empty } = view.state.selection
+        let rect: DOMRect | null = null
+        if (!empty && view.hasFocus()) {
+          const a = view.coordsAtPos(from)
+          const b = view.coordsAtPos(to)
+          rect = new DOMRect(Math.min(a.left, b.left), Math.min(a.top, b.top), Math.abs(b.right - a.left), Math.max(a.bottom, b.bottom) - Math.min(a.top, b.top))
+        }
+        setSelection({ rect, active: editor.active() })
       },
       editable: () => !readOnlyNow.current,
     })
@@ -156,7 +176,15 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, covered, onL
       pager.layout(g)
     }
 
-    live.current = { editor, pager, piece, flush, relayout, save, moment }
+    // "Keep this moment": a moment now, kept for good (0005).
+    const keep = async () => {
+      await save.flush().catch(() => {})
+      if (failedNow || readOnlyNow.current) return
+      await takeMoment(deps, piece.id, { kept: true })
+      setAnnounce('Moment kept')
+    }
+
+    live.current = { editor, pager, piece, flush, keep, relayout, save, moment }
     flushRef.current = flush
 
     // Lay out once the fonts are in, so page breaks do not move after load (0011).
@@ -381,7 +409,14 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, covered, onL
         </div>
       </div>
 
-      <div className="foot">
+      {live.current && writing && !readOnly && keyboard > 0 && selection && (
+        <WritingBar editor={live.current.editor} active={selection.active} keyboard={keyboard} />
+      )}
+      {live.current && !readOnly && keyboard === 0 && selection?.rect && (
+        <SelectionMenu editor={live.current.editor} rect={selection.rect} active={selection.active} onKeep={() => void live.current?.keep()} />
+      )}
+
+      <div className={keyboard > 0 ? 'foot raised' : 'foot'} style={keyboard > 0 ? { bottom: keyboard } : undefined}>
         {tools ? (
           <ToolsBar
             page={page + 1}

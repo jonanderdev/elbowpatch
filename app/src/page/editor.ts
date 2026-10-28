@@ -17,10 +17,14 @@ export interface EditorOptions {
   onFocusChange?(focused: boolean): void
   /** False while another window writes this piece. */
   editable?(): boolean
+  /** The selection moved or changed: the selection menu follows it. */
+  onSelection?(view: EditorView): void
 }
 
 export interface Editor {
   view: EditorView
+  /** Which formatting the selection carries, for the pressed state of B, I and the quote. */
+  active(): { bold: boolean; italic: boolean; quote: boolean }
   markdown(): string
   focus(): void
   /** Formatting from the selection menu or the writing bar. */
@@ -70,12 +74,18 @@ export function createEditor(mount: HTMLElement, options: EditorOptions): Editor
       const next = view.state.apply(tr)
       view.updateState(next)
       if (tr.docChanged) options.onChange(serialize(toBlocks(next.doc)))
+      if (tr.selectionSet || tr.docChanged || tr.storedMarksSet) options.onSelection?.(view)
     },
   })
 
   return {
     view,
     markdown: () => serialize(toBlocks(view.state.doc)),
+    active: () => ({
+      bold: markActive(view.state, schema.marks.strong),
+      italic: markActive(view.state, schema.marks.em),
+      quote: view.state.selection.$from.parent.type === schema.nodes.quote,
+    }),
     focus: () => view.focus(),
     run(command) {
       const commands: Record<typeof command, Command> = {
@@ -90,6 +100,12 @@ export function createEditor(mount: HTMLElement, options: EditorOptions): Editor
     },
     destroy: () => view.destroy(),
   }
+}
+
+function markActive(state: EditorState, type: MarkType): boolean {
+  const { from, to, empty, $from } = state.selection
+  if (empty) return !!type.isInSet(state.storedMarks ?? $from.marks())
+  return state.doc.rangeHasMark(from, to, type)
 }
 
 const insertBreak: Command = (state, dispatch) => {

@@ -876,3 +876,31 @@ button {
   position: fixed;
   bottom: calc((92px - 44px) / 2);
 }
+
+/* ——— Writing tools ——— */
+
+.glyph {
+  font-size: 17px;
+  line-height: 1;
+  color: var(--title);
+}
+.glyph.bold {
+  font-weight: 600;
+}
+.glyph.italic {
+  font-style: italic;
+}
+
+.selection-menu {
+  position: fixed;
+  z-index: 4;
+}
+
+.writing-bar {
+  position: fixed;
+  left: var(--edge);
+  z-index: 4;
+}
+.foot.raised {
+  height: 60px;
+}

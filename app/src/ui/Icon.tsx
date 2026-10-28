@@ -4,6 +4,10 @@ import alignLeft from './icons/align-left.svg'
 import close from './icons/close.svg'
 import exportIcon from './icons/export.svg'
 import history from './icons/history.svg'
+import keyboard from './icons/keyboard.svg'
+import redo from './icons/redo.svg'
+import section from './icons/section.svg'
+import undo from './icons/undo.svg'
 import justify from './icons/justify.svg'
 import keep from './icons/keep.svg'
 import moon from './icons/moon.svg'
@@ -13,7 +17,7 @@ import sun from './icons/sun.svg'
 import viewList from './icons/view-list.svg'
 import viewShelf from './icons/view-shelf.svg'
 
-const icons = { add, alignLeft, close, export: exportIcon, history, justify, keep, moon, quote, settings, sun, viewList, viewShelf }
+const icons = { add, alignLeft, close, export: exportIcon, history, justify, keep, keyboard, moon, quote, redo, section, settings, sun, undo, viewList, viewShelf }
 
 export type IconName = keyof typeof icons
 
