@@ -28,7 +28,7 @@ test('words that could not be saved survive leaving the page, and come back with
   await breakSaves(page)
   await page.keyboard.type(' Not yet saved.')
   await expect(page.getByRole('alert')).toBeVisible()
-  await page.locator('.library-link').click()
+  await page.locator('.head .word-button').click()
   // The page is gone; the app still says so.
   await expect(page.getByRole('alert')).toContainText("Can't save right now")
   await mendSaves(page)
@@ -80,7 +80,7 @@ test('opening the app keeps the place where you left off', async ({ page }) => {
   await page.keyboard.type('The end.')
   const last = await page.locator('.page-button').textContent()
   expect(Number(last)).toBeGreaterThan(1)
-  await page.locator('.library-link').click()
+  await page.locator('.head .word-button').click()
   await expect(page.locator('.patch')).toHaveText(last!)
   await page.reload()
   await page.goto('./#/')

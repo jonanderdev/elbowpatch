@@ -13,6 +13,8 @@ export interface Settings {
   dropcap: boolean
   indent: boolean
   firstRunDone: boolean
+  /** The tools have been opened once on this device: the way in is not shown again. */
+  toolsSeen: boolean
 }
 
 const KEY = 'elbowpatch.settings'
@@ -24,6 +26,7 @@ const defaults: Settings = {
   dropcap: false,
   indent: false,
   firstRunDone: false,
+  toolsSeen: false,
 }
 
 let current: Settings = load()
@@ -55,7 +58,7 @@ export function apply() {
   document.querySelector('meta[name="theme-color"]:not([media])')?.remove()
   const meta = document.createElement('meta')
   meta.name = 'theme-color'
-  meta.content = theme() === 'night' ? '#0e0e0e' : '#fbfbf9'
+  meta.content = theme() === 'night' ? '#0e0e0e' : '#f3f3f0'
   document.head.append(meta)
   listeners.forEach((l) => l())
 }

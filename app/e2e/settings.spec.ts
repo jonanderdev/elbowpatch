@@ -13,7 +13,7 @@ async function essay(page: Page, title: string, text: string) {
   await page.keyboard.press('Enter')
   await page.keyboard.type(text)
   await saved(page, text)
-  await page.locator('.library-link').click()
+  await page.locator('.head .word-button').click()
   await expect(page.locator('.continue')).toContainText(text)
 }
 
@@ -24,7 +24,7 @@ test('export everything, and bring it all back in another browser', async ({ pag
   await page.keyboard.press('End')
   await page.keyboard.type(' More words.')
   await saved(page, 'More words.')
-  await page.locator('.library-link').click()
+  await page.locator('.head .word-button').click()
   await page.getByRole('button', { name: 'Settings' }).click()
   await page.getByRole('button', { name: /Export & import/ }).click()
   const download = page.waitForEvent('download')
@@ -98,12 +98,12 @@ test('a put-away piece cannot be reopened with the Back button', async ({ page }
   await essay(page, 'Here', 'Other.')
   await page.locator('.row', { hasText: 'Gone for now' }).click()
   await expect(page.locator('.title')).toHaveText('Gone for now')
-  await page.locator('.library-link').click()
+  await page.locator('.head .word-button').click()
   await page.locator('.continue').click({ button: 'right' }).catch(() => {})
   await page.keyboard.press('Escape')
   // "Gone for now" is in Continue now; open "Here" and come back so it is a row.
   await page.locator('.row', { hasText: 'Here' }).click()
-  await page.locator('.library-link').click()
+  await page.locator('.head .word-button').click()
   await page.locator('.row', { hasText: 'Gone for now' }).click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Put away' }).click()
   await page.goBack()

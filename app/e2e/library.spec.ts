@@ -11,7 +11,7 @@ async function essay(page: Page, title: string, text: string) {
   await page.keyboard.type(title)
   await page.keyboard.press('Enter')
   await page.keyboard.type(text)
-  await page.locator('.library-link').click()
+  await page.locator('.head .word-button').click()
   await expect(page.locator('.continue')).toContainText(text)
 }
 

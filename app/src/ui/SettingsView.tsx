@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { unzip } from '../adapters/zip'
 import { guessKind, importArchive, importMarkdown } from '../domain/archive'
 import { downloadEverything, lastExport } from './everything'
+import { WordButton } from './WordButton'
 import type { Kind, Piece } from '../domain/model'
 import { restore, type Deps } from '../domain/pieces'
 import { longDate, number, size } from '../domain/words'
@@ -33,9 +34,7 @@ export function Settings(props: Props) {
   return (
     <div className="settings" role="main">
       <div className="settings-head">
-        <button type="button" className="library-link" onClick={() => props.go(props.area === 'list' ? '/' : '/settings')}>
-          {props.area === 'list' ? 'Library' : 'Settings'}
-        </button>
+        <WordButton word={props.area === 'list' ? 'Library' : 'Settings'} onClick={() => props.go(props.area === 'list' ? '/' : '/settings')} />
       </div>
       <div className="settings-inner">
         <h1 ref={heading} tabIndex={-1} className="settings-title">

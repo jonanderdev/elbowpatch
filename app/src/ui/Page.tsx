@@ -11,7 +11,8 @@ import { createEditor, type Editor } from '../page/editor'
 import { geometry, Pager } from '../page/pager'
 import { download } from './download'
 import { ExportSheet } from './Export'
-import { useSettings } from './settings'
+import { update, useSettings } from './settings'
+import { WordButton } from './WordButton'
 import { unsaved } from './unsaved'
 import { TextSettings, ToolsBar } from './Tools'
 import { SelectionMenu, useKeyboard, WritingBar } from './Writing'
@@ -526,9 +527,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
   return (
     <div ref={screen} className={piece.kind === 'journal' ? 'page-screen journal' : 'page-screen'} inert={covered} aria-hidden={covered}>
       <div className="head">
-        <button type="button" className="library-link" onClick={onLibrary}>
-          Library
-        </button>
+        <WordButton word="Library" onClick={onLibrary} />
         {page > (titlePage ? 1 : 0) && <div className="running-head">{heading}</div>}
       </div>
 
@@ -603,15 +602,26 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
             onExport={() => setSheet('export')}
           />
         ) : (
+          <>
+          {/* The way in, shown once: until the tools are first opened on this device (DESIGN.md, Control). */}
+          {!settings.toolsSeen && keyboard === 0 && !failed && !line && writer !== 'elsewhere' && (
+            <span className="way-in" aria-hidden="true">
+              Your tools are here
+            </span>
+          )}
           <button
             ref={pageButton}
             type="button"
             className="page-button surface"
             aria-label={`Page ${page + 1} of ${count}. Open tools`}
-            onClick={() => setTools(true)}
+            onClick={() => {
+              setTools(true)
+              if (!settings.toolsSeen) update({ toolsSeen: true })
+            }}
           >
             {page + 1}
           </button>
+          </>
         )}
       </div>
 

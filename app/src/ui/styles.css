@@ -1,17 +1,18 @@
 @import './fonts.css';
 
-/* Colours from DESIGN.md, named for what they do. Every text pair is ≥ 4.5:1. */
+/* Colours from DESIGN.md, named for what they do. Every text pair is ≥ 4.5:1. Paper is soft: a light grey page. */
 :root,
 [data-theme='paper'] {
-  --page: #fbfbf9;
+  --page: #f3f3f0;
   --title: #1f1f1f;
   --text: #1f1f1f;
-  --secondary: #6e6e6e;
+  --secondary: #676767;
   --dimmed: #1f1f1f; /* paper does not dim */
   --surface: #ffffff;
-  --surface-line: #e8e8e4;
-  --pressed: #f1f1ee;
-  --selection: #dcdcd6;
+  --surface-line: #e2e2de;
+  --word-line: #c9c9c4;
+  --pressed: #e9e9e5;
+  --selection: #d6d6d0;
   --lift: 0 1px 2px #0000000a, 0 8px 28px #00000014;
   --segment-lift: 0 1px 2px #00000014;
   color-scheme: light;
@@ -25,6 +26,7 @@
   --dimmed: #8c8c8a;
   --surface: #1a1a1a;
   --surface-line: #2a2a2a;
+  --word-line: #3a3a38;
   --pressed: #242424;
   --selection: #3a3a38;
   --lift: 0 1px 2px #00000066, 0 10px 32px #00000080;
@@ -208,22 +210,42 @@ button {
   height: var(--top);
   display: flex;
   align-items: center;
-  /* Library sits on the text's left edge: its 8px padding hangs into the margin. */
-  padding: 0 calc(var(--side) - 8px);
+  /* Library's outline, not its word, sits on the text's left edge (DESIGN.md, Control). */
+  padding: 0 var(--side);
   z-index: 2;
 }
 
-.library-link {
+.word-button {
   height: 44px;
-  padding: 0 8px;
-  border-radius: 22px;
-  font-size: 13px;
-  line-height: 1.4;
-  color: var(--secondary);
+  display: inline-flex;
+  align-items: center;
   flex: none;
+  border-radius: 15px;
 }
-.library-link:hover {
+.word-button .word {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--word-line);
+  border-radius: 15px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--secondary);
+  transition: color 160ms, background-color 160ms;
+}
+.word-button:hover .word,
+.word-button:active .word {
   color: var(--title);
+  background: var(--pressed);
+}
+/* The focus ring goes round the pill, not the tap area. */
+.word-button:focus-visible {
+  outline: none;
+}
+.word-button:focus-visible .word {
+  outline: 2px solid var(--title);
+  outline-offset: 2px;
 }
 
 .running-head {
@@ -524,7 +546,7 @@ button {
   border-radius: 50%;
   border: 1px solid #b5b5b2;
 }
-.swatch.paper { background: #fbfbf9; }
+.swatch.paper { background: #f3f3f0; }
 .swatch.night { background: #0e0e0e; border-color: #0e0e0e; }
 
 .toggle {
@@ -991,7 +1013,8 @@ button {
   align-items: center;
   max-width: 568px;
   margin: 0 auto;
-  padding-left: 4px;
+  /* The outline on the text's left edge, as on the page. */
+  padding-left: 12px;
 }
 .settings-inner {
   max-width: 568px;
@@ -1198,4 +1221,14 @@ button {
 }
 .title.book-title {
   break-after: column;
+}
+
+/* "Your tools are here": on the page, no surface, level with the page button and ending 10px from it. */
+.way-in {
+  margin-right: 10px;
+  font-size: 13px;
+  font-style: italic;
+  line-height: 1;
+  color: var(--secondary);
+  pointer-events: none;
 }
