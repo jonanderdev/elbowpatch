@@ -1,4 +1,5 @@
 import type { Kind, Outline, Piece, Place, Version, Working } from './model'
+import { countWords } from './markdown'
 import type { Clock, Ids, Store, Tx } from './ports'
 
 export interface Deps {
@@ -17,10 +18,8 @@ export interface OpenSection {
  * A new piece, not yet stored. It is stored by its first write, so a new piece
  * left empty is never kept (DESIGN.md, The library).
  */
-export function newPiece(deps: Pick<Deps, 'clock' | 'ids'>, kind: Kind, lang: string, today?: string): Piece {
+export function newPiece(deps: Pick<Deps, 'clock' | 'ids'>, kind: Kind, lang: string): Piece {
   const now = deps.clock.now()
-  // A journal day's title is its date (ISO); a chapter's starts empty; an essay's title is the piece's.
-  const first = { sectionId: deps.ids.next(), title: kind === 'journal' ? (today ?? '') : '' }
   return {
     id: deps.ids.next(),
     kind,
@@ -28,7 +27,8 @@ export function newPiece(deps: Pick<Deps, 'clock' | 'ids'>, kind: Kind, lang: st
     createdAt: now,
     updatedAt: now,
     title: kind === 'journal' ? 'Journal' : '',
-    sections: [first],
+    // A journal's days join as they are written (withDay); an essay is one section, a book starts with one chapter.
+    sections: kind === 'journal' ? [] : [{ sectionId: deps.ids.next(), title: '' }],
     outlineId: null,
   }
 }
@@ -40,7 +40,11 @@ export function write(deps: Pick<Deps, 'store' | 'clock'>, draft: Piece, section
     const stored = await tx.piece(draft.id)
     const working = await tx.working(sectionId)
     if (stored && working?.content === content) return
-    await tx.putPiece({ ...(stored ?? draft), updatedAt: now })
+    const piece = stored ?? draft
+    // A section new in the draft (today, in a journal) joins the piece with its first words.
+    const sections = piece.sections.some((s) => s.sectionId === sectionId) ? piece.sections : draft.sections
+    const words = { ...piece.words, [sectionId]: countWords(content) }
+    await tx.putPiece({ ...piece, sections, words, updatedAt: now })
     await tx.putWorking({
       sectionId,
       pieceId: draft.id,
@@ -58,6 +62,30 @@ export function rename(deps: Pick<Deps, 'store' | 'clock'>, draft: Piece, title:
     if (stored?.title === title) return
     await tx.putPiece({ ...(stored ?? draft), title, updatedAt: deps.clock.now() })
   })
+}
+
+/** A chapter's title: a field, kept in the outline (0005). */
+export function renameSection(deps: Pick<Deps, 'store' | 'clock'>, draft: Piece, sectionId: string, title: string): Promise<void> {
+  return deps.store.transaction(async (tx) => {
+    const piece = (await tx.piece(draft.id)) ?? draft
+    const sections = (piece.sections.some((s) => s.sectionId === sectionId) ? piece.sections : draft.sections).map((s) =>
+      s.sectionId === sectionId ? { ...s, title } : s,
+    )
+    await tx.putPiece({ ...piece, sections, updatedAt: deps.clock.now() })
+  })
+}
+
+/** Opening a journal lands on today: a new day joins the draft, and is stored by its first words. */
+export function withDay(deps: Pick<Deps, 'ids'>, piece: Piece, isoDay: string): { piece: Piece; sectionId: string } {
+  const day = piece.sections.find((s) => s.title === isoDay)
+  if (day) return { piece, sectionId: day.sectionId }
+  const sectionId = deps.ids.next()
+  const sections = [...piece.sections, { sectionId, title: isoDay }].sort((a, b) => a.title.localeCompare(b.title))
+  return { piece: { ...piece, sections }, sectionId }
+}
+
+export function totalWords(piece: Piece): number {
+  return Object.values(piece.words ?? {}).reduce((a, b) => a + b, 0)
 }
 
 export function savePlace(deps: Pick<Deps, 'store'>, pieceId: string, place: Place): Promise<void> {

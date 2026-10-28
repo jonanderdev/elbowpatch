@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { memoryStore } from '../adapters/memory-store'
-import { history, library, newPiece, openPiece, recover, rename, takeMoment, write } from './pieces'
+import { history, library, newPiece, openPiece, recover, rename, takeMoment, totalWords, withDay, write } from './pieces'
 
 function setup(start = 1_000_000) {
   let t = start
@@ -104,6 +104,23 @@ describe('pieces', () => {
     await write(deps, piece, section, 'Kept.')
     await write(deps, piece, section, 'Kept.')
     expect((await openPiece(deps, piece.id))?.sections[0]?.content).toBe('Kept.')
+  })
+
+  it('a journal keeps a day only once it is written, in date order', async () => {
+    const { deps } = setup()
+    let journal = newPiece(deps, 'journal', 'en')
+    const a = withDay(deps, journal, '2026-10-27')
+    expect(withDay(deps, a.piece, '2026-10-27').sectionId).toBe(a.sectionId)
+    await write(deps, a.piece, a.sectionId, 'Tuesday.')
+    journal = (await openPiece(deps, journal.id))!.piece
+    const b = withDay(deps, journal, '2026-10-26')
+    expect(b.piece.sections.map((s) => s.title)).toEqual(['2026-10-26', '2026-10-27'])
+    // Monday opened but left empty: not kept.
+    expect((await openPiece(deps, journal.id))!.piece.sections.map((s) => s.title)).toEqual(['2026-10-27'])
+    await write(deps, b.piece, b.sectionId, 'Monday.')
+    const open = await openPiece(deps, journal.id)
+    expect(open!.sections.map((s) => [s.title, s.content])).toEqual([['2026-10-26', 'Monday.'], ['2026-10-27', 'Tuesday.']])
+    expect(totalWords(open!.piece)).toBe(2)
   })
 
   it('an empty section with no history gives no version', async () => {

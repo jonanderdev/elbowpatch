@@ -1,0 +1,873 @@
+@import './fonts.css';
+
+/* Colours from DESIGN.md, named for what they do. Every text pair is ≥ 4.5:1. */
+:root,
+[data-theme='paper'] {
+  --page: #fbfbf9;
+  --title: #1f1f1f;
+  --text: #1f1f1f;
+  --secondary: #6e6e6e;
+  --dimmed: #1f1f1f; /* paper does not dim */
+  --surface: #ffffff;
+  --surface-line: #e8e8e4;
+  --pressed: #f1f1ee;
+  --selection: #dcdcd6;
+  --lift: 0 1px 2px #0000000a, 0 8px 28px #00000014;
+  --segment-lift: 0 1px 2px #00000014;
+  color-scheme: light;
+}
+
+[data-theme='night'] {
+  --page: #0e0e0e;
+  --title: #e6e6e3;
+  --text: #b5b5b2;
+  --secondary: #8c8c8a;
+  --dimmed: #8c8c8a;
+  --surface: #1a1a1a;
+  --surface-line: #2a2a2a;
+  --pressed: #242424;
+  --selection: #3a3a38;
+  --lift: 0 1px 2px #00000066, 0 10px 32px #00000080;
+  --segment-lift: 0 1px 2px #00000066;
+  color-scheme: dark;
+}
+
+/* Text settings (DESIGN.md, Control). Size steps around the designed 18 / 19px. */
+:root {
+  --body: 18px;
+  --leading: 1.55;
+  --measure: 34rem;
+  --top: 64px;
+  --bottom: 92px;
+  --edge: 16px;
+}
+[data-size='s'] { --body: 16px; }
+[data-size='l'] { --body: 20px; }
+[data-leading='tight'] { --leading: 1.42; }
+[data-leading='loose'] { --leading: 1.72; }
+[data-measure='wide'] { --measure: 40rem; }
+
+@media (min-width: 700px) {
+  :root { --body: 19px; --top: 88px; --bottom: 96px; --edge: 20px; }
+  [data-size='s'] { --body: 17px; }
+  [data-size='l'] { --body: 21px; }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--page);
+  color: var(--text);
+  font-family: Literata, Georgia, serif;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+}
+
+#app {
+  height: 100%;
+}
+
+::selection {
+  background: var(--selection);
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:focus {
+  outline: none;
+}
+:focus-visible {
+  outline: 2px solid var(--title);
+  outline-offset: 2px;
+}
+/* Headings take focus only so a screen reader starts there; they are not controls. */
+[tabindex='-1']:focus-visible,
+.title:focus-visible,
+.body:focus-visible {
+  outline: none;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ——— Controls ——— */
+
+.surface {
+  background: var(--surface);
+  border: 1px solid var(--surface-line);
+  box-shadow: var(--lift);
+}
+
+.icon {
+  display: block;
+  width: 20px;
+  height: 20px;
+  background: currentColor;
+  mask: var(--icon) center / contain no-repeat;
+  -webkit-mask: var(--icon) center / contain no-repeat;
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: 50%;
+  color: var(--title);
+  transition: background-color 160ms;
+}
+.icon-button:hover,
+.icon-button:active,
+.icon-button[aria-pressed='true'] {
+  background: var(--pressed);
+}
+.icon-button.quiet {
+  color: var(--secondary);
+}
+
+.aa {
+  font-size: 16px;
+  line-height: 1;
+  color: var(--title);
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 4px;
+  border-radius: 22px;
+}
+@media (min-width: 700px) {
+  .bar { gap: 2px; padding: 0 6px; }
+}
+
+.bar-separator {
+  flex: none;
+  width: 1px;
+  height: 18px;
+  margin: 0 4px;
+  background: var(--surface-line);
+}
+@media (min-width: 700px) {
+  .bar-separator { margin: 0 6px; }
+}
+
+.text-link {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--secondary);
+  padding: 4px 0;
+}
+.text-link:hover {
+  color: var(--title);
+}
+.text-link.strong {
+  color: var(--title);
+}
+
+/* ——— The page ——— */
+
+.page-screen {
+  position: fixed;
+  inset: 0;
+  background: var(--page);
+}
+
+.head {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--top);
+  display: flex;
+  align-items: center;
+  /* Library sits on the text's left edge: its 8px padding hangs into the margin. */
+  padding: 0 calc(var(--side) - 8px);
+  z-index: 2;
+}
+
+.library-link {
+  height: 44px;
+  padding: 0 8px;
+  border-radius: 22px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--secondary);
+  flex: none;
+}
+.library-link:hover {
+  color: var(--title);
+}
+
+.running-head {
+  position: absolute;
+  left: calc(var(--side) + 72px);
+  right: calc(var(--side) + 72px);
+  text-align: center;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.pager {
+  position: absolute;
+  top: var(--top);
+  bottom: var(--bottom);
+  left: var(--side);
+  width: var(--measure-px);
+  overflow: hidden;
+}
+
+.flow {
+  height: 100%;
+  column-fill: auto;
+  font-size: var(--body);
+  line-height: var(--leading);
+  font-weight: 360;
+  font-variant-numeric: oldstyle-nums proportional-nums;
+  color: var(--text);
+  hyphens: manual;
+  overflow-wrap: break-word;
+}
+[data-align='justify'] .flow {
+  text-align: justify;
+  hyphens: auto;
+}
+
+.title {
+  margin: 0 0 var(--body);
+  padding: 0.149em 0 0.263em;
+  font-size: calc(var(--body) * 2.05);
+  font-weight: 300;
+  font-variation-settings: 'opsz' 60;
+  line-height: 1.12;
+  letter-spacing: -0.012em;
+  color: var(--title);
+  text-align: left;
+  hyphens: manual;
+  break-inside: avoid;
+  break-after: avoid;
+  white-space: pre-wrap;
+}
+.title:empty::before {
+  content: attr(data-placeholder);
+  color: var(--secondary);
+}
+
+.body {
+  outline: none;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  caret-color: var(--title);
+}
+.body p,
+.body blockquote {
+  margin: 0 0 1em;
+  orphans: 2;
+  widows: 2;
+}
+.body > :last-child {
+  margin-bottom: 0;
+}
+.body p.empty::before {
+  content: attr(data-placeholder);
+  color: var(--secondary);
+  pointer-events: none;
+  float: left;
+  height: 0;
+}
+.body em {
+  /* EB Garamond italic, scaled so its x-height matches Literata's, on the same baseline. */
+  font-family: 'EB Garamond', serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: 1.17em;
+  line-height: 1;
+}
+.body strong {
+  font-weight: 600;
+}
+.body blockquote.pull {
+  margin: 0 0 1em;
+  padding: 0.53em 1.2em 0.58em;
+  text-align: center;
+  font-family: 'EB Garamond', serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: 1.36em;
+  line-height: 1.32;
+  color: var(--title);
+  hyphens: manual;
+}
+.body blockquote.pull em {
+  font-size: 1em;
+  font-style: normal;
+}
+.body p.raw {
+  white-space: pre-wrap;
+}
+
+/* Night focus: earlier paragraphs dim; paper never does. */
+[data-theme='night'] .body .earlier {
+  color: var(--dimmed);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .body p,
+  .body blockquote {
+    transition: color 360ms;
+  }
+}
+
+/* Indented paragraphs, as in a printed book. */
+[data-indent='true'] .body p {
+  margin-bottom: 0;
+}
+[data-indent='true'] .body p + p {
+  text-indent: 1.5em;
+}
+[data-indent='true'] .body blockquote.pull {
+  margin-top: 1em;
+}
+
+/* Drop cap: the first letter of the piece, four lines deep. */
+[data-dropcap='true'] .body > p:first-child::first-letter {
+  initial-letter: 4;
+  -webkit-initial-letter: 4;
+  font-weight: 600;
+  font-variation-settings: 'opsz' 72;
+  color: var(--title);
+  margin-right: 0.08em;
+}
+@supports not ((initial-letter: 4) or (-webkit-initial-letter: 4)) {
+  [data-dropcap='true'] .body > p:first-child::first-letter {
+    float: left;
+    font-size: calc(var(--leading) * 4em - 0.2em);
+    line-height: 0.82;
+    padding-top: 0.08em;
+  }
+}
+
+.foot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--bottom);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: var(--edge);
+  pointer-events: none;
+}
+.foot > * {
+  pointer-events: auto;
+}
+
+.page-button {
+  min-width: 44px;
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 22px;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--title);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+.count {
+  padding: 0 6px 0 10px;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre;
+  color: var(--secondary);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+@media (min-width: 700px) {
+  .count { padding: 0 10px 0 12px; font-size: 12.5px; }
+}
+
+.line {
+  position: absolute;
+  left: var(--edge);
+  bottom: calc((var(--bottom) - 44px) / 2);
+  max-width: calc(100% - 2 * var(--edge) - 56px);
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-radius: 22px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--title);
+  z-index: 3;
+}
+.line button {
+  color: var(--title);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  flex: none;
+}
+
+/* ——— Sheets ——— */
+
+.sheet {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 20px 16px;
+  border-radius: 20px;
+  color: var(--title);
+}
+@media (min-width: 700px) {
+  .sheet { left: auto; right: var(--edge); bottom: calc((var(--bottom) - 44px) / 2); width: 300px; }
+  .sheet[aria-label='Export'] { width: 366px; }
+}
+
+.setting {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.setting legend,
+.setting-label {
+  padding: 0;
+  margin-bottom: 6px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--secondary);
+}
+
+.segments {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 14px;
+  background: var(--pressed);
+}
+.segment {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 8px;
+  border-radius: 11px;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--secondary);
+}
+.segment[aria-checked='true'] {
+  background: var(--surface);
+  color: var(--title);
+  box-shadow: var(--segment-lift);
+}
+.segment .icon {
+  width: 18px;
+  height: 18px;
+}
+.swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid #b5b5b2;
+}
+.swatch.paper { background: #fbfbf9; }
+.swatch.night { background: #0e0e0e; border-color: #0e0e0e; }
+
+.toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--title);
+}
+.switch {
+  position: relative;
+  width: 44px;
+  height: 26px;
+  border-radius: 13px;
+  background: var(--pressed);
+  flex: none;
+}
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: var(--segment-lift);
+}
+.switch[aria-checked='true'] {
+  background: var(--title);
+}
+.switch[aria-checked='true']::after {
+  left: 20px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .switch, .switch::after { transition: left 160ms, background-color 160ms; }
+}
+
+.sheet-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 12px;
+  margin-top: 4px;
+  border-top: 1px solid var(--surface-line);
+}
+
+/* ——— The library ——— */
+
+.library {
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  background: var(--page);
+  padding: 64px 12px 96px;
+}
+.library-inner {
+  max-width: 568px;
+  margin: 0 auto;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+@media (min-width: 700px) {
+  .library { padding-top: 88px; }
+}
+
+.library-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 0 2px 29px 12px;
+}
+.library-head h1 {
+  margin: 0;
+  font-size: calc(var(--body) * 2.05);
+  font-weight: 300;
+  font-variation-settings: 'opsz' 60;
+  line-height: 1.12;
+  letter-spacing: -0.012em;
+  color: var(--title);
+}
+.library-actions {
+  display: flex;
+  gap: 4px;
+  padding-top: 6px;
+}
+
+.group-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0;
+  padding: 0 0 5px 12px;
+  font-size: 15px;
+  line-height: 1.4;
+  font-style: italic;
+  font-weight: 400;
+  color: var(--secondary);
+}
+.group + .group .group-heading {
+  padding-top: 47px;
+}
+.mark {
+  font-style: normal;
+  font-size: 16px;
+  line-height: 1;
+}
+.mark sup {
+  font-size: 0.5em;
+  vertical-align: 0.7em;
+  line-height: 0;
+  margin-left: 1px;
+}
+
+.continue-heading {
+  padding: 0 0 6px 12px;
+  font-size: 15px;
+  font-style: italic;
+  color: var(--secondary);
+}
+.continue {
+  margin: 0 12px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px 10px 16px;
+  border-radius: 16px;
+  text-align: left;
+  color: var(--text);
+}
+.continue-excerpt {
+  font-size: 16px;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  width: 100%;
+}
+.continue-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+.continue-meta {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.patch {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--surface-line);
+  border-radius: 50%;
+  font-size: 12px;
+  color: var(--title);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 12px;
+  border-radius: 12px;
+  text-align: left;
+  transition: background-color 160ms;
+}
+.row:hover,
+.row:active {
+  background: var(--pressed);
+}
+.row-title {
+  font-size: calc(var(--body) * 1.12);
+  line-height: 1.3;
+  color: var(--title);
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.row-meta {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--secondary);
+}
+
+.empty-library {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding-bottom: 92px;
+  text-align: center;
+}
+.empty-mark {
+  font-size: 96px;
+  line-height: 100px;
+  font-weight: 300;
+  color: var(--secondary);
+}
+.empty-line {
+  font-size: 18px;
+  line-height: 1.55;
+  color: var(--secondary);
+  margin: 0;
+}
+.starts {
+  display: flex;
+  gap: 12px;
+}
+.start {
+  position: relative;
+  width: 100px;
+  height: 140px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 14px 12px 12px;
+  text-align: left;
+  font-size: 15px;
+  line-height: 19px;
+  color: var(--title);
+  background: var(--start-outline) center / 100% 100% no-repeat;
+  border-radius: 10px;
+}
+.start.book { padding-left: 20px; }
+.start.journal { padding-right: 26px; }
+.start .mark {
+  font-size: 19px;
+  color: var(--secondary);
+}
+
+.first-run {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding-top: 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--secondary);
+  max-width: 300px;
+}
+.first-run p {
+  margin: 0;
+}
+.first-run.at-foot {
+  align-items: flex-start;
+  text-align: left;
+  max-width: none;
+  padding: 48px 12px 0;
+}
+.links {
+  display: flex;
+  gap: 6px;
+}
+.links .text-link {
+  color: var(--title);
+  padding: 0;
+}
+
+.new-piece-bar .menu-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px 0 9px;
+  border-radius: 18px;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--title);
+}
+.new-piece-bar .menu-item:hover {
+  background: var(--pressed);
+}
+.new-piece-bar .mark {
+  min-width: 20px;
+  text-align: center;
+  font-size: 19px;
+}
+
+/* ——— Launch ——— */
+/* The launch screen itself is in index.html, so it shows before any script runs. */
+.launch[hidden] {
+  display: none;
+}
+
+/* Sheet head and rows (export, and later Contents and Days). */
+.sheet-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  font-size: 17px;
+  line-height: 1.4;
+  color: var(--title);
+}
+.sheet-aside {
+  min-width: 0;
+  font-size: 13px;
+  color: var(--secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sheet-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 0;
+  border-radius: 12px;
+  text-align: left;
+}
+.sheet-row-name {
+  font-size: 17px;
+  color: var(--title);
+}
+.sheet-row-note {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--secondary);
+}
+.sheet-row:hover .sheet-row-name {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* The library's foot is not reserved: the + floats over the last rows. */
+.library-foot {
+  position: fixed;
+}

@@ -4,6 +4,8 @@ import { defineConfig } from 'vite'
 // The code imports React; Preact runs it (docs/decisions/0002). Going back to
 // React is deleting these aliases.
 export default defineConfig({
+  // Relative paths, so any static host works, in a subfolder too.
+  base: './',
   resolve: {
     alias: [
       { find: /^react\/jsx-runtime$/, replacement: 'preact/jsx-runtime' },

@@ -21,6 +21,8 @@ export interface Piece {
   outlineId: string | null
   putAwayAt?: number
   place?: Place
+  /** Each section's word count as last written, so the library never opens the text. */
+  words?: Record<string, number>
 }
 
 /** Where the writer was: a paragraph, an offset and a few words, so it survives edits made elsewhere. */
@@ -28,7 +30,13 @@ export interface Place {
   sectionId: string
   paragraph: number
   offset: number
+  /** The paragraph's opening words: finds the place again after edits, and is the library's excerpt. */
   snippet: string
+  /** The page it was on: for orientation only, it follows the screen. */
+  page: number
+  /** True when the caret was there; otherwise it is the first line on screen. */
+  caret: boolean
+  at: number
 }
 
 /** One section's full Markdown at a moment. Immutable once written (0001). */
