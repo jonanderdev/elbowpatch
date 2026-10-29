@@ -69,7 +69,7 @@ html,
 body {
   margin: 0;
   height: 100%;
-  overflow: hidden;
+  overflow: auto;
   background: var(--page);
   color: var(--text);
   font-family: Literata, Georgia, serif;
@@ -78,6 +78,14 @@ body {
   -webkit-text-size-adjust: 100%;
   /* A sideways swipe past the edge is not the browser's Back here. */
   overscroll-behavior: none;
+}
+/* The smallest screen the app lays out for (the smallest phones). In a window smaller than this
+   the screens keep this size and the window scrolls, rather than squeezing the page to nothing.
+   The full-screen layers below fill the body, not the window, so they keep it too. */
+body {
+  position: relative;
+  min-width: 320px;
+  min-height: 360px;
 }
 
 #app {
@@ -203,7 +211,7 @@ button {
 /* ——— The page ——— */
 
 .page-screen {
-  position: fixed;
+  position: absolute;
   inset: 0;
   background: var(--page);
 }
@@ -618,7 +626,7 @@ button {
 /* ——— The library ——— */
 
 .library {
-  position: fixed;
+  position: absolute;
   inset: 0;
   overflow-y: auto;
   background: var(--page);
@@ -1019,7 +1027,7 @@ button {
 /* ——— Settings ——— */
 
 .settings {
-  position: fixed;
+  position: absolute;
   inset: 0;
   overflow-y: auto;
   background: var(--page);

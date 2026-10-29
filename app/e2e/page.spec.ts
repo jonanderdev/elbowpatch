@@ -622,3 +622,23 @@ test('a piece opens straight at the place it was left, with no frame of page 1 f
   expect(shown.length).toBeGreaterThan(0)
   expect(new Set(shown)).toEqual(new Set([`Long one ${left}`]))
 })
+
+test('in a window smaller than the smallest phone the page keeps its size, and the window scrolls', async ({ page }) => {
+  await newEssay(page)
+  await fill(page, 4)
+  await page.setViewportSize({ width: 240, height: 280 })
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const screen = document.querySelector('.page-screen')!.getBoundingClientRect()
+        const column = document.querySelector('.pager')!.getBoundingClientRect()
+        const root = document.scrollingElement!
+        return {
+          screen: [Math.round(screen.width), Math.round(screen.height)],
+          column: Math.round(column.width),
+          scrolls: root.scrollWidth > root.clientWidth && root.scrollHeight > root.clientHeight,
+        }
+      }),
+    )
+    .toEqual({ screen: [320, 360], column: 272, scrolls: true })
+})
