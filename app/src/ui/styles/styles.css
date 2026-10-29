@@ -86,6 +86,12 @@ body {
   position: relative;
   min-width: 320px;
   min-height: 360px;
+  /* Only the document scrolls (and only in a window smaller than this). */
+  overflow: visible;
+}
+/* On desktop a page needs more height to be a page: below this, the window scrolls. */
+@media (min-width: 700px) {
+  body { min-height: 600px; }
 }
 
 #app {
@@ -213,6 +219,10 @@ button {
 .page-screen {
   position: absolute;
   inset: 0;
+  /* What sits at its edges (the foot, 20px from the bottom on desktop) never makes the window scroll. */
+  overflow: clip;
+  /* Each screen is its own layer, so what is raised inside it (the head) never shows over the next. */
+  isolation: isolate;
   background: var(--page);
 }
 /* In the side margins, the pointer is the way the page turns, drawn as our icons are (1.5 strokes,
@@ -628,6 +638,7 @@ button {
 .library {
   position: absolute;
   inset: 0;
+  isolation: isolate;
   overflow-y: auto;
   background: var(--page);
   padding: 64px 12px 96px;
@@ -1029,6 +1040,7 @@ button {
 .settings {
   position: absolute;
   inset: 0;
+  isolation: isolate;
   overflow-y: auto;
   background: var(--page);
   padding: 0 12px 96px;

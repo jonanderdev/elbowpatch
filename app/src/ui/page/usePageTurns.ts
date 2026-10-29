@@ -22,10 +22,10 @@ export function usePageTurns(screen: RefObject<HTMLDivElement | null>, session: 
       e.preventDefault()
     }
 
-    // Scrolling does not turn pages: the page is no scroll, and a sideways swipe is the browser's
-    // Back. Swallowed here, so it does neither (sheets still scroll).
+    // Scrolling does not turn pages. A sideways swipe is swallowed, since it is also the browser's
+    // Back; up and down are left alone, for a window smaller than the app's least size (and sheets).
     const onWheel = (e: WheelEvent) => {
-      if (!(e.target as HTMLElement).closest('.sheet')) e.preventDefault()
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) e.preventDefault()
     }
 
     let touchStart: { x: number; y: number } | undefined

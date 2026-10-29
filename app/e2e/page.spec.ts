@@ -641,4 +641,41 @@ test('in a window smaller than the smallest phone the page keeps its size, and t
       }),
     )
     .toEqual({ screen: [320, 360], column: 272, scrolls: true })
+  // And the wheel scrolls it. (Playwright's WebKit scrolls nothing under a non-passive wheel
+  // listener, which the page needs to stop a sideways swipe going Back: checked in the others.)
+  if (test.info().project.name.startsWith('webkit')) return
+  await page.mouse.move(100, 150)
+  await page.mouse.wheel(0, 200)
+  await expect.poll(() => page.evaluate(() => document.scrollingElement!.scrollTop)).toBeGreaterThan(0)
+})
+
+test('a desktop window less than 600 tall keeps the page 600 tall, and scrolls', async ({ page }) => {
+  await newEssay(page)
+  await page.setViewportSize({ width: 1200, height: 500 })
+  await expect.poll(() => page.evaluate(() => Math.round(document.querySelector('.page-screen')!.getBoundingClientRect().height))).toBe(600)
+})
+
+test('at a normal size nothing scrolls the window, and the library covers the page whole', async ({ page }) => {
+  await newEssay(page)
+  await fill(page, 2)
+  const fits = () => page.evaluate(() => { const r = document.scrollingElement!; return r.scrollHeight <= r.clientHeight && r.scrollWidth <= r.clientWidth })
+  expect(await fits()).toBe(true)
+  const head = (await page.locator('.head .word-button').boundingBox())!
+  await page.locator('.head .word-button').click()
+  await expect(page.locator('.library')).toBeVisible()
+  expect(await fits()).toBe(true)
+  // Nothing of the page shows through: on desktop, where its Library button was, the library has
+  // only its background. (Checked by pixels: the covered page is inert, so hit-testing skips it.)
+  if (page.viewportSize()!.width < 700) return
+  await page.waitForTimeout(300)
+  const shot = await page.screenshot({ clip: head, animations: 'disabled' })
+  const flat = await page.evaluate(async (b64) => {
+    const bm = await createImageBitmap(await (await fetch('data:image/png;base64,' + b64)).blob())
+    const c = new OffscreenCanvas(bm.width, bm.height).getContext('2d')!
+    c.drawImage(bm, 0, 0)
+    const d = c.getImageData(0, 0, bm.width, bm.height).data
+    for (let i = 4; i < d.length; i += 4) if (Math.abs(d[i]! - d[0]!) + Math.abs(d[i + 1]! - d[1]!) + Math.abs(d[i + 2]! - d[2]!) > 24) return false
+    return true
+  }, shot.toString('base64'))
+  expect(flat, 'the page\'s Library button shows through the library').toBe(true)
 })
