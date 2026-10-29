@@ -7,7 +7,7 @@ import type { Held, WriterLock } from '../domain/ports'
 import { Library } from './Library'
 import { download } from './download'
 import { downloadEverything } from './everything'
-import { Page, type Opened } from './Page'
+import { Page, type Opened } from './page/Page'
 import { Settings } from './SettingsView'
 import { unsaved } from './unsaved'
 
