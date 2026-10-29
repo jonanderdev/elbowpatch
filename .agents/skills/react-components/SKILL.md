@@ -78,13 +78,15 @@ Adapted in part from Vercel's `react-best-practices` and `composition-patterns` 
 
 ## Imperative libraries
 
-The editor (ProseMirror), the pager and saving are imperative and long-lived.
+The editor (ProseMirror) and the pager are imperative and long-lived.
 
-- **Wrap them in a plain class or module** with a constructor, methods and `destroy()`, not in a
-  long effect with state in closures.
-- **One hook owns the instance**: it creates it in an effect keyed on what it belongs to, destroys
-  it in the cleanup, and mirrors into React state only what the screen shows, through callbacks
-  the instance calls.
+- **One hook per library, one job per hook** (`useEditor`, `usePager`, `useSaving`). The hook
+  creates the instance in an effect keyed on what it belongs to, destroys it in the cleanup, and
+  mirrors into React state only what the screen shows, through callbacks the instance calls.
+- **The component composes the hooks.** It reads as a list of what the screen does; no session
+  object that knows everything.
+- **Plain functions for logic with no React in it** (a `create…` factory, a pure helper), in their
+  own module, called by the hook that needs them.
 - **Keep non-React helpers out of component files.** Code that works on the DOM or the library
   lives in its own module beside that library, testable without React.
 - **Uncontrolled where React would get in the way.** A contentEditable field filled when it opens
@@ -110,6 +112,13 @@ The editor (ProseMirror), the pager and saving are imperative and long-lived.
 - **Batch DOM style changes** through a class or a CSS variable rather than many inline writes.
 - **Long lists:** render what is visible, or let CSS skip offscreen work (`content-visibility`).
 - **Conditionals:** prefer a ternary to `&&` when the left side can be `0` or `''`.
+
+## Types and lint
+
+- **Every export states its types**, return types included. TypeScript's `isolatedDeclarations`
+  enforces it; local callbacks keep their inferred types.
+- **`npm run lint`** (Biome) checks hook rules, effect dependencies and accessibility. Silence a
+  rule only with a `biome-ignore` comment that says why.
 
 ## JavaScript
 
