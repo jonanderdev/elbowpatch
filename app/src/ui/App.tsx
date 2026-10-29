@@ -2,36 +2,20 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Kind, Piece } from '../domain/model'
 import { pieceAsMarkdown } from '../domain/export'
 import { forgetPutAway, thin } from '../domain/thinning'
-import { library, newPiece, openPiece, putAway, recover, rename, renameSection, restore, setSubtitle, withDay, write, type Deps } from '../domain/pieces'
-import type { Held, WriterLock } from '../domain/ports'
-import { Library } from './Library'
+import { library, newPiece, openPiece, putAway, recover, rename, restore, withDay, type Deps } from '../domain/pieces'
+import type { WriterLock } from '../domain/ports'
+import { replayJournal } from './app/replay'
+import { useRoute } from './app/useRoute'
+import { useWriterLock } from './app/useWriterLock'
+import { Library } from './library/Library'
 import { download } from './download'
 import { downloadEverything } from './everything'
 import { Page, type Opened } from './page/Page'
 import { Settings } from './SettingsView'
-import { unsaved } from './unsaved'
 
 const LAST = 'elbowpatch.last'
 /** The least time the launch screen shows, from the page's start, in ms. */
 const MIN_LAUNCH = 1000
-
-/** URLs use the hash, so any static host works (0011): #/ is the library, #/p/<id> a piece. */
-function useRoute(): [string, (to: string) => void] {
-  const [route, setRoute] = useState(() => location.hash.slice(1) || '/')
-  useEffect(() => {
-    const on = () => setRoute(location.hash.slice(1) || '/')
-    window.addEventListener('hashchange', on)
-    // A change between the first read and now would otherwise be missed.
-    on()
-    return () => window.removeEventListener('hashchange', on)
-  }, [])
-  const go = useCallback((to: string) => {
-    // Follow at once; hashchange arrives a tick later and finds nothing to do.
-    setRoute(to)
-    if (location.hash.slice(1) !== to) location.hash = to
-  }, [])
-  return [route, go]
-}
 
 export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
   const [route, go] = useRoute()
@@ -112,70 +96,11 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
     if (opened) writeLast(opened.piece.id)
   }, [opened?.piece.id])
 
-  // One window writes a piece (0010). The lock follows the piece, not the page,
-  // so reopening the same piece never locks this window out.
-  // Waiting for the lock, writing, or another window writes it.
-  // Kept with the piece it is about, so a newly opened piece is never taken for one already held.
-  const [writerOf, setWriterOf] = useState<{ pieceId?: string; state: 'waiting' | 'here' | 'elsewhere' }>({ state: 'waiting' })
-  const held = useRef<Held | null>(null)
+  // The open page's save, for whoever needs it first (another window, an export, the library);
+  // and its last save as it closes, which the lock is let go only after.
   const flushPage = useRef<(() => Promise<void>) | null>(null)
   const closing = useRef<Promise<void>>(Promise.resolve())
-  const pieceId = opened?.piece.id
-  const writer = writerOf.pieceId === pieceId ? writerOf.state : 'waiting'
-  const setWriter = useCallback((state: 'waiting' | 'here' | 'elsewhere', id = pieceIdNow.current) => setWriterOf({ pieceId: id, state }), [])
-  const pieceIdNow = useRef(pieceId)
-  pieceIdNow.current = pieceId
-  const onAsked = useCallback(async () => {
-    await flushPage.current?.()
-    setWriter('elsewhere')
-  }, [])
-  const follow = useCallback((h: Held) => {
-    held.current = h
-    setWriter('here')
-    void h.lost.then(() => {
-      if (held.current === h) {
-        held.current = null
-        setWriter('elsewhere')
-      }
-    })
-  }, [])
-  useEffect(() => {
-    if (!pieceId) return
-    let alive = true
-    setWriter('waiting')
-    void (async () => {
-      let h = await lock.hold(pieceId, onAsked)
-      // Back to a piece this window just left: its lock goes once the last save there settles.
-      if (!h && alive) {
-        await settled(closing.current)
-        if (alive) h = await lock.hold(pieceId, onAsked)
-      }
-      if (!alive) return h?.release()
-      if (h) follow(h)
-      else setWriter('elsewhere')
-    })()
-    return () => {
-      alive = false
-      const h = held.current
-      held.current = null
-      // Let go after the closing page's last save, so no other window writes alongside it,
-      // but never wait on a stuck save for long. (A timeout: the page's cleanup, which sets
-      // `closing`, runs after this one.)
-      setTimeout(() => void settled(closing.current).then(() => h?.release()), 0)
-    }
-  }, [pieceId])
-
-  const writeHere = async () => {
-    const id = pieceId
-    if (!id) return
-    const h = await lock.take(id, onAsked)
-    // Moved on to another piece while waiting: this one is not needed now.
-    if (pieceIdNow.current !== id) return h.release()
-    // The other window has saved: start from what it left.
-    const fresh = await open(id)
-    follow(h)
-    if (fresh) setOpened(fresh)
-  }
+  const { writer, writeHere } = useWriterLock(lock, opened?.piece.id, flushPage, closing)
 
   const startNew = (kind: Kind) => {
     let piece = newPiece(deps, kind, navigator.language || 'en')
@@ -202,7 +127,13 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
           deps={deps}
           opened={opened}
           writer={writer}
-          onWriteHere={() => void writeHere()}
+          onWriteHere={() =>
+            // The other window has saved: start from what it left.
+            void writeHere(async () => {
+              const fresh = opened && (await open(opened.piece.id))
+              if (fresh) setOpened(fresh)
+            })
+          }
           flushRef={flushPage}
           closingRef={closing}
           covered={inLibrary || inSettings}
@@ -319,54 +250,4 @@ function askToPersist() {
   if (asked) return
   asked = true
   void navigator.storage?.persist?.().catch(() => {})
-}
-
-/**
- * Words the last session could not store before it closed (see Page, journal)
- * go into the database first, under the piece's lock (one writer, 0010). An
- * entry already stored is dropped. One older than its section's stored copy
- * was overtaken elsewhere: it is not applied, and waits for Save a copy.
- */
-async function replayJournal(deps: Deps, lock: WriterLock) {
-  for (const u of unsaved.all()) {
-    const stored = await deps.store.transaction(async (tx) => ({ working: await tx.working(u.sectionId), piece: await tx.piece(u.pieceId) }))
-    const sameText = stored.working?.content === u.markdown
-    const sameTitle =
-      (u.title === null || titleIn(stored.piece, u.sectionId) === u.title) &&
-      (!u.bookTitle || stored.piece?.title === u.bookTitle) &&
-      (u.subtitle == null || (stored.piece?.subtitle ?? '') === u.subtitle)
-    if (sameText && sameTitle) {
-      unsaved.saved(u.sectionId)
-      continue
-    }
-    if (stored.working && stored.working.updatedAt > u.at) continue
-    const held = await lock.hold(u.pieceId, async () => {})
-    if (!held) continue // another window writes it now; the words wait for Save a copy
-    try {
-      // The journal's piece is only a draft: write() keeps what is stored and adds a section it lacks.
-      await write(deps, u.piece, u.sectionId, u.markdown)
-      // A title only if it changed here and nothing renamed the piece since.
-      if (!stored.piece || stored.piece.updatedAt <= u.at) {
-        if (u.title !== null) {
-          if (u.piece.kind === 'essay') await rename(deps, u.piece, u.title)
-          else await renameSection(deps, u.piece, u.sectionId, u.title)
-        }
-        if (u.bookTitle) await rename(deps, u.piece, u.bookTitle)
-        if (u.subtitle != null) await setSubtitle(deps, u.piece, u.subtitle)
-      }
-      unsaved.saved(u.sectionId)
-    } finally {
-      held.release()
-    }
-  }
-}
-
-function titleIn(piece: Piece | undefined, sectionId: string): string | undefined {
-  if (!piece) return undefined
-  return piece.kind === 'essay' ? piece.title : piece.sections.find((s) => s.sectionId === sectionId)?.title
-}
-
-/** A promise that settled, or two seconds, whichever comes first; never rejects. */
-function settled(p: Promise<unknown>): Promise<void> {
-  return Promise.race([p.then(() => {}, () => {}), new Promise<void>((r) => setTimeout(r, 2000))])
 }
