@@ -8,6 +8,7 @@ Load only what the task needs. Leave the rest unread.
 A marketing site is the page a person lands on to understand or choose. An application is the tool they come back to. Official look wins: DESIGN.md, then Figma, then the board. Hunt finds references and proposes an adaptation; it does not code the page. Open the moodboard before they pick, mark the lead after, say what we take, change, and leave, then ask once to write or update DESIGN.md — only on yes. Code the page only when they asked to build. Direction-only stops after persist. A site hunts live pages; an application hunts screen shots. With a direction already, hunt only the piece.
 
 - Building or fixing: ponytail. The smallest change that finishes the job. Leave validation, error handling, security, and accessibility in place.
+- React code in `app/src/ui` (a component, a hook, state, an effect): react-components. One job per component, effects only to sync with what is outside React, the editor and saving in plain classes behind a hook.
 - A diff: ponytail-review. Read it like someone who gets paged.
 - The whole repo: ponytail-audit. That same pass, over every file.
 - Shortcuts you meant to come back to: ponytail-debt. Collect the limits you marked.
