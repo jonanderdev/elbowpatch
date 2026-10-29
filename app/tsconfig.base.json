@@ -9,6 +9,8 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
-    "noEmit": true
+    "noEmit": true,
+    "declaration": true,
+    "isolatedDeclarations": true
   }
 }

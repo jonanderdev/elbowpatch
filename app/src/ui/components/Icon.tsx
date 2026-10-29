@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react'
+import type { CSSProperties, ReactElement } from 'react'
 import add from './icons/add.svg'
 import alignLeft from './icons/align-left.svg'
 import close from './icons/close.svg'
@@ -17,16 +17,34 @@ import sun from './icons/sun.svg'
 import viewList from './icons/view-list.svg'
 import viewShelf from './icons/view-shelf.svg'
 
-const icons = { add, alignLeft, close, export: exportIcon, history, justify, keep, keyboard, moon, quote, redo, section, settings, sun, undo, viewList, viewShelf }
+export type IconName =
+  | 'add'
+  | 'alignLeft'
+  | 'close'
+  | 'export'
+  | 'history'
+  | 'justify'
+  | 'keep'
+  | 'keyboard'
+  | 'moon'
+  | 'quote'
+  | 'redo'
+  | 'section'
+  | 'settings'
+  | 'sun'
+  | 'undo'
+  | 'viewList'
+  | 'viewShelf'
 
-export type IconName = keyof typeof icons
+const icons: Record<IconName, string> = { add, alignLeft, close, export: exportIcon, history, justify, keep, keyboard, moon, quote, redo, section, settings, sun, undo, viewList, viewShelf }
 
 /** One icon set drawn for the app, in the current text colour (DESIGN.md, Control). */
-export function Icon({ name }: { name: IconName }) {
+export function Icon({ name }: { name: IconName }): ReactElement {
   return <span className="icon" aria-hidden="true" style={{ '--icon': `url("${icons[name]}")` } as CSSProperties} />
 }
 
-export function IconButton(props: { icon: IconName; label: string; onClick(): void; quiet?: boolean; pressed?: boolean }) {
+/** A button that is its icon. `keepFocus`: pressing it leaves the focus (and a selection) where it is. */
+export function IconButton(props: { icon: IconName; label: string; onClick(): void; quiet?: boolean; pressed?: boolean; keepFocus?: boolean }): ReactElement {
   return (
     <button
       type="button"
@@ -34,6 +52,7 @@ export function IconButton(props: { icon: IconName; label: string; onClick(): vo
       aria-label={props.label}
       aria-pressed={props.pressed}
       onClick={props.onClick}
+      onMouseDown={props.keepFocus ? (e) => e.preventDefault() : undefined}
     >
       <Icon name={props.icon} />
     </button>

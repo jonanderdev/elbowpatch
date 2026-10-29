@@ -15,4 +15,6 @@ const deps = {
 
 apply()
 watchForUpdates()
-render(<App deps={deps} lock={writerLock()} />, document.getElementById('app')!)
+const root = document.getElementById('app')
+if (!root) throw new Error('index.html has no #app to render into')
+render(<App deps={deps} lock={writerLock()} />, root)

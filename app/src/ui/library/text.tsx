@@ -1,4 +1,5 @@
-import { type Piece } from '../../domain/model'
+import type { ReactNode } from 'react'
+import type { Piece } from '../../domain/model'
 import { totalWords } from '../../domain/pieces'
 import { dayTitle, number, shortDate, words } from '../../domain/words'
 
@@ -6,7 +7,7 @@ export function excerpt(piece: Piece): string {
   return piece.place?.snippet.trim() || 'Begin anywhere.'
 }
 
-export function continueMeta(piece: Piece) {
+export function continueMeta(piece: Piece): ReactNode {
   const section = piece.sections.find((s) => s.sectionId === piece.place?.sectionId)
   if (piece.kind === 'essay') return piece.title.trim() || 'Untitled'
   const part = piece.kind === 'journal' ? dayTitle(section?.title ?? '') : section?.title.trim() || 'Untitled'

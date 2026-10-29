@@ -25,7 +25,7 @@ export const migrations: ((db: IDBPDatabase<Schema>) => void)[] = [
   },
 ]
 
-export const SCHEMA_VERSION = migrations.length
+export const SCHEMA_VERSION: number = migrations.length
 
 export function openStore(name = 'elbowpatch'): Store & { close(): void } {
   let db: Promise<IDBPDatabase<Schema>> | undefined

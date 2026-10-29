@@ -1,10 +1,10 @@
 /// <reference types="vitest/config" />
-import { defineConfig } from 'vite'
+import { defineConfig, type UserConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 // The code imports React; Preact runs it (docs/decisions/0002). Going back to
 // React is deleting these aliases.
-export default defineConfig({
+const config: UserConfig = defineConfig({
   // Relative paths, so any static host works, in a subfolder too.
   base: './',
   plugins: [
@@ -48,3 +48,5 @@ export default defineConfig({
     isolate: true,
   },
 })
+
+export default config

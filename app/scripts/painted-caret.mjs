@@ -40,7 +40,7 @@ async function run(engine) {
   // Two images, the caret shown and made transparent: what differs is the painted caret.
   const diff = async (a, b) =>
     (decoder ?? page).evaluate(async ([a, b]) => {
-      const load = async (s) => { const bm = await createImageBitmap(await (await fetch('data:image/png;base64,' + s)).blob()); const c = new OffscreenCanvas(bm.width, bm.height); const x = c.getContext('2d'); x.drawImage(bm, 0, 0); return x.getImageData(0, 0, bm.width, bm.height) }
+      const load = async (s) => { const bm = await createImageBitmap(await (await fetch(`data:image/png;base64,${s}`)).blob()); const c = new OffscreenCanvas(bm.width, bm.height); const x = c.getContext('2d'); x.drawImage(bm, 0, 0); return x.getImageData(0, 0, bm.width, bm.height) }
       const A = await load(a), B = await load(b)
       let x0 = 1e9, y0 = 1e9, y1 = -1
       for (let y = 0; y < A.height; y++) for (let x = 0; x < A.width; x++) { const i = (y * A.width + x) * 4; if (Math.abs(A.data[i] - B.data[i]) > 60) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y) } }
@@ -48,7 +48,7 @@ async function run(engine) {
     }, [a, b])
   const painted = async () => {
     if (ff) {
-      if (!id) { await page.evaluate(() => (document.title = 'caret-' + Date.now())); await page.waitForTimeout(300); id = windowId(await page.title()) }
+      if (!id) { await page.evaluate(() => (document.title = `caret-${Date.now()}`)); await page.waitForTimeout(300); id = windowId(await page.title()) }
       const shot = (n) => { execFileSync('screencapture', ['-x', '-o', `-l${id}`, join(tmp, n)]); return readFileSync(join(tmp, n)).toString('base64') }
       const a = shot('a.png')
       const style = await page.addStyleTag({ content: '* { caret-color: transparent !important }' })
@@ -107,7 +107,7 @@ async function run(engine) {
   }
   await browser.close()
   console.log(`${engine} ${w}x${h}: ${checks} steps, ${bad.length} painted elsewhere`)
-  for (const b of bad) console.log('  ' + b)
+  for (const b of bad) console.log(`  ${b}`)
   return bad.length
 }
 

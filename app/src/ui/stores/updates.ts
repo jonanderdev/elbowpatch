@@ -7,12 +7,12 @@ let waiting = false
 let restart: (() => Promise<void>) | undefined
 const listeners = new Set<() => void>()
 
-export function watchForUpdates() {
+export function watchForUpdates(): void {
   if (!('serviceWorker' in navigator) || import.meta.env.DEV) return
   restart = registerSW({
     onNeedRefresh() {
       waiting = true
-      listeners.forEach((l) => l())
+      for (const l of listeners) l()
     },
   })
 }
@@ -25,5 +25,6 @@ export function useUpdateWaiting(): (() => void) | undefined {
     },
     () => waiting,
   )
-  return ready && restart ? () => void restart!() : undefined
+  const now = restart
+  return ready && now ? () => void now() : undefined
 }

@@ -3,7 +3,7 @@ import { BREAK, type Block, type Mark, type Span } from '../domain/markdown'
 
 // The page's editor schema: the v1 marks of docs/decisions/0003. A `raw` block
 // holds Markdown outside them, shown with its symbols and written back as is.
-export const schema = new Schema({
+export const schema: Schema<'doc' | 'paragraph' | 'quote' | 'raw' | 'text' | 'hard_break', 'em' | 'strong'> = new Schema({
   nodes: {
     doc: { content: 'block+' },
     paragraph: {

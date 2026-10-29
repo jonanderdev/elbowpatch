@@ -88,7 +88,7 @@ test("when a save fails the words stay, the page says so, and it recovers", asyn
   await page.evaluate(() => {
     const w = window as unknown as { __tx: unknown }
     w.__tx = IDBDatabase.prototype.transaction
-    IDBDatabase.prototype.transaction = function () {
+    IDBDatabase.prototype.transaction = () => {
       throw new DOMException('The disk is full.', 'QuotaExceededError')
     }
   })
@@ -352,7 +352,7 @@ test('← and → across a page break never leave the caret where it is painted 
     page.evaluate(() => {
       const s = getSelection()!
       const t = s.focusNode
-      if (!t || t.nodeType !== 3 || s.focusOffset === 0 || s.focusOffset >= t.textContent!.length) return false
+      if (t?.nodeType !== 3 || s.focusOffset === 0 || s.focusOffset >= t.textContent!.length) return false
       if (!/\s/.test(t.textContent![s.focusOffset - 1] ?? '')) return false
       const r = document.createRange()
       const page = (x: number) => Math.floor((x - document.querySelector('.flow')!.getBoundingClientRect().left + 40) / innerWidth)
@@ -429,7 +429,7 @@ test('a book opens on its title page; chapter 1 begins on the next', async ({ pa
   for (const [field, word] of [['.book-title', 'Untitled'], ['.subtitle', 'Subtitle']] as const) {
     const shown = await page.locator(field).evaluate((el) => {
       const before = getComputedStyle(el, '::before')
-      return before.content.replace(/"/g, '') + '|' + before.visibility
+      return `${before.content.replace(/"/g, '')}|${before.visibility}`
     })
     expect(shown).toBe(`${word}|visible`)
   }
@@ -509,7 +509,7 @@ test('"Your tools are here" until the tools are first opened, then never again',
   await expect(wayIn).toHaveCount(0)
 })
 
-test('Library and the page button: text edge on a phone, frame corners on desktop', async ({ page, isMobile }) => {
+test('Library and the page button: text edge on a phone, frame corners on desktop', async ({ page }) => {
   await newEssay(page)
   await page.keyboard.type('Words.')
   const width = page.viewportSize()!.width
@@ -668,7 +668,7 @@ test('at a normal size nothing scrolls the window, and the library covers the pa
   await page.waitForTimeout(300)
   const shot = await page.screenshot({ clip: head, animations: 'disabled' })
   const flat = await page.evaluate(async (b64) => {
-    const bm = await createImageBitmap(await (await fetch('data:image/png;base64,' + b64)).blob())
+    const bm = await createImageBitmap(await (await fetch(`data:image/png;base64,${b64}`)).blob())
     const c = new OffscreenCanvas(bm.width, bm.height).getContext('2d')!
     c.drawImage(bm, 0, 0)
     const d = c.getImageData(0, 0, bm.width, bm.height).data

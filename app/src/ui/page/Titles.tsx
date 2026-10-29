@@ -1,4 +1,4 @@
-import type { RefObject } from 'react'
+import type { RefObject, ReactElement } from 'react'
 import { emptied } from './fields'
 
 // The page's title fields. They are uncontrolled: their text is filled when a section opens
@@ -21,7 +21,7 @@ interface TitlePageProps {
  * centred in the upper third; chapter 1 or the first day begins on the next page
  * (DESIGN.md, Books and chapters; The journal).
  */
-export function TitlePage({ nameRef, subtitleRef, kind, readOnly, onFocus, onInput, onDone }: TitlePageProps) {
+export function TitlePage({ nameRef, subtitleRef, kind, readOnly, onFocus, onInput, onDone }: TitlePageProps): ReactElement {
   const editable = readOnly ? undefined : ('plaintext-only' as const)
   return (
     <div className="title-page">
@@ -44,6 +44,7 @@ export function TitlePage({ nameRef, subtitleRef, kind, readOnly, onFocus, onInp
           subtitleRef.current?.focus()
         }}
       />
+      {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: contentEditable makes it an editable text field, which a label names. */}
       <p
         ref={subtitleRef}
         className="subtitle"
@@ -80,7 +81,7 @@ interface SectionTitleProps {
 }
 
 /** An essay's title, a chapter's, or a journal day's date, at the top of its first page. */
-export function SectionTitle({ titleRef, editable, placeholder, afterTitlePage, onFocus, onInput, onDone }: SectionTitleProps) {
+export function SectionTitle({ titleRef, editable, placeholder, afterTitlePage, onFocus, onInput, onDone }: SectionTitleProps): ReactElement {
   return (
     <h1
       ref={titleRef}

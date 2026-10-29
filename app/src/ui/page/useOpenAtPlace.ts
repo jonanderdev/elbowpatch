@@ -10,6 +10,8 @@ import type { Opened } from './fields'
  * never shows a frame of page 1 first; again once the fonts are in, since they move the breaks.
  */
 export function useOpenAtPlace(editor: Editor | null, pager: Pager | null, opened: Opened): void {
+  // Once, when the editor and the pager exist; the page is remounted for each section.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `opened` is the section this page was made for.
   useLayoutEffect(() => {
     if (!editor || !pager) return
     const { place } = opened.piece
@@ -21,7 +23,5 @@ export function useOpenAtPlace(editor: Editor | null, pager: Pager | null, opene
     return () => {
       alive = false
     }
-    // Once, when the editor and the pager exist; the page is remounted for each section.
-    // biome-ignore lint/correctness/useExhaustiveDependencies: `opened` is the section this page was made for.
   }, [editor, pager])
 }

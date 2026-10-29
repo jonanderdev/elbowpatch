@@ -1,6 +1,5 @@
-import { useState } from 'react'
-import { type Piece } from '../../domain/model'
-import { number, words } from '../../domain/words'
+import { useState, type ReactElement } from 'react'
+import type { Piece } from '../../domain/model'
 import { update } from '../stores/settings'
 import { download } from '../files/download'
 import { lastExport } from '../files/everything'
@@ -8,7 +7,7 @@ import { unsaved, useUnsaved } from '../stores/unsaved'
 import { useUpdateWaiting } from '../stores/updates'
 
 /** Words a closed page could not store (0010): said here too, since the page that said it is gone. */
-export function UnsavedLine() {
+export function UnsavedLine(): ReactElement | null {
   const waiting = useUnsaved()
   if (waiting.length === 0) return null
   return (
@@ -31,7 +30,7 @@ export function UnsavedLine() {
 }
 
 /** Only in the library, never on the page: restarting here cannot cut off a sentence (0010). */
-export function UpdateLine() {
+export function UpdateLine(): ReactElement | null {
   const restart = useUpdateWaiting()
   if (!restart) return null
   return (
@@ -44,7 +43,7 @@ export function UpdateLine() {
   )
 }
 
-export function SafariNote({ atFoot }: { atFoot?: boolean }) {
+export function SafariNote({ atFoot }: { atFoot?: boolean }): ReactElement | null {
   if (!safariOutsideHomeScreen()) return null
   return (
     <div className={atFoot ? 'first-run at-foot' : 'first-run'}>
@@ -66,7 +65,7 @@ const CAN_CONNECT = false
  * "Last exported 5 weeks ago · Export", and "Connect a place" once there is
  * one to connect (DESIGN.md, The library).
  */
-export function ExportReminder({ pieces, onExport, onDone }: { pieces: Piece[]; onExport(): Promise<string>; onDone(line: string): void }) {
+export function ExportReminder({ pieces, onExport, onDone }: { pieces: Piece[]; onExport(): Promise<string>; onDone(line: string): void }): ReactElement | null {
   const [busy, setBusy] = useState(false)
   const [, refresh] = useState(0)
   const now = Date.now()

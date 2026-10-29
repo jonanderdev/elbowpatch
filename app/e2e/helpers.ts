@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test'
 
 /** Puts the caret at the end of the text. (End scrolls instead on macOS WebKit.) */
-export async function caretToEnd(page: Page) {
+export async function caretToEnd(page: Page): Promise<void> {
   await page.locator('.body').focus()
   await page.evaluate(() => {
     const body = document.querySelector('.body')!
@@ -15,7 +15,7 @@ export async function caretToEnd(page: Page) {
 }
 
 /** Waits until the words are in a stored working copy: the save landed, however busy the machine is. */
-export async function saved(page: Page, words: string) {
+export async function saved(page: Page, words: string): Promise<void> {
   await expect
     .poll(
       () =>

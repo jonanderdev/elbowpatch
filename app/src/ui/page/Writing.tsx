@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from 'react'
 import type { Editor } from '../../page/editor'
 import { Icon, IconButton } from '../components/Icon'
 
@@ -28,9 +28,7 @@ function Formatting({ editor, active }: { editor: Editor; active: ReturnType<Edi
     <>
       <Mark label="Bold" glyph="B" pressed={active.bold} onClick={() => run('bold')} />
       <Mark label="Italic" glyph="I" pressed={active.italic} onClick={() => run('italic')} />
-      <span onMouseDown={(e) => e.preventDefault()}>
-        <IconButton icon="quote" label="Pull quote" pressed={active.quote} onClick={() => run('quote')} />
-      </span>
+      <IconButton icon="quote" label="Pull quote" pressed={active.quote} onClick={() => run('quote')} keepFocus />
     </>
   )
 }
@@ -39,7 +37,7 @@ function Formatting({ editor, active }: { editor: Editor; active: ReturnType<Edi
  * The selection menu: the same rounded bar, floating over the selected words
  * (DESIGN.md, Control). § waits for chapters.
  */
-export function SelectionMenu({ editor, rect, active, onKeep }: { editor: Editor; rect: DOMRect; active: ReturnType<Editor['active']>; onKeep(): void }) {
+export function SelectionMenu({ editor, rect, active, onKeep }: { editor: Editor; rect: DOMRect; active: ReturnType<Editor['active']>; onKeep(): void }): ReactElement {
   const ref = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
   useLayoutEffect(() => {
@@ -63,9 +61,7 @@ export function SelectionMenu({ editor, rect, active, onKeep }: { editor: Editor
     >
       <Formatting editor={editor} active={active} />
       <span className="bar-separator" />
-      <span onMouseDown={(e) => e.preventDefault()}>
-        <IconButton icon="keep" label="Keep this moment" onClick={onKeep} />
-      </span>
+      <IconButton icon="keep" label="Keep this moment" onClick={onKeep} keepFocus />
     </div>
   )
 }
@@ -74,7 +70,7 @@ export function SelectionMenu({ editor, rect, active, onKeep }: { editor: Editor
  * Above the phone keyboard: undo, redo, then the formatting, then hide
  * keyboard. A phone has no reliable undo of its own (DESIGN.md, Control).
  */
-export function WritingBar({ editor, active, keyboard }: { editor: Editor; active: ReturnType<Editor['active']>; keyboard: number }) {
+export function WritingBar({ editor, active, keyboard }: { editor: Editor; active: ReturnType<Editor['active']>; keyboard: number }): ReactElement {
   return (
     <div className="bar surface writing-bar" role="toolbar" aria-label="Writing" style={{ bottom: keyboard + 8 }} onMouseDown={(e) => e.preventDefault()}>
       <IconButton icon="undo" label="Undo" onClick={() => editor.run('undo')} />

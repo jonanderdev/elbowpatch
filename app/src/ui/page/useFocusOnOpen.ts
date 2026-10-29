@@ -31,6 +31,8 @@ export function useFocusOnOpen({ opened, editor, saving, titles, covered, readOn
   // The caret was placed for this opening (the page is remounted per section, so once per mount).
   const placed = useRef(false)
 
+  // On covering and uncovering, and once the editor and saving exist.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the rest is this page's, fixed while it is open.
   useEffect(() => {
     // Nothing to do until the section's editor and saving exist (just after the first render).
     if (!editor || !saving) return
@@ -62,8 +64,6 @@ export function useFocusOnOpen({ opened, editor, saving, titles, covered, readOn
     }
     const place = opened.piece.place
     if (place?.caret && place.sectionId === opened.sectionId && desktop) editor.focus()
-    // On covering and uncovering, and once the editor and saving exist.
-    // biome-ignore lint/correctness/useExhaustiveDependencies: the rest is this page's, fixed while it is open.
   }, [covered, readOnly, editor, saving])
 
   return {

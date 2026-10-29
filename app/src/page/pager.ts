@@ -18,7 +18,7 @@ export interface Geometry {
  * with at least `minSide` either side and `minLeft` on the left (the journal's
  * margin rule wants more room there).
  */
-export function geometry(screenWidth: number, maxMeasure: number, minSide: number, minLeft = minSide): Geometry {
+export function geometry(screenWidth: number, maxMeasure: number, minSide: number, minLeft: number = minSide): Geometry {
   const width = Math.floor(screenWidth)
   const measure = Math.floor(Math.min(maxMeasure, width - minSide - minLeft))
   const side = Math.max(minLeft, Math.floor((width - measure) / 2))
@@ -91,7 +91,7 @@ export class Pager {
     })
   }
 
-  layout(g: Geometry) {
+  layout(g: Geometry): void {
     this.g = g
     this.flow.style.columnWidth = `${g.measure}px`
     this.flow.style.columnGap = `${g.stride - g.measure}px`
@@ -99,7 +99,7 @@ export class Pager {
   }
 
   /** Recount pages after the text or the layout changed. */
-  measure() {
+  measure(): void {
     const count = pageCount(this.viewport.scrollWidth, this.g)
     const page = Math.min(this.page, count - 1)
     const changed = count !== this.count || page !== this.page
@@ -109,7 +109,7 @@ export class Pager {
     if (changed) this.onChange(this.page, this.count)
   }
 
-  turnTo(page: number) {
+  turnTo(page: number): void {
     const next = Math.max(0, Math.min(this.count - 1, page))
     this.viewport.scrollLeft = next * this.g.stride
     if (next === this.page) return
@@ -117,11 +117,11 @@ export class Pager {
     this.onChange(this.page, this.count)
   }
 
-  next = () => this.turnTo(this.page + 1)
-  previous = () => this.turnTo(this.page - 1)
+  next = (): void => this.turnTo(this.page + 1)
+  previous = (): void => this.turnTo(this.page - 1)
 
   /** Turns to the page holding a point on screen (a caret, a found word). */
-  show(clientX: number) {
+  show(clientX: number): void {
     const start = this.flow.getBoundingClientRect().left
     this.measure()
     this.turnTo(pageAt(clientX - start, this.g))

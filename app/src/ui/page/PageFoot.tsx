@@ -1,4 +1,4 @@
-import type { RefObject } from 'react'
+import type { RefObject, ReactElement } from 'react'
 import { words as wordsLine } from '../../domain/words'
 import { ToolsBar } from './Tools'
 
@@ -20,7 +20,7 @@ interface PageFootProps {
 }
 
 /** The foot of the page: the page button, which opens into the tools bar. */
-export function PageFoot({ page, count, words, journal, tools, showWayIn, keyboard, pageButtonRef, onOpenTools, onCloseTools, onTextSettings, onExport }: PageFootProps) {
+export function PageFoot({ page, count, words, journal, tools, showWayIn, keyboard, pageButtonRef, onOpenTools, onCloseTools, onTextSettings, onExport }: PageFootProps): ReactElement {
   return (
     <div className={keyboard > 0 ? 'foot raised' : 'foot'} style={keyboard > 0 ? { bottom: keyboard } : undefined}>
       {/* The day's words, at the text's left edge, level with the page button. */}
@@ -53,7 +53,7 @@ interface StatusLineProps {
 }
 
 /** One line at the foot, most important first: another window writes, a save failed, or a calm note. */
-export function StatusLine({ writer, failed, line, onWriteHere, onSaveCopy }: StatusLineProps) {
+export function StatusLine({ writer, failed, line, onWriteHere, onSaveCopy }: StatusLineProps): ReactElement | null {
   if (writer === 'elsewhere')
     return (
       <div className="line surface" role="status">

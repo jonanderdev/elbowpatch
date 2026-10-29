@@ -1,4 +1,4 @@
-import { type ReactElement, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { type ReactElement, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { TextSelection } from 'prosemirror-state'
 import { countWords } from '../../domain/markdown'
 import type { Piece } from '../../domain/model'
@@ -167,8 +167,15 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
   // Writing here or not changed (another window took the piece, or Write here): the editor asks
   // `editable` again at once.
   useEffect(() => {
-    editor?.view.setProps({})
+    editor?.view.setProps({ editable: () => !readOnly })
   }, [editor, readOnly])
+
+  // Closing the tools closes what was opened from them; the focus goes back to the page button.
+  const closeTools = useCallback((): void => {
+    setSheet(null)
+    setTools(false)
+    requestAnimationFrame(() => pageButton.current?.focus())
+  }, [])
 
   // Escape closes what is open, innermost first: a sheet, then the tools. One listener reads what
   // is open now from a ref: re-attached on each change, an Escape pressed right after one (Done,
@@ -186,7 +193,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [covered])
+  }, [covered, closeTools])
 
   // A calm line at the foot for a few seconds.
   useEffect(() => {
@@ -195,12 +202,6 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     return () => clearTimeout(t)
   }, [line])
 
-  function closeTools(): void {
-    // Closing the tools closes what was opened from them.
-    setSheet(null)
-    setTools(false)
-    requestAnimationFrame(() => pageButton.current?.focus())
-  }
 
   async function exportMarkdown(): Promise<string | undefined> {
     if (!editor) return undefined

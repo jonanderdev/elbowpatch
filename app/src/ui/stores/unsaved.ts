@@ -47,7 +47,7 @@ function read(): Unsaved[] {
 
 function changed() {
   snapshot = read()
-  listeners.forEach((l) => l())
+  for (const l of listeners) l()
 }
 
 // Another window kept or cleared words.
@@ -59,7 +59,7 @@ export const unsaved = {
    * than `since` (when this page read its text): an older save must not
    * replace newer words.
    */
-  keep(u: Omit<Unsaved, 'at'>, since = Date.now()) {
+  keep(u: Omit<Unsaved, 'at'>, since: number = Date.now()): void {
     const there = unsaved.get(u.sectionId)
     if (there && there.at > since && there.markdown !== u.markdown) return
     const entry: Unsaved = { ...u, at: Date.now() }
@@ -73,7 +73,7 @@ export const unsaved = {
     changed()
   },
   /** These words (and title) are stored now. Different words kept since stay. */
-  saved(sectionId: string, markdown?: string, title?: string | null) {
+  saved(sectionId: string, markdown?: string, title?: string | null): void {
     const there = unsaved.get(sectionId)
     if (!there) return
     if (markdown !== undefined && (there.markdown !== markdown || (there.title !== null && there.title !== title))) return

@@ -49,7 +49,7 @@ export async function exportAll(deps: Pick<Deps, 'store' | 'clock'>): Promise<Ar
           current.push({ sectionId, title, content: text })
           // A section's file reads well anywhere: a chapter opens with its title (0005).
           const head = piece.kind === 'essay' ? '' : `# ${sectionName(piece.kind, title, true) || 'Untitled'}\n\n`
-          if (piece.kind !== 'essay') files.push({ path: `${folder}/${name}.md`, text: head + text + '\n' })
+          if (piece.kind !== 'essay') files.push({ path: `${folder}/${name}.md`, text: `${head}${text}\n` })
         }
         if (working) {
           const file = `${folder}/history/${name}/working.md`
@@ -123,7 +123,13 @@ export async function importArchive(deps: Deps, files: ArchiveFile[]): Promise<I
         if ((await tx.pieces()).some((p) => p.copyOf === print)) return 'skipped'
         // Different: a new piece beside the one here, with every id new.
         const map = new Map<string, string>()
-        ids = (id: string) => map.get(id) ?? (map.set(id, deps.ids.next()), map.get(id)!)
+        ids = (id: string): string => {
+          const known = map.get(id)
+          if (known) return known
+          const fresh = deps.ids.next()
+          map.set(id, fresh)
+          return fresh
+        }
       }
       await tx.putPiece({
         ...incoming,

@@ -60,7 +60,7 @@ export function debounced(task: () => Promise<void>, idle: number, max: number):
  * than one every `every` ms while writing. `flush` takes one at once, for blur,
  * hiding, closing and switching pieces.
  */
-export function moments(take: () => Promise<unknown>, idle = 3000, every = 5 * 60_000): Scheduled {
+export function moments(take: () => Promise<unknown>, idle: number = 3000, every: number = 5 * 60_000): Scheduled {
   let timer: ReturnType<typeof setTimeout> | undefined
   let last = -Infinity
   let pending = false

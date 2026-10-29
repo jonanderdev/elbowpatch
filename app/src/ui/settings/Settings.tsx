@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { unzip } from '../../adapters/zip'
 import { guessKind, importArchive, importMarkdown } from '../../domain/archive'
 import { downloadEverything, lastExport } from '../files/everything'
@@ -27,12 +27,14 @@ interface Props {
   onChanged(): Promise<void>
 }
 
-export function Settings(props: Props) {
+export function Settings(props: Props): ReactElement {
   const heading = useRef<HTMLHeadingElement>(null)
+  // Each area opens with the focus on its heading, for screen readers and the keyboard.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the area is the trigger, not read inside.
   useEffect(() => heading.current?.focus(), [props.area])
   const title = props.area === 'export' ? 'Export & import' : props.area === 'put-away' ? 'Put away' : 'Settings'
   return (
-    <div className="settings" role="main">
+    <main className="settings">
       <div className="settings-head">
         <WordButton word={props.area === 'list' ? 'Library' : 'Settings'} onClick={() => props.go(props.area === 'list' ? '/' : '/settings')} />
       </div>
@@ -44,7 +46,7 @@ export function Settings(props: Props) {
         {props.area === 'export' && <ExportImport {...props} />}
         {props.area === 'put-away' && <PutAway {...props} />}
       </div>
-    </div>
+    </main>
   )
 }
 
@@ -177,13 +179,16 @@ function ExportImport({ deps, beforeExport, onChanged }: Props) {
     }
   }
   const sheet = useRef<HTMLDivElement>(null)
+  const sheetOpen = loose !== null
   useEffect(() => {
-    if (!loose) return
+    if (!sheetOpen) return
     ;(sheet.current?.querySelector('[aria-checked="true"]') as HTMLElement | null)?.focus()
-    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setLoose(null)
+    const esc = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setLoose(null)
+    }
     window.addEventListener('keydown', esc)
     return () => window.removeEventListener('keydown', esc)
-  }, [!!loose])
+  }, [sheetOpen])
 
   return (
     <>
@@ -225,6 +230,7 @@ function ExportImport({ deps, beforeExport, onChanged }: Props) {
                   // Journal only when the headings are dates.
                   .filter((k) => k !== 'journal' || f.guess === 'journal')
                   .map((k) => (
+                    // biome-ignore lint/a11y/useSemanticElements: a segmented control: buttons with radio semantics, in one bar.
                     <button
                       key={k}
                       type="button"
@@ -286,7 +292,7 @@ function PutAway({ deps, pieces, onChanged }: Props) {
               key={p.id}
               name={p.title.trim() || 'Untitled'}
               action="Bring back"
-              status={`${KIND_WORD[p.kind]} · put away ${longDate(p.putAwayAt!, Date.now())} · ${left(p)}`}
+              status={`${KIND_WORD[p.kind]} · put away ${longDate(p.putAwayAt, Date.now())} · ${left(p)}`}
               onAction={async () => {
                 await restore(deps, p.id)
                 await onChanged()
@@ -308,23 +314,26 @@ function PutAway({ deps, pieces, onChanged }: Props) {
   )
 }
 
+/** A piece that is put away, with the time it was. */
+type PutAway = Piece & { putAwayAt: number }
+
 /** Put-away pieces, the one going soonest first. */
-function waiting(pieces: Piece[]): Piece[] {
-  return pieces.filter((p) => p.putAwayAt !== undefined).sort((a, b) => a.putAwayAt! - b.putAwayAt!)
+function waiting(pieces: Piece[]): PutAway[] {
+  return pieces.filter((p): p is PutAway => p.putAwayAt !== undefined).sort((a, b) => a.putAwayAt - b.putAwayAt)
 }
 
-function daysLeft(p: Piece): number {
-  return Math.max(0, Math.ceil((p.putAwayAt! + 30 * DAY - Date.now()) / DAY))
+function daysLeft(p: PutAway): number {
+  return Math.max(0, Math.ceil((p.putAwayAt + 30 * DAY - Date.now()) / DAY))
 }
 
 /** "25 days left", and in its last week "goes in 4 days". */
-function left(p: Piece): string {
+function left(p: PutAway): string {
   const n = daysLeft(p)
   if (n > 7) return `${n} days left`
   return `goes ${goesIn(p)}`
 }
 
-function goesIn(p: Piece): string {
+function goesIn(p: PutAway): string {
   const n = daysLeft(p)
   return n <= 1 ? 'in a day' : `in ${n} days`
 }

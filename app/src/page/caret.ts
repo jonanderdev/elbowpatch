@@ -40,7 +40,7 @@ export function caretRect(view: EditorView): DOMRect | null {
  * Shows the page the caret is on, while writing in the text. Not when the writer is in a title
  * field or reading: then the page stays. `force` shows it anyway, to open at their place.
  */
-export function showCaret(view: EditorView, pager: Pager, force = false) {
+export function showCaret(view: EditorView, pager: Pager, force: boolean = false): void {
   if (!force && !view.hasFocus()) return
   const rect = caretRect(view)
   if (rect) pager.show(rect.left)
@@ -71,7 +71,9 @@ export function caretToEnd(view: EditorView, viewport: HTMLElement): boolean {
   const onPage = (b: DOMRect) => b.right > r.left + 1 && b.left < r.right - 1 && b.height > 0
   const range = document.createRange()
   const blocks: { text: string; offset: number }[] = []
-  view.state.doc.forEach((node, offset) => blocks.push({ text: node.textContent, offset }))
+  view.state.doc.forEach((node, offset) => {
+    blocks.push({ text: node.textContent, offset })
+  })
   let pos: number | null = null
   for (const { text, offset } of blocks.reverse()) {
     const dom = view.nodeDOM(offset)
@@ -155,7 +157,7 @@ export function moveLine(view: EditorView, pager: Pager, flow: HTMLElement, down
  * view, so at a page's edge it stops. When the move left the browser's caret where it was, step it
  * one letter. The browser's caret is read, not the editor's, which may not have caught up yet.
  */
-export function stepIfStuck(view: EditorView, dir: 1 | -1) {
+export function stepIfStuck(view: EditorView, dir: 1 | -1): void {
   const dom = getSelection()
   const node = dom?.focusNode
   const offset = dom?.focusOffset ?? 0

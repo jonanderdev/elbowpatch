@@ -29,7 +29,7 @@ export function placeOf(view: EditorView, sectionId: string, page: number, viewp
 }
 
 /** Finds the place again after edits made elsewhere: by its words, else the nearest paragraph. */
-export function restorePlace(view: EditorView, place: Place | undefined, sectionId: string) {
+export function restorePlace(view: EditorView, place: Place | undefined, sectionId: string): void {
   if (!place || place.sectionId !== sectionId) return
   const doc = view.state.doc
   const key = place.snippet.slice(0, 40)

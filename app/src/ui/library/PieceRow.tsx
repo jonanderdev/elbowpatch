@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { type Piece } from '../../domain/model'
+import { useEffect, useRef, useState, type ReactNode, type ReactElement } from 'react'
+import type { Piece } from '../../domain/model'
 import { IconButton } from '../components/Icon'
-import { meta } from './text'
 
 /**
  * One piece in the list, or the Continue card. Press and hold, right-click, or
@@ -18,7 +17,7 @@ export function PieceRow(props: {
   onRename(title: string): void
   onExport(): void
   onPutAway(): void
-}) {
+}): ReactElement {
   const { piece, menuOpen, onMenu, card } = props
   const [renaming, setRenaming] = useState(false)
   const Wrap = card ? 'div' : 'li'
@@ -37,14 +36,17 @@ export function PieceRow(props: {
     input.current?.focus()
     input.current?.select()
   }, [renaming])
+  // The parent's onMenu as it is now, for the listeners below (attached while the menu is open).
+  const onMenuNow = useRef(onMenu)
+  onMenuNow.current = onMenu
   useEffect(() => {
     if (!menuOpen) return
-    const away = (e: Event) => {
-      if (!menu.current?.contains(e.target as Node)) onMenu(false)
+    const away = (e: Event): void => {
+      if (!menu.current?.contains(e.target as Node)) onMenuNow.current(false)
     }
-    const esc = (e: KeyboardEvent) => {
+    const esc = (e: KeyboardEvent): void => {
       if (e.key !== 'Escape') return
-      onMenu(false)
+      onMenuNow.current(false)
       row.current?.focus()
     }
     document.addEventListener('pointerdown', away)
@@ -71,7 +73,6 @@ export function PieceRow(props: {
           <input
             ref={input}
             className="row-title rename"
-            autoFocus
             defaultValue={piece.title}
             aria-label="Title"
             onKeyDown={(e) => {
@@ -132,7 +133,9 @@ export function PieceRow(props: {
             const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0
             if (!step) return
             e.preventDefault()
-            const items = [...menu.current!.querySelectorAll('button')]
+            const box = menu.current
+            if (!box) return
+            const items = [...box.querySelectorAll('button')]
             const at = items.indexOf(document.activeElement as HTMLButtonElement)
             items[(at + step + items.length) % items.length]?.focus()
           }}

@@ -12,7 +12,7 @@ async function newEssay(page: Page, title: string) {
 const breakSaves = (page: Page) =>
   page.evaluate(() => {
     ;(window as unknown as { __tx: unknown }).__tx = IDBDatabase.prototype.transaction
-    IDBDatabase.prototype.transaction = function () {
+    IDBDatabase.prototype.transaction = () => {
       throw new DOMException('The disk is full.', 'QuotaExceededError')
     }
   })
@@ -82,10 +82,10 @@ test('opening the app keeps the place where you left off', async ({ page }) => {
   const last = await page.locator('.page-button').textContent()
   expect(Number(last)).toBeGreaterThan(1)
   await page.locator('.head .word-button').click()
-  await expect(page.locator('.patch')).toHaveText(last!)
+  await expect(page.locator('.patch')).toHaveText(`page ${last}`)
   await page.reload()
   await page.goto('./#/')
-  await expect(page.locator('.patch')).toHaveText(last!)
+  await expect(page.locator('.patch')).toHaveText(`page ${last}`)
   await page.locator('.continue').click()
   await expect(page.locator('.page-button')).toHaveText(last!)
   await caretToEnd(page)

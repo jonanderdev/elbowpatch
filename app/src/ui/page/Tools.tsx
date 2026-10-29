@@ -1,9 +1,9 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode, type ReactElement } from 'react'
 import { number } from '../../domain/words'
 import { Icon, IconButton } from '../components/Icon'
 import { theme, update, useSettings, type Settings } from '../stores/settings'
 
-export function ToolsBar(props: { page: number; count: number; words: number; onClose(): void; onTextSettings(): void; onExport(): void }) {
+export function ToolsBar(props: { page: number; count: number; words: number; onClose(): void; onTextSettings(): void; onExport(): void }): ReactElement {
   const settings = useSettings()
   const night = theme(settings) === 'night'
   const ref = useRef<HTMLDivElement>(null)
@@ -47,6 +47,7 @@ function Segments<K extends keyof Settings>(props: {
         {props.options.map((o) => {
           const checked = settings[props.setting] === o.value
           return (
+            // biome-ignore lint/a11y/useSemanticElements: a segmented control: buttons with radio semantics, in one bar.
             <button
               key={String(o.value)}
               type="button"
@@ -90,7 +91,7 @@ function Toggle(props: { label: string; setting: 'dropcap' | 'indent' }) {
 }
 
 /** Text settings: a sheet over the page, applied live (DESIGN.md, Control). */
-export function TextSettings(props: { onDone(): void }) {
+export function TextSettings(props: { onDone(): void }): ReactElement {
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
     ;(ref.current?.querySelector('[aria-checked="true"]') as HTMLElement | null)?.focus()
@@ -155,6 +156,7 @@ function ThemeSegments() {
       <span className="setting-label" aria-hidden="true">Page</span>
       <div className="segments">
         {options.map((o) => (
+          // biome-ignore lint/a11y/useSemanticElements: a segmented control: buttons with radio semantics, in one bar.
           <button
             key={o.value}
             type="button"

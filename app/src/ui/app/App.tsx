@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react'
 import type { Kind, Piece } from '../../domain/model'
 import { pieceAsMarkdown } from '../../domain/export'
 import { forgetPutAway, thin } from '../../domain/thinning'
@@ -19,7 +19,7 @@ let reads = 0
 /** The least time the launch screen shows, from the page's start, in ms. */
 const MIN_LAUNCH = 1000
 
-export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
+export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElement | null {
   const [route, go] = useRoute()
   const [ready, setReady] = useState(false)
   const [pieces, setPieces] = useState<Piece[]>([])
@@ -43,8 +43,10 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
         // The journal opens on today.
         ;({ piece, sectionId } = withDay(deps, piece, isoDay(new Date())))
       } else {
-        const placed = piece.place && piece.sections.some((s) => s.sectionId === piece.place!.sectionId)
-        sectionId = placed ? piece.place!.sectionId : piece.sections[0]!.sectionId
+        // At the writer's place, if its section is still there; else the first chapter.
+        const place = piece.place
+        const placed = place !== undefined && piece.sections.some((s) => s.sectionId === place.sectionId)
+        sectionId = placed ? place.sectionId : piece.sections[0]!.sectionId
       }
       const section = found.sections.find((s) => s.sectionId === sectionId)
       return { piece, sectionId, content: section?.content ?? '', updatedAt: section?.updatedAt, readAt: ++reads }
@@ -55,6 +57,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
   // Startup (0010): open the store and run its migrations, bring back text a
   // crash left, lay out the last piece behind the library, wait for the fonts,
   // then let the launch screen go.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once per app load, with what it was started with.
   useEffect(() => {
     void (async () => {
       try {
@@ -75,11 +78,10 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
       const idle = window.requestIdleCallback ?? ((f: () => void) => setTimeout(f, 3000))
       idle(() => void forgetPutAway(deps).then(() => thin(deps)).catch(() => {}))
     })()
-    // Once, at launch.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Following the route: a piece opens, or the library comes back over the page.
+  const openedId = opened?.piece.id
   useEffect(() => {
     if (!ready) return
     if (route === '/' || route.startsWith('/settings')) {
@@ -87,16 +89,16 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
       return
     }
     const id = route.startsWith('/p/') ? route.slice(3) : ''
-    if (opened?.piece.id === id) return
+    if (openedId === id) return
     void open(id).then((next) => {
       if (next) setOpened(next)
       else go('/')
     })
-  }, [route, ready])
+  }, [route, ready, openedId, open, refresh, go])
 
   useEffect(() => {
-    if (opened) writeLast(opened.piece.id)
-  }, [opened?.piece.id])
+    if (openedId) writeLast(openedId)
+  }, [openedId])
 
   // The open page's save, for whoever needs it first (another window, an export, the library);
   // and its last save as it closes, which the lock is let go only after.

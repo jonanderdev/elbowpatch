@@ -1,10 +1,10 @@
-import { defineConfig, devices } from '@playwright/test'
+import { defineConfig, devices, type PlaywrightTestConfig } from '@playwright/test'
 
 // Real layout, in Chromium, WebKit and Firefox at phone and desktop sizes (docs/decisions/0007).
 const phone = { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: false }
 const desktop = { viewport: { width: 1440, height: 900 } }
 
-export default defineConfig({
+const config: PlaywrightTestConfig = defineConfig({
   testDir: 'e2e',
   fullyParallel: true,
   // Runs stalled when a stray `vite preview` held the port, when tests waited fixed times
@@ -24,3 +24,5 @@ export default defineConfig({
     { name: 'firefox-desktop', use: { ...devices['Desktop Firefox'], ...desktop } },
   ],
 })
+
+export default config

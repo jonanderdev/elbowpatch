@@ -55,7 +55,7 @@ function parseBlock(source: string): Block {
 function serializeBlock(block: Block): string {
   if (block.type === 'raw') return block.text
   const text = serializeInline(block.spans)
-  if (block.type === 'quote') return text.split('\n').map((l) => '> ' + l).join('\n')
+  if (block.type === 'quote') return text.split('\n').map((l) => `> ${l}`).join('\n')
   return text
 }
 
@@ -107,7 +107,7 @@ const ESCAPABLE = '\\*#>'
 
 function serializeInline(spans: Span[]): string {
   let out = ''
-  let open: Mark[] = []
+  const open: Mark[] = []
   for (const span of merge(spans)) {
     // Close what this span does not carry (innermost first), then open what it adds.
     while (open.some((m) => !span.marks.includes(m))) out += marker(open.pop()!)

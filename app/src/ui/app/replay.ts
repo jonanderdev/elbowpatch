@@ -9,7 +9,7 @@ import { unsaved } from '../stores/unsaved'
  * entry already stored is dropped. One older than its section's stored copy
  * was overtaken elsewhere: it is not applied, and waits for Save a copy.
  */
-export async function replayJournal(deps: Deps, lock: WriterLock) {
+export async function replayJournal(deps: Deps, lock: WriterLock): Promise<void> {
   for (const u of unsaved.all()) {
     const stored = await deps.store.transaction(async (tx) => ({ working: await tx.working(u.sectionId), piece: await tx.piece(u.pieceId) }))
     const sameText = stored.working?.content === u.markdown

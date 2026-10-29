@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { type Kind } from '../../domain/model'
-import { ordinal, words } from '../../domain/words'
+import { useEffect, useRef, useState, type ReactNode, type ReactElement } from 'react'
+import type { Kind } from '../../domain/model'
+import { ordinal } from '../../domain/words'
 import { Icon, IconButton } from '../components/Icon'
 import { SafariNote } from './Notes'
 
@@ -12,7 +12,7 @@ export const KINDS: { kind: Kind; group: string; word: string }[] = [
 ]
 
 /** Kinds have marks, not drawings: & for a book, today's date for the journal, ¶ for an essay. */
-export function KindMark({ kind, today }: { kind: Kind; today: string }) {
+export function KindMark({ kind, today }: { kind: Kind; today: string }): ReactElement {
   if (kind === 'book') return <span className="mark" aria-hidden="true">&amp;</span>
   if (kind === 'essay') return <span className="mark" aria-hidden="true">¶</span>
   const day = Number(today.slice(8, 10))
@@ -24,7 +24,7 @@ export function KindMark({ kind, today }: { kind: Kind; today: string }) {
   )
 }
 
-export function NewPiece({ today, onNew }: { today: string; onNew(kind: Kind): void }) {
+export function NewPiece({ today, onNew }: { today: string; onNew(kind: Kind): void }): ReactElement {
   const [open, setOpen] = useState(false)
   const bar = useRef<HTMLDivElement>(null)
   const plus = useRef<HTMLButtonElement>(null)
@@ -85,7 +85,7 @@ const OUTLINES: Record<Kind, ReactNode> = {
   ),
 }
 
-export function Empty({ today, onNew, firstRun }: { today: string; onNew(kind: Kind): void; firstRun: boolean }) {
+export function Empty({ today, onNew, firstRun }: { today: string; onNew(kind: Kind): void; firstRun: boolean }): ReactElement {
   const words = { book: 'Start a book', journal: 'Start a journal', essay: 'Start an essay' }
   return (
     <div className="empty-library">

@@ -73,6 +73,7 @@ export function usePager({ screen, viewport, flow, kind, settings, onRelayout }:
 
   // Text settings change the page: lay it out again, on the next frame, once they apply.
   const { size, leading, measure, align, dropcap, indent } = settings
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the settings act through CSS; they are the triggers.
   useEffect(() => {
     const screenEl = screen.current
     if (!pager || !screenEl) return

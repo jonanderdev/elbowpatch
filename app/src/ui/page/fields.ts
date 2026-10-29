@@ -5,7 +5,7 @@
 import type { RefObject } from 'react'
 import type { Piece } from '../../domain/model'
 import { dayTitle } from '../../domain/words'
-import { unsaved } from '../stores/unsaved'
+import { type Unsaved, unsaved } from '../stores/unsaved'
 
 /** A section of a piece, open on the page. */
 export interface Opened {
@@ -42,7 +42,7 @@ export function titleOf(opened: Opened): string {
 }
 
 /** Words kept for this section in the unsaved journal that are newer than what is stored. */
-export function keptFor(opened: Opened) {
+export function keptFor(opened: Opened): Unsaved | undefined {
   const kept = unsaved.get(opened.sectionId)
   return kept && kept.at > (opened.updatedAt ?? 0) ? kept : undefined
 }
@@ -62,7 +62,7 @@ export function fillTitleFields(opened: Opened, fields: TitleFields): string {
  * An empty field holds one <br> and says so in data-empty, which shows its placeholder.
  * Without the <br>, Firefox puts the caret at the line's left edge, not where centred words start.
  */
-export function emptied(el: HTMLElement) {
+export function emptied(el: HTMLElement): void {
   const empty = el.textContent === ''
   if (empty && !(el.childNodes.length === 1 && el.firstChild?.nodeName === 'BR')) el.replaceChildren(document.createElement('br'))
   el.toggleAttribute('data-empty', empty)

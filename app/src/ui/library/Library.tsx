@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { type Kind, type Piece } from '../../domain/model'
+import { useEffect, useRef, useState, type ReactElement } from 'react'
+import type { Kind, Piece } from '../../domain/model'
 import { ExportSheet } from '../components/ExportSheet'
 import { IconButton } from '../components/Icon'
 import { useSettings } from '../stores/settings'
@@ -25,7 +25,7 @@ interface Props {
   onExportEverything(): Promise<string>
 }
 
-export function Library({ pieces, last, today, onOpen, onNew, onRename, onExport, onPutAway, onRestore, onSettings, onExportEverything }: Props) {
+export function Library({ pieces, last, today, onOpen, onNew, onRename, onExport, onPutAway, onRestore, onSettings, onExportEverything }: Props): ReactElement | null {
   const settings = useSettings()
   const headingRef = useRef<HTMLHeadingElement>(null)
   useEffect(() => headingRef.current?.focus(), [])
@@ -41,6 +41,8 @@ export function Library({ pieces, last, today, onOpen, onNew, onRename, onExport
   }, [line])
   // "Put away for 30 days. Undo", for about 6 seconds; ⌘/Ctrl + Z undoes it too while it shows.
   const [awayNow, setAwayNow] = useState<Piece | null>(null)
+  // The undo as it is now, for the key listener below (made once per put-away, not per render).
+  const undoNow = useRef<() => Promise<void>>(async () => {})
   useEffect(() => {
     if (!awayNow) return
     const t = setTimeout(() => setAwayNow(null), 6000)
@@ -50,7 +52,7 @@ export function Library({ pieces, last, today, onOpen, onNew, onRename, onExport
       if (t.closest('input, textarea, [contenteditable]')) return
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
         e.preventDefault()
-        void undoPutAway()
+        void undoNow.current()
       }
     }
     window.addEventListener('keydown', undo)
@@ -79,15 +81,16 @@ export function Library({ pieces, last, today, onOpen, onNew, onRename, onExport
       setAwayNow(piece)
     },
   })
-  const undoPutAway = async () => {
+  const undoPutAway = async (): Promise<void> => {
     if (!awayNow) return
     const piece = awayNow
     setAwayNow(null)
     await onRestore(piece)
   }
+  undoNow.current = undoPutAway
 
   return (
-    <div className="library" role="main">
+    <main className="library">
       <div className="library-inner">
         <div className="library-head">
           <h1 ref={headingRef} tabIndex={-1}>
@@ -113,7 +116,8 @@ export function Library({ pieces, last, today, onOpen, onNew, onRename, onExport
                       <span className="continue-excerpt">{excerpt(last)}</span>
                       <span className="continue-foot">
                         <span className="continue-meta">{continueMeta(last)}</span>
-                        <span className="patch" aria-label={`page ${last.place?.page ?? 1}`}>
+                        <span className="patch">
+                          <span className="visually-hidden">page </span>
                           {last.place?.page ?? 1}
                         </span>
                       </span>
@@ -173,7 +177,7 @@ export function Library({ pieces, last, today, onOpen, onNew, onRename, onExport
           onDone={() => setExporting(null)}
         />
       )}
-    </div>
+    </main>
   )
 }
 

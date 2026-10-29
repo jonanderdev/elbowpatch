@@ -15,6 +15,6 @@ export function pieceAsMarkdown(piece: Piece, sections: OpenSection[]): { name: 
       : sections.flatMap((s) => [`# ${piece.kind === 'journal' ? dayTitle(s.title, true) : s.title.trim() || 'Untitled'}`, s.content])
   return {
     name: `${title.replace(/[\\/:*?"<>|]/g, '').trim() || 'Untitled'}.md`,
-    text: parts.filter((p) => p !== '').join('\n\n') + '\n',
+    text: `${parts.filter((p) => p !== '').join('\n\n')}\n`,
   }
 }

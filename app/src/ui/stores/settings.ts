@@ -46,7 +46,7 @@ export function theme(s: Settings = current): 'paper' | 'night' {
   return s.theme ?? (system.matches ? 'night' : 'paper')
 }
 
-export function apply() {
+export function apply(): void {
   const root = document.documentElement.dataset
   root.theme = theme()
   root.size = current.size
@@ -60,10 +60,10 @@ export function apply() {
   meta.name = 'theme-color'
   meta.content = theme() === 'night' ? '#0e0e0e' : '#f3f3f0'
   document.head.append(meta)
-  listeners.forEach((l) => l())
+  for (const l of listeners) l()
 }
 
-export function update(change: Partial<Settings>) {
+export function update(change: Partial<Settings>): void {
   current = { ...current, ...change }
   try {
     localStorage.setItem(KEY, JSON.stringify(current))
