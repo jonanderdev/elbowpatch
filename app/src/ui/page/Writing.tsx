@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { Editor } from '../page/editor'
-import { Icon, IconButton } from './Icon'
+import type { Editor } from '../../page/editor'
+import { Icon, IconButton } from '../components/Icon'
 
 type Command = Parameters<Editor['run']>[0]
 

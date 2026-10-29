@@ -4,7 +4,7 @@
 
 import type { Piece } from '../../domain/model'
 import { dayTitle } from '../../domain/words'
-import { unsaved } from '../unsaved'
+import { unsaved } from '../stores/unsaved'
 
 /** A section of a piece, open on the page. */
 export interface Opened {

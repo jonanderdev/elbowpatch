@@ -1,7 +1,7 @@
-import { zip } from '../adapters/zip'
-import { exportAll } from '../domain/archive'
-import type { Deps } from '../domain/pieces'
-import { longDate } from '../domain/words'
+import { zip } from '../../adapters/zip'
+import { exportAll } from '../../domain/archive'
+import type { Deps } from '../../domain/pieces'
+import { longDate } from '../../domain/words'
 
 // "Export everything", from Settings or from the library's reminder: one zip,
 // downloaded at once, remembered as the last export on this device.

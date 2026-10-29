@@ -7,7 +7,7 @@ import { debounced, moments } from '../../adapters/schedule'
 import { pieceAsMarkdown } from '../../domain/export'
 import type { Piece, Place } from '../../domain/model'
 import { openPiece, rename, renameSection, savePlace, setSubtitle, takeMoment, write, type Deps } from '../../domain/pieces'
-import { unsaved } from '../unsaved'
+import { unsaved } from '../stores/unsaved'
 
 /** What the page holds now. A title is null when the page has no such field. */
 export interface Held {

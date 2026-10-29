@@ -1,6 +1,6 @@
 import type { RefObject } from 'react'
 import { words as wordsLine } from '../../domain/words'
-import { ToolsBar } from '../Tools'
+import { ToolsBar } from './Tools'
 
 interface PageFootProps {
   page: number

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { type Kind } from '../../domain/model'
 import { ordinal, words } from '../../domain/words'
-import { Icon, IconButton } from '../Icon'
+import { Icon, IconButton } from '../components/Icon'
 import { SafariNote } from './Notes'
 
 /** The three kinds, in the order the library and the new-piece bar show them. */

@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import type { Piece } from '../domain/model'
+import type { Piece } from '../../domain/model'
 
 // Words not stored yet, kept outside the page that holds them (0010): when a
 // save fails, and synchronously when the page hides or unloads, since the

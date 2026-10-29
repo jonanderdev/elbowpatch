@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { type Piece } from '../../domain/model'
-import { IconButton } from '../Icon'
+import { IconButton } from '../components/Icon'
 import { meta } from './text'
 
 /**

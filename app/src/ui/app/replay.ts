@@ -1,7 +1,7 @@
 import type { Piece } from '../../domain/model'
 import { rename, renameSection, setSubtitle, write, type Deps } from '../../domain/pieces'
 import type { WriterLock } from '../../domain/ports'
-import { unsaved } from '../unsaved'
+import { unsaved } from '../stores/unsaved'
 
 /**
  * Words the last session could not store before it closed (see page/saving.ts, journal)

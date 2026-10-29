@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { unzip } from '../adapters/zip'
-import { guessKind, importArchive, importMarkdown } from '../domain/archive'
-import { downloadEverything, lastExport } from './everything'
-import { WordButton } from './WordButton'
-import type { Kind, Piece } from '../domain/model'
-import { restore, type Deps } from '../domain/pieces'
-import { longDate, number, size } from '../domain/words'
+import { unzip } from '../../adapters/zip'
+import { guessKind, importArchive, importMarkdown } from '../../domain/archive'
+import { downloadEverything, lastExport } from '../files/everything'
+import { WordButton } from '../components/WordButton'
+import type { Kind, Piece } from '../../domain/model'
+import { restore, type Deps } from '../../domain/pieces'
+import { longDate, number, size } from '../../domain/words'
 
 // Settings (DESIGN.md, Settings): opened from the library only. The areas
 // here are the ones that work today, Export & import and Put away.

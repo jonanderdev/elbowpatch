@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react'
-import { number } from '../domain/words'
-import { Icon, IconButton } from './Icon'
-import { theme, update, useSettings, type Settings } from './settings'
+import { number } from '../../domain/words'
+import { Icon, IconButton } from '../components/Icon'
+import { theme, update, useSettings, type Settings } from '../stores/settings'
 
 export function ToolsBar(props: { page: number; count: number; words: number; onClose(): void; onTextSettings(): void; onExport(): void }) {
   const settings = useSettings()

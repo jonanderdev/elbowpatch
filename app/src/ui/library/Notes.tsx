@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { type Piece } from '../../domain/model'
 import { number, words } from '../../domain/words'
-import { update } from '../settings'
-import { download } from '../download'
-import { lastExport } from '../everything'
-import { unsaved, useUnsaved } from '../unsaved'
-import { useUpdateWaiting } from '../updates'
+import { update } from '../stores/settings'
+import { download } from '../files/download'
+import { lastExport } from '../files/everything'
+import { unsaved, useUnsaved } from '../stores/unsaved'
+import { useUpdateWaiting } from '../stores/updates'
 
 /** Words a closed page could not store (0010): said here too, since the page that said it is gone. */
 export function UnsavedLine() {
