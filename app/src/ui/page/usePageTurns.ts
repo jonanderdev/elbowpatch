@@ -7,7 +7,8 @@ const MARGIN_CLEAR = 80
 /**
  * Turning pages by hand (DESIGN.md, Behaviour): Page Up / Page Down and Alt + ← / → everywhere, a
  * sideways swipe on a phone, a click in the side margins on desktop, where the pointer becomes an
- * arrow while there is a page to go to. Scrolling turns nothing. Off while the library covers the page.
+ * arrow while there is a page to go to. Scrolling turns nothing (nothing listens to the wheel). Off while
+ * the library covers the page.
  */
 export function usePageTurns(screen: RefObject<HTMLDivElement | null>, session: PageSession | null, covered: boolean) {
   useEffect(() => {
@@ -20,12 +21,6 @@ export function usePageTurns(screen: RefObject<HTMLDivElement | null>, session: 
       else if (e.key === 'PageUp' || (e.altKey && e.key === 'ArrowLeft')) session.turn(-1)
       else return
       e.preventDefault()
-    }
-
-    // Scrolling does not turn pages. A sideways swipe is swallowed, since it is also the browser's
-    // Back; up and down are left alone, for a window smaller than the app's least size (and sheets).
-    const onWheel = (e: WheelEvent) => {
-      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) e.preventDefault()
     }
 
     let touchStart: { x: number; y: number } | undefined
@@ -79,7 +74,6 @@ export function usePageTurns(screen: RefObject<HTMLDivElement | null>, session: 
     }
 
     window.addEventListener('keydown', onKey)
-    el.addEventListener('wheel', onWheel, { passive: false })
     el.addEventListener('touchstart', onTouchStart, { passive: true })
     el.addEventListener('touchend', onTouchEnd)
     el.addEventListener('mousedown', onMouseDown)
@@ -88,7 +82,6 @@ export function usePageTurns(screen: RefObject<HTMLDivElement | null>, session: 
     return () => {
       el.dataset.turn = ''
       window.removeEventListener('keydown', onKey)
-      el.removeEventListener('wheel', onWheel)
       el.removeEventListener('touchstart', onTouchStart)
       el.removeEventListener('touchend', onTouchEnd)
       el.removeEventListener('mousedown', onMouseDown)

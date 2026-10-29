@@ -641,9 +641,7 @@ test('in a window smaller than the smallest phone the page keeps its size, and t
       }),
     )
     .toEqual({ screen: [320, 360], column: 272, scrolls: true })
-  // And the wheel scrolls it. (Playwright's WebKit scrolls nothing under a non-passive wheel
-  // listener, which the page needs to stop a sideways swipe going Back: checked in the others.)
-  if (test.info().project.name.startsWith('webkit')) return
+  // And the wheel scrolls it.
   await page.mouse.move(100, 150)
   await page.mouse.wheel(0, 200)
   await expect.poll(() => page.evaluate(() => document.scrollingElement!.scrollTop)).toBeGreaterThan(0)
