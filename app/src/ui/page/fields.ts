@@ -2,6 +2,7 @@
 // and on a book's or journal's title page its name and subtitle. They are uncontrolled
 // contentEditable elements, filled each time a section opens and read when saving.
 
+import type { RefObject } from 'react'
 import type { Piece } from '../../domain/model'
 import { dayTitle } from '../../domain/words'
 import { unsaved } from '../stores/unsaved'
@@ -15,12 +16,21 @@ export interface Opened {
   updatedAt?: number
   /** Just made: the title takes the caret. */
   fresh?: boolean
+  /** Which reading from storage this is: the page starts over for each. */
+  readAt: number
 }
 
 export interface TitleFields {
   title: HTMLElement | null
   bookTitle: HTMLElement | null
   subtitle: HTMLElement | null
+}
+
+/** The same fields as refs, as the page holds them. */
+export interface TitleRefs {
+  title: RefObject<HTMLHeadingElement | null>
+  bookTitle: RefObject<HTMLHeadingElement | null>
+  subtitle: RefObject<HTMLParagraphElement | null>
 }
 
 /** The section's title as stored: an essay's own, a chapter's, or a journal day's date. */

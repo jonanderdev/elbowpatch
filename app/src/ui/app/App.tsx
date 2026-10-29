@@ -14,6 +14,8 @@ import { Page, type Opened } from '../page/Page'
 import { Settings } from '../settings/Settings'
 
 const LAST = 'elbowpatch.last'
+/** Counts the sections read from storage, so each reading opens a new page. */
+let reads = 0
 /** The least time the launch screen shows, from the page's start, in ms. */
 const MIN_LAUNCH = 1000
 
@@ -45,7 +47,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
         sectionId = placed ? piece.place!.sectionId : piece.sections[0]!.sectionId
       }
       const section = found.sections.find((s) => s.sectionId === sectionId)
-      return { piece, sectionId, content: section?.content ?? '', updatedAt: section?.updatedAt }
+      return { piece, sectionId, content: section?.content ?? '', updatedAt: section?.updatedAt, readAt: ++reads }
     },
     [deps],
   )
@@ -106,7 +108,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
     let piece = newPiece(deps, kind, navigator.language || 'en')
     let sectionId = piece.sections[0]?.sectionId ?? ''
     if (kind === 'journal') ({ piece, sectionId } = withDay(deps, piece, today))
-    setOpened({ piece, sectionId, content: '', fresh: true })
+    setOpened({ piece, sectionId, content: '', fresh: true, readAt: ++reads })
     go(`/p/${piece.id}`)
   }
 
@@ -123,7 +125,8 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }) {
     <>
       {opened && (
         <Page
-          key={`${opened.piece.id}:${opened.sectionId}`}
+          // A new page for each section opened, and again when it is read anew (Write here, a rename).
+          key={`${opened.piece.id}:${opened.sectionId}:${opened.readAt}`}
           deps={deps}
           opened={opened}
           writer={writer}

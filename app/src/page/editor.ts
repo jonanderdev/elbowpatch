@@ -197,3 +197,13 @@ function nightFocus(): Plugin {
     },
   })
 }
+
+/** Where a selection is on screen, for the selection menu; null for a caret, or while not writing. */
+export function selectionBox(view: EditorView): DOMRect | null {
+  const { from, to, empty } = view.state.selection
+  if (empty || !view.hasFocus()) return null
+  const a = view.coordsAtPos(from)
+  const b = view.coordsAtPos(to)
+  const top = Math.min(a.top, b.top)
+  return new DOMRect(Math.min(a.left, b.left), top, Math.abs(b.right - a.left), Math.max(a.bottom, b.bottom) - top)
+}

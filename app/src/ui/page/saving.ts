@@ -1,13 +1,13 @@
 // Saving one open section (docs/decisions/0005, 0010): its words about a second after typing,
 // at most every five; its titles when they changed; a moment when the writer pauses or leaves;
 // and, when a save fails or the page hides, the words not stored yet into the unsaved journal,
-// so nothing is lost. Not React: the page session creates one per section and closes it.
+// so nothing is lost. Plain TypeScript: useSaving makes one per section.
 
-import { debounced, moments } from '../../adapters/schedule'
+import { debounced, moments, type Scheduled } from '../../adapters/schedule'
 import { pieceAsMarkdown } from '../../domain/export'
 import type { Piece, Place } from '../../domain/model'
 import { openPiece, rename, renameSection, savePlace, setSubtitle, takeMoment, write, type Deps } from '../../domain/pieces'
-import { unsaved } from '../stores/unsaved'
+import { type Unsaved, unsaved } from '../stores/unsaved'
 
 /** What the page holds now. A title is null when the page has no such field. */
 export interface Held {
@@ -17,12 +17,19 @@ export interface Held {
   subtitle: string | null
 }
 
+/** What is stored now, so only changes are written. */
+export interface Stored {
+  markdown: string
+  title: string
+  bookTitle: string
+  subtitle: string
+}
+
 export interface SavingOptions {
   deps: Deps
   piece: Piece
   sectionId: string
-  /** What is stored now, so only changes are written. */
-  stored: { markdown: string; title: string; bookTitle: string; subtitle: string }
+  stored: Stored
   read(): Held
   /** Another window writes the piece: nothing is written here, words wait in the journal. */
   readOnly(): boolean
@@ -32,144 +39,139 @@ export interface SavingOptions {
   onFailed(failed: boolean): void
 }
 
-export class Saving {
-  readonly save: ReturnType<typeof debounced>
-  readonly moment: ReturnType<typeof moments>
-  private stored: SavingOptions['stored']
-  private piece: Piece
-  private failed = false
-  private closed = false
-  private retry: ReturnType<typeof setTimeout> | undefined
-
-  constructor(private readonly o: SavingOptions) {
-    this.stored = { ...o.stored }
-    this.piece = o.piece
-    this.save = debounced(() => this.write(), 1000, 5000)
-    this.moment = moments(() => this.keepMoment())
-  }
-
+export interface Saving {
   /** Something changed: save soon, and keep a moment when the writer pauses. */
-  touch() {
-    this.save.touch()
-    this.moment.touch()
-  }
-
+  touch(): void
   /** Leaving, hiding, closing: save now and keep a moment (0005). */
-  async flush() {
-    this.moment.touch()
-    await this.moment.flush()
-  }
-
+  flush(): Promise<void>
   /** "Keep this moment": a moment now, kept for good (0005). False when nothing could be kept. */
-  async keep(): Promise<boolean> {
-    await this.save.flush().catch(() => {})
-    if (this.failed || this.o.readOnly()) return false
-    await takeMoment(this.o.deps, this.o.piece.id, { kept: true })
-    return true
-  }
-
-  /**
-   * The page is hiding or unloading and the database may not finish: put what is not stored yet
-   * in the journal first (synchronous); the next launch writes it (0010).
-   */
-  journal() {
-    if (this.closed || this.o.readOnly()) return
-    const held = this.o.read()
-    if (this.changed(held)) unsaved.keep(this.entry(held))
-  }
-
+  keep(): Promise<boolean>
+  /** The page is hiding or unloading: what is not stored yet goes to the journal first (synchronous). */
+  journal(): void
   /** The page closes: one last save on what it holds now, then nothing more. */
-  close(): Promise<void> {
-    clearTimeout(this.retry)
-    const last = this.flush().finally(() => {
-      this.save.cancel()
-      this.moment.cancel()
-    })
-    this.closed = true
-    return last
-  }
+  close(): Promise<void>
+}
 
-  private changed(h: Held) {
-    const s = this.stored
-    return (
-      h.markdown !== s.markdown ||
-      (h.title !== null && h.title !== s.title) ||
-      (h.bookTitle !== null && h.bookTitle !== s.bookTitle) ||
-      (h.subtitle !== null && h.subtitle !== s.subtitle)
-    )
-  }
+export function createSaving(o: SavingOptions): Saving {
+  const stored: Stored = { ...o.stored }
+  let piece = o.piece
+  let failed = false
+  let closed = false
+  let retry: ReturnType<typeof setTimeout> | undefined
+
+  const changed = (h: Held): boolean =>
+    h.markdown !== stored.markdown ||
+    (h.title !== null && h.title !== stored.title) ||
+    (h.bookTitle !== null && h.bookTitle !== stored.bookTitle) ||
+    (h.subtitle !== null && h.subtitle !== stored.subtitle)
 
   /** What the journal keeps for this section: the words, and a title only when it changed. */
-  private entry(h: Held) {
-    const s = this.stored
-    return {
-      piece: this.piece,
-      pieceId: this.o.piece.id,
-      sectionId: this.o.sectionId,
-      name: pieceAsMarkdown(this.piece, []).name,
-      markdown: h.markdown,
-      title: h.title !== null && h.title !== s.title ? h.title : null,
-      bookTitle: h.bookTitle !== null && h.bookTitle !== s.bookTitle ? h.bookTitle : null,
-      subtitle: h.subtitle !== null && h.subtitle !== s.subtitle ? h.subtitle : null,
-    }
-  }
+  const entry = (h: Held): Omit<Unsaved, 'at'> => ({
+    piece,
+    pieceId: o.piece.id,
+    sectionId: o.sectionId,
+    name: pieceAsMarkdown(piece, []).name,
+    markdown: h.markdown,
+    title: h.title !== null && h.title !== stored.title ? h.title : null,
+    bookTitle: h.bookTitle !== null && h.bookTitle !== stored.bookTitle ? h.bookTitle : null,
+    subtitle: h.subtitle !== null && h.subtitle !== stored.subtitle ? h.subtitle : null,
+  })
 
-  private async write() {
-    const { deps, sectionId } = this.o
+  async function saveWords(): Promise<void> {
+    const { deps, sectionId } = o
     // Read everything before the first await: the page may close while this runs.
     const since = Date.now()
-    const held = this.o.read()
-    if (this.o.readOnly()) {
+    const held = o.read()
+    if (o.readOnly()) {
       // Another window writes this piece now: what was not saved here waits, with Save a copy.
-      if (this.changed(held)) unsaved.keep(this.entry(held), since)
+      if (changed(held)) unsaved.keep(entry(held), since)
       return
     }
     try {
-      await write(deps, this.piece, sectionId, held.markdown)
-      this.stored.markdown = held.markdown
+      await write(deps, piece, sectionId, held.markdown)
+      stored.markdown = held.markdown
       // A journal day's title is its date, never written here (its title is null).
-      if (held.title !== null && held.title !== this.stored.title) {
-        if (this.piece.kind === 'essay') await rename(deps, this.piece, held.title)
-        else await renameSection(deps, this.piece, sectionId, held.title)
-        this.stored.title = held.title
+      if (held.title !== null && held.title !== stored.title) {
+        if (piece.kind === 'essay') await rename(deps, piece, held.title)
+        else await renameSection(deps, piece, sectionId, held.title)
+        stored.title = held.title
       }
-      if (held.bookTitle !== null && held.bookTitle !== this.stored.bookTitle) {
-        await rename(deps, this.piece, held.bookTitle)
-        this.stored.bookTitle = held.bookTitle
+      if (held.bookTitle !== null && held.bookTitle !== stored.bookTitle) {
+        await rename(deps, piece, held.bookTitle)
+        stored.bookTitle = held.bookTitle
       }
-      if (held.subtitle !== null && held.subtitle !== this.stored.subtitle) {
-        await setSubtitle(deps, this.piece, held.subtitle)
-        this.stored.subtitle = held.subtitle
+      if (held.subtitle !== null && held.subtitle !== stored.subtitle) {
+        await setSubtitle(deps, piece, held.subtitle)
+        stored.subtitle = held.subtitle
       }
       // Clears only these words: newer ones kept meanwhile (the page hid) stay.
       unsaved.saved(sectionId, held.markdown, held.title)
-      const stored = await openPiece(deps, this.o.piece.id)
-      if (stored) {
-        this.piece = stored.piece
-        this.o.onStored(stored.piece)
+      const found = await openPiece(deps, o.piece.id)
+      if (found) {
+        piece = found.piece
+        o.onStored(found.piece)
       }
-      if (this.failed) this.o.onFailed((this.failed = false))
+      if (failed) {
+        failed = false
+        o.onFailed(false)
+      }
     } catch (error) {
       // The words stay; say so, and keep trying while this page is open (0010).
       // A closed page hands them on and never writes again.
-      unsaved.keep(this.entry(held), since)
-      if (!this.closed) {
-        this.o.onFailed((this.failed = true))
-        clearTimeout(this.retry)
-        this.retry = setTimeout(() => this.save.touch(), 5000)
+      unsaved.keep(entry(held), since)
+      if (!closed) {
+        failed = true
+        o.onFailed(true)
+        clearTimeout(retry)
+        retry = setTimeout(() => save.touch(), 5000)
       }
       throw error
     }
   }
 
-  private async keepMoment() {
-    const { deps } = this.o
-    await this.save.flush().catch(() => {})
-    if (this.failed || this.o.readOnly()) return
-    await takeMoment(deps, this.o.piece.id).catch(() => {})
-    const place = this.o.place()
-    if (place) await savePlace(deps, this.o.piece.id, place).catch(() => {})
-    const stored = await openPiece(deps, this.o.piece.id).catch(() => undefined)
-    if (stored) this.o.onStored(stored.piece)
+  async function keepMoment(): Promise<void> {
+    await save.flush().catch(() => {})
+    if (failed || o.readOnly()) return
+    await takeMoment(o.deps, o.piece.id).catch(() => {})
+    const place = o.place()
+    if (place) await savePlace(o.deps, o.piece.id, place).catch(() => {})
+    const found = await openPiece(o.deps, o.piece.id).catch(() => undefined)
+    if (found) o.onStored(found.piece)
+  }
+
+  const save: Scheduled = debounced(saveWords, 1000, 5000)
+  const moment: Scheduled = moments(keepMoment)
+
+  const flush = async (): Promise<void> => {
+    moment.touch()
+    await moment.flush()
+  }
+
+  return {
+    touch(): void {
+      save.touch()
+      moment.touch()
+    },
+    flush,
+    async keep(): Promise<boolean> {
+      await save.flush().catch(() => {})
+      if (failed || o.readOnly()) return false
+      await takeMoment(o.deps, o.piece.id, { kept: true })
+      return true
+    },
+    journal(): void {
+      if (closed || o.readOnly()) return
+      const held = o.read()
+      if (changed(held)) unsaved.keep(entry(held))
+    },
+    close(): Promise<void> {
+      clearTimeout(retry)
+      const last = flush().finally(() => {
+        save.cancel()
+        moment.cancel()
+      })
+      closed = true
+      return last
+    },
   }
 }
