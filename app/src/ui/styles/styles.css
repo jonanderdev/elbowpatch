@@ -264,10 +264,11 @@ button {
 /* ——— The page ——— */
 
 /* The smallest screen the page lays out for: the page at its least scale, its text between the head and
-   the foot (PAGES in the pager). The phone's page at 0.75: 64 + 670 × 0.75 + 92 = 658 tall; the desktop's
-   at 0.9: 64 + 686 × 0.9 + 84 = 765. In a window smaller than this the page keeps this size and the window
-   scrolls, rather than shrinking the type past reading size. Only the page: the library and settings fill
-   the window and scroll themselves, so a short window never shows two scrollbars. */
+   the foot (PAGES in the pager). The phone's page, whose text takes the height between them: at least
+   502px of text, 658 tall; the desktop's at 0.9: 64 + 686 × 0.9 + 84 = 765. In a window smaller than this
+   the page keeps this size and the window scrolls, rather than shrinking the page past reading. Only the
+   page: the library and settings fill the window and scroll themselves, so a short window never shows two
+   scrollbars. */
 .page-screen {
   position: absolute;
   inset: 0;
@@ -337,15 +338,23 @@ button {
 .path .home {
   display: inline-flex;
   align-items: center;
+  position: relative;
   height: 44px;
-  /* A 44px tap area round the glyph, which still stands on the text's left edge. */
-  min-width: 44px;
-  padding: 0 14px;
-  margin-left: -14px;
   font-size: 22px;
   font-weight: 300;
   line-height: 1;
   color: var(--title);
+}
+/* A 44px tap area round the glyph, which still stands on the text's left edge: drawn past the
+   button, so the slash after it keeps its own spacing. */
+.path .home::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -14px;
+  right: -14px;
+  min-width: 44px;
 }
 /* § sits low in its box: raised so its ink centres on the line beside it. */
 .path .home span {
@@ -361,6 +370,8 @@ button {
   color: var(--text);
 }
 .path .slash {
+  /* Centred between § and the word, and between two words (DESIGN.md, Control). */
+  margin: 0 8px;
   color: var(--secondary);
 }
 .path .crumb-word {
@@ -1648,10 +1659,13 @@ button {
   }
   .head .path .home {
     height: 36px;
-    min-width: 0;
-    padding: 0 10px;
-    margin-left: -10px;
     font-size: 20px;
+  }
+  .head .path .home::after,
+  .settings-head .path .home::after {
+    left: -10px;
+    right: -10px;
+    min-width: 0;
   }
   .head .path .crumbs {
     display: block;
@@ -1688,9 +1702,6 @@ button {
   }
   .settings-head .path .home {
     height: 36px;
-    min-width: 0;
-    padding: 0 10px;
-    margin-left: -10px;
     font-size: 20px;
   }
   .settings-head .path .crumbs {
@@ -1840,8 +1851,8 @@ button {
     flex-direction: column;
     padding: 13px 20px 24px;
     background: var(--page);
-    /* A hairline you can barely see: the pressed tint at 70% (DESIGN.md, Layout). Decorative only. */
-    border-right: 1px solid color-mix(in srgb, var(--pressed) 70%, var(--page));
+    /* A hairline, the journal's line: the surface line (DESIGN.md, Layout). Decorative only. */
+    border-right: 1px solid var(--surface-line);
   }
   /* The head's line: under it the places start 76px from the top, as the right column does. */
   .rail-top {
@@ -1854,7 +1865,7 @@ button {
   .rail-mark {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     margin: 0;
     font-size: 15px;
     color: var(--text);

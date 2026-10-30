@@ -20,8 +20,9 @@ export function Path({ crumbs = [], onHome, keepFocus }: { crumbs?: Crumb[]; onH
         <span className="crumbs">
           {crumbs.map((c) => (
             <span key={c.word} className="crumb">
+              <wbr />
               <span className="slash" aria-hidden="true">
-                /{' '}
+                /
               </span>
               {c.onClick ? (
                 <button type="button" className="crumb-word" onClick={c.onClick}>

@@ -19,6 +19,12 @@
         var night = s.theme ? s.theme === 'night' : matchMedia('(prefers-color-scheme: dark)').matches
         document.documentElement.dataset.theme = night ? 'night' : 'paper'
       } catch (e) {}
+      // iPhone and iPad zoom in on text under 16px when it takes focus, and the page's type is smaller at a
+      // low screen scale. maximum-scale stops that zoom; Safari still lets a pinch zoom, so only there.
+      if (/iP(hone|od|ad)/.test(navigator.platform) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+        var vp = document.querySelector('meta[name=viewport]')
+        vp.content += ', maximum-scale=1'
+      }
     </script>
     <style>
       html { background: #f3f3f0; }
