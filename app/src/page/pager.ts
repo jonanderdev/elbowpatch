@@ -16,8 +16,8 @@ export interface Geometry {
 }
 
 /**
- * The pages, in their own px (DESIGN.md, Layout): one for phones, tall and narrow, one for larger screens,
- * a paperback page. Each keeps its size on every screen of its kind; the screen only scales it. Side margins:
+ * The pages, in their own px (DESIGN.md, Layout): one for phones, as wide as the screen and as tall as it
+ * allows, one for larger screens, a paperback page that keeps its size and is only scaled. Side margins:
  * normal, with the wide measure, and the journal's left one, which leaves room for its margin rule.
  */
 export const PAGES = {
