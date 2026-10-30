@@ -1,7 +1,7 @@
 import { type Selection, TextSelection, type Transaction } from 'prosemirror-state'
 import type { EditorView } from 'prosemirror-view'
 import { type RefObject, useEffect, useRef } from 'react'
-import { drawnBeforeBreak, type LineMemory, moveLine, PAGED, showCaret, stepIfStuck } from '../../page/caret'
+import { drawnBeforeBreak, followCaret, type LineMemory, moveLine, PAGED, stepIfStuck } from '../../page/caret'
 import type { Editor } from '../../page/editor'
 import type { Pager } from '../../page/pager'
 
@@ -15,7 +15,7 @@ interface CaretMemory {
 }
 
 export interface CaretKeys {
-  /** For the editor's keys: ↑ and ↓ are the page's; ← and → the browser's, with a step where Firefox stops. */
+  /** For the editor's keys: ↑ and ↓ are the page's, with Shift too; ← and → the browser's, with a step where Firefox stops. */
   onKey(view: EditorView, e: KeyboardEvent): boolean
   /** For the editor's selection changes: notes a caret the page placed itself. */
   onSelection(tr: Transaction, selection: Selection): void
@@ -24,7 +24,7 @@ export interface CaretKeys {
 
 /**
  * The editor's arrow keys on paged text (src/page/caret.ts). The browser's own ↑ and ↓ can jump
- * into a column out of view, so the page moves the caret itself; with Shift they stay the browser's.
+ * into a column out of view, so the page moves the caret itself, and with Shift a selection's end.
  */
 export function useCaretKeys(pager: Pager | null, flow: RefObject<HTMLDivElement | null>): CaretKeys {
   const memory = useRef<CaretMemory>({ placed: null, lastMove: 0, lines: { lastHead: -1 } }).current
@@ -41,8 +41,8 @@ export function useCaretKeys(pager: Pager | null, flow: RefObject<HTMLDivElement
         return false
       }
       const { pager: p, flow: f } = now.current
-      if ((e.key !== 'ArrowUp' && e.key !== 'ArrowDown') || !plain || !p || !f.current) return false
-      return moveLine(view, p, f.current, e.key === 'ArrowDown', e.repeat, memory.lines)
+      if ((e.key !== 'ArrowUp' && e.key !== 'ArrowDown') || e.altKey || e.metaKey || e.ctrlKey || !p || !f.current) return false
+      return moveLine(view, p, f.current, e.key === 'ArrowDown', e.repeat, memory.lines, e.shiftKey)
     },
     onSelection(tr: Transaction, selection: Selection): void {
       // A move the page made itself already shows the right page; any other, however soon after, is followed.
@@ -81,7 +81,7 @@ export function useCaretFollowing(
           view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, at + (memory.lastMove > 0 ? 1 : -1))))
           return
         }
-        showCaret(view, pager)
+        followCaret(view, pager, flowEl)
       })
     }
     // A click places the caret like ←.
@@ -89,7 +89,7 @@ export function useCaretFollowing(
       memory.lastMove = -1
     }
     // The browser scrolled the pager by itself to show the caret: settle on the caret's page.
-    pager.onDrift = () => showCaret(editor.view, pager)
+    pager.onDrift = () => followCaret(editor.view, pager, flowEl)
     document.addEventListener('selectionchange', follow)
     mountEl.addEventListener('mousedown', onPointer)
     return () => {

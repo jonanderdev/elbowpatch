@@ -39,9 +39,10 @@ export function usePageTurns({ screen, viewport, bookTitle, editor, pager, cover
      * A page on or back. It takes the caret along, to the end of the text on the new page, where
      * words are added next: always while writing, and on desktop also while reading, so a turn
      * leaves the page ready to type (DESIGN.md, Behaviour). Not taken from the tools or a sheet;
-     * on a phone a swipe does not raise the keyboard, and a tap places it.
+     * on a phone a swipe does not raise the keyboard, and a tap places it. With `extend` (Shift +
+     * Page Up / Down while writing), the selection grows there instead.
      */
-    const turn = (dir: 1 | -1): void => {
+    const turn = (dir: 1 | -1, extend = false): void => {
       now.current.onTurn()
       const from = pager.page
       if (dir > 0) pager.next()
@@ -51,21 +52,24 @@ export function usePageTurns({ screen, viewport, bookTitle, editor, pager, cover
       const view = editor.view
       const writing = view.hasFocus()
       if (!writing && (!matchMedia('(pointer: fine)').matches || document.activeElement?.closest('.sheet, .foot, .head'))) return
+      const anchor = extend && writing ? view.state.selection.anchor : undefined
       // Placed before the text takes focus, so the browser never scrolls to the old caret first.
-      if (caretToEnd(view, viewportEl)) {
+      if (caretToEnd(view, viewportEl, anchor)) {
         if (!writing) view.focus()
         return
       }
       const title = bookTitle.current
-      if (title) {
+      if (title && anchor === undefined) {
         title.focus()
         getSelection()?.collapse(title, title.childNodes.length)
       }
     }
 
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'PageDown' || (e.altKey && e.key === 'ArrowRight')) turn(1)
-      else if (e.key === 'PageUp' || (e.altKey && e.key === 'ArrowLeft')) turn(-1)
+      // Alt + ← / → alone: with Shift, ⌘ or Ctrl too they move or select by word, as the system does.
+      const alt = e.altKey && !e.shiftKey && !e.metaKey && !e.ctrlKey
+      if (e.key === 'PageDown' || (alt && e.key === 'ArrowRight')) turn(1, e.shiftKey)
+      else if (e.key === 'PageUp' || (alt && e.key === 'ArrowLeft')) turn(-1, e.shiftKey)
       else return
       e.preventDefault()
     }

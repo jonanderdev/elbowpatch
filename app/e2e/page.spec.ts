@@ -180,6 +180,67 @@ test('a selection grown back across pages shows where it now ends', async ({ pag
   await onPage(page, '1')
 })
 
+/** The caret to the text's first letter, on page 1 (again until it holds: the typing may still be settling). */
+async function toStart(page: Page) {
+  await expect
+    .poll(async () => {
+      await page.evaluate(() => {
+        const r = document.createRange()
+        r.setStart(document.querySelector('.body p')!.firstChild!, 0)
+        getSelection()!.removeAllRanges()
+        getSelection()!.addRange(r)
+      })
+      return pageNow(page).then(String)
+    })
+    .toBe('1')
+}
+
+test('Alt + Shift + → selects as the system does, and never turns the page', async ({ page }) => {
+  await newEssay(page)
+  await fill(page, 8)
+  await toStart(page)
+  await page.keyboard.press('Alt+Shift+ArrowRight')
+  await page.keyboard.press('Alt+Shift+ArrowRight')
+  await onPage(page, '1')
+  // Alone, it still turns.
+  await page.keyboard.press('Alt+ArrowRight')
+  await onPage(page, '2')
+})
+
+test('Shift + ↓ grows a selection on to the next page, and the page turns once with it', async ({ page }) => {
+  await newEssay(page)
+  await fill(page, 8)
+  await toStart(page)
+  const seen: number[] = []
+  for (let i = 0; i < 80 && !seen.includes(2); i++) {
+    await page.keyboard.press('Shift+ArrowDown')
+    seen.push(await pageNow(page))
+  }
+  expect(seen).toContain(2)
+  for (let i = 0; i < 3; i++) {
+    await page.keyboard.press('Shift+ArrowDown')
+    seen.push(await pageNow(page))
+  }
+  // Never back to page 1 once on page 2, and the selection still starts at the first letter.
+  expect(seen.slice(seen.indexOf(2))).not.toContain(1)
+  expect(await page.evaluate(() => getSelection()!.toString())).toMatch(/^1\. Nobody/)
+})
+
+test('Shift + Page Down grows a selection to the end of the next page', async ({ page }) => {
+  await newEssay(page)
+  await fill(page, 8)
+  await toStart(page)
+  await page.keyboard.press('Shift+PageDown')
+  await onPage(page, '2')
+  const selected = await page.evaluate(() => getSelection()!.toString())
+  expect(selected).toMatch(/^1\. Nobody/)
+  // Plain Page Up drops it, as a turn does.
+  await page.keyboard.press('PageUp')
+  await onPage(page, '1')
+  expect(await page.evaluate(() => getSelection()!.isCollapsed)).toBe(true)
+  expect(selected.length).toBeGreaterThan(PARAGRAPH.length)
+})
+
 test('the caret and the pages move together', async ({ page }) => {
   await newEssay(page)
   await fill(page, 8)

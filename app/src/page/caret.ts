@@ -63,11 +63,33 @@ export function drawnAt(view: EditorView, pos: number): DOMRect | null {
 }
 
 /**
+ * Shows the caret's page, as showCaret does. A selection's moving end that still touches the page
+ * in view keeps it there: where a page breaks mid-line, one position is on both pages, and a
+ * browser paints it on either, so growing a selection would turn back and forth.
+ */
+export function followCaret(view: EditorView, pager: Pager, flow: HTMLElement): void {
+  const { empty, head } = view.state.selection
+  if (!empty && view.hasFocus()) {
+    const start = flow.getBoundingClientRect().left
+    try {
+      if ([-1, 1].some((side) => pageAt(view.coordsAtPos(head, side).left - start, pager.g) === pager.page)) {
+        pager.turnTo(pager.page) // back, if the browser scrolled by itself
+        return
+      }
+    } catch {
+      // not laid out yet
+    }
+  }
+  showCaret(view, pager)
+}
+
+/**
  * The caret to the end of the text on the page in view, where words are added next. False when
  * the page holds no text. Found from the text's own boxes, not by asking what is at a point,
- * which a browser can answer with the title over the whole page.
+ * which a browser can answer with the title over the whole page. With `anchor`, a selection
+ * grows from it to there instead (Shift + Page Up / Down).
  */
-export function caretToEnd(view: EditorView, viewport: HTMLElement): boolean {
+export function caretToEnd(view: EditorView, viewport: HTMLElement, anchor?: number): boolean {
   const r = viewport.getBoundingClientRect()
   const onPage = (b: DOMRect) => b.right > r.left + 1 && b.left < r.right - 1 && b.height > 0
   const range = document.createRange()
@@ -119,7 +141,9 @@ export function caretToEnd(view: EditorView, viewport: HTMLElement): boolean {
   // letter (mostly the space after the last word) is on this page's last line only.
   let at: number = full ?? pos
   if (full === null && at < view.state.doc.resolve(at).end()) at--
-  view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(at), -1)).setMeta(PAGED, true))
+  const $at = view.state.doc.resolve(at)
+  const selection = anchor === undefined ? TextSelection.near($at, -1) : TextSelection.between(view.state.doc.resolve(anchor), $at)
+  view.dispatch(view.state.tr.setSelection(selection).setMeta(PAGED, true))
   return true
 }
 
@@ -131,10 +155,11 @@ export interface LineMemory {
 
 /**
  * ↑ or ↓: the caret to the line above or below, at the same place across, turning the page when
- * that line is on another. At the text's first or last line, to its start or end. False when the
- * caret's line cannot be found, to leave the key to the browser.
+ * that line is on another. At the text's first or last line, to its start or end. With `extend`
+ * (Shift), the selection's moving end goes, and its anchor stays. False when the caret's line
+ * cannot be found, to leave the key to the browser.
  */
-export function moveLine(view: EditorView, pager: Pager, flow: HTMLElement, down: boolean, repeat: boolean, memory: LineMemory): boolean {
+export function moveLine(view: EditorView, pager: Pager, flow: HTMLElement, down: boolean, repeat: boolean, memory: LineMemory, extend = false): boolean {
   const caret = caretRect(view)
   if (!caret) return false
   const head = view.state.selection.head
@@ -147,16 +172,18 @@ export function moveLine(view: EditorView, pager: Pager, flow: HTMLElement, down
   // Keep the place across while moving up and down, as text fields do.
   if (memory.goalX === undefined || !(repeat || memory.lastHead === head)) memory.goalX = caret.left - edge(page)
   const target = lines[at + (down ? 1 : -1)]
+  const anchor = extend ? view.state.selection.anchor : undefined
   if (!target) {
     const doc = view.state.doc
-    view.dispatch(view.state.tr.setSelection(down ? TextSelection.atEnd(doc) : TextSelection.atStart(doc)).setMeta(PAGED, true))
+    const end = down ? TextSelection.atEnd(doc) : TextSelection.atStart(doc)
+    view.dispatch(view.state.tr.setSelection(anchor === undefined ? end : TextSelection.between(doc.resolve(anchor), end.$head)).setMeta(PAGED, true))
     showCaret(view, pager)
   } else {
     // On another page: turn to it first, so the line is on screen to be found.
     if (target.page !== pager.page) pager.turnTo(target.page)
     const x = edge(target.page) + Math.min(Math.max(memory.goalX, target.left + 1), target.right - 1)
     const hit = view.posAtCoords({ left: x, top: (target.top + target.bottom) / 2 })
-    if (hit) placeOn(view, hit.pos, target, edge(target.page), pager)
+    if (hit) placeOn(view, hit.pos, target, edge(target.page), pager, anchor)
   }
   memory.lastHead = view.state.selection.head
   return true
@@ -240,11 +267,11 @@ function linesNear(view: EditorView, pos: number, pager: Pager, flow: HTMLElemen
 }
 
 /**
- * Puts the caret at `pos`, on `line`. Where a line wraps, the same position ends one line and
- * starts the next, and browsers differ in which they draw it on: if it is drawn on the wrong
- * one, it moves a letter at a time onto the line.
+ * Puts the caret at `pos`, on `line`, or a selection's moving end with `anchor`. Where a line wraps,
+ * the same position ends one line and starts the next, and browsers differ in which they draw it
+ * on: if it is drawn on the wrong one, it moves a letter at a time onto the line.
  */
-function placeOn(view: EditorView, pos: number, line: Line, edge: number, pager: Pager) {
+function placeOn(view: EditorView, pos: number, line: Line, edge: number, pager: Pager, anchor?: number) {
   const end = view.state.doc.content.size
   let at = pos
   // Measured before the caret moves, since a caret drawn out of view makes the browser scroll to it.
@@ -266,5 +293,7 @@ function placeOn(view: EditorView, pos: number, line: Line, edge: number, pager:
     const b = view.coordsAtPos(at, 1)
     if (Math.abs(a.left - b.left) > 1 && Math.abs(a.top - b.top) > 1 && Math.abs(a.top - line.top) < Math.abs(b.top - line.top)) at--
   }
-  view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(at))).setMeta(PAGED, true))
+  const $end = view.state.doc.resolve(at)
+  const selection = anchor === undefined ? TextSelection.near($end) : TextSelection.between(view.state.doc.resolve(anchor), $end)
+  view.dispatch(view.state.tr.setSelection(selection).setMeta(PAGED, true))
 }
