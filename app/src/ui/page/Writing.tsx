@@ -82,7 +82,7 @@ export function SelectionMenu({
  */
 export function WritingBar({ editor, active, keyboard }: { editor: Editor; active: ReturnType<Editor['active']>; keyboard: number }): ReactElement {
   return (
-    <div className="bar surface writing-bar" role="toolbar" aria-label="Writing" style={{ bottom: keyboard + 8 }} onMouseDown={(e) => e.preventDefault()}>
+    <div className="bar surface writing-bar" role="toolbar" aria-label="Writing" style={{ bottom: keyboard + 12 }} onMouseDown={(e) => e.preventDefault()}>
       <IconButton icon="undo" label="Undo" onClick={() => editor.run('undo')} />
       <IconButton icon="redo" label="Redo" onClick={() => editor.run('redo')} />
       <span className="bar-separator" />

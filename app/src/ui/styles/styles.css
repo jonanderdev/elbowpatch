@@ -1283,13 +1283,24 @@ button {
   z-index: 4;
 }
 
+/* The writing bar and the page button stand level, 12px above the keyboard. The bar is spaced as on
+   desktop, unless that would not leave the page button room (under 360px wide). */
 .writing-bar {
   position: fixed;
   left: var(--edge);
   z-index: 4;
 }
+@media (min-width: 360px) {
+  .writing-bar {
+    gap: 2px;
+    padding: 0 6px;
+  }
+  .writing-bar .bar-separator {
+    margin: 0 6px;
+  }
+}
 .foot.raised {
-  height: 60px;
+  height: 68px;
 }
 
 /* The piece menu floats just above its piece, which takes the pressed tint. */
