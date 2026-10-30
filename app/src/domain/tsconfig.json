@@ -1,0 +1,10 @@
+{
+  "//": "The domain knows nothing of the browser, the editor or the UI (docs/decisions/0009). No DOM lib, no React, no ambient types: touching window or importing React here does not compile.",
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": []
+  },
+  "include": ["./**/*.ts"],
+  "exclude": ["./**/*.test.ts"]
+}

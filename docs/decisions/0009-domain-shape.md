@@ -9,6 +9,7 @@ The rules of the app (versions, thinning, put away, export) should outlive the w
 - **The product's words are the code's words:** piece, section, version, outline, working copy, moment, put away, bring back, keep a copy. Never `doc`, `note`, `commit` or `branch`.
 - **`domain/` holds the model and the use cases** as plain types and functions: `write`, `takeMoment`, `bringBack`, `keepACopy`, `putAway`, `restore`, `thin`, `exportAll`, `importArchive`. The UI calls these and never touches storage.
 - **A piece is the unit of consistency:** a piece, its outline, its sections and their working copies change together in one transaction. Versions are immutable records that hang off it (0001).
+- **Order comes from the data, not the clock:** a section's newest version is found through `parentId`, and the `Clock` port is only asked for labels (0005).
 - **The outside world comes in through interfaces the domain declares:** `Store` (with `transaction()`), `Clock`, `Ids`, `WriterLock`, and later `Connector`. Adapters implement them; `main.tsx` connects them.
 - **Markdown belongs to the domain:** export, import and word counts need it. `domain/markdown.ts` reads and writes a small tree of blocks and marks; `page/` maps that tree to and from the editor.
 - **Platform details stay out:** timers and "the page was hidden" live in a small moment scheduler in `adapters/` that calls `takeMoment()`. The window lock lives in an adapter. ProseMirror lives only in `page/`.

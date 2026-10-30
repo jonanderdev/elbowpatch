@@ -83,18 +83,21 @@ the chapters with the page each starts on. Reordering chapters by drag and a bin
 - The app automatically takes **snapshots** while the user writes (debounced, plus on pause, on blur, and
   on close). Users never press "save" or "commit".
 - A **timeline** lets the user move back through a piece's history as a story, not a diff list:
-  visually calm, with a scrubber, dates written in plain language ("Tuesday evening", "3 weeks ago").
-  Later, perhaps, a gentle view of what changed (words added and removed shown softly, never a
-  code-style diff); v1 shows the old version only (docs/decisions/0008).
-- Actions in plain language: **Look back**, **Bring this version back** (restores as the current text but
-  never destroys later history), **Keep a copy as a new draft**.
+  visually calm, with a scrubber, dates written in plain language ("Tuesday evening", "14 October").
+  It shows the whole piece at one moment; bringing back acts on one section: a chapter, a day, or an essay. Later, perhaps, a gentle
+  view of what changed (words added and removed shown softly, never a code-style diff); v1 shows the
+  old version only (docs/decisions/0008, DESIGN.md).
+- Actions in plain language: **Look back**, **Bring chapter / day / essay back** (restores that section as
+  the current text but never destroys later history), **Bring part back** (inserts a selected passage,
+  replacing nothing), **Keep a copy** (as a new draft).
 - Alternate versions ("drafts") exist so a writer can try a different ending without fear. Comparing and
   choosing is the primary interaction. Merging two drafts is NOT a v1 goal.
 - History is **append-only** from the user's view. Restoring never deletes anything.
 
 ### 4.4 Sync and backup (optional, provider-based)
-- Local storage works with no account. A gentle, non-nagging first-run message explains that the browser
-  can lose data and offers to connect a backup destination or export.
+- Local storage works with no account. No warning on first launch: the app asks the browser to keep its
+  storage, and after 30 days without a copy one quiet line in the library offers to export, or to connect
+  a place once sync exists. Safari outside the Home Screen, the one real risk, is said once (DESIGN.md).
 - Sync is built behind a **provider interface**, not hard-wired to any service. See Architecture.
 - v1 ships exactly **one** provider: GitHub (the user's own private repo, which the app creates for them).
 - **One place at a time.** Connecting another place replaces the current one after one confirmation; the
@@ -123,12 +126,12 @@ escape hatch and the answer to "what if this app disappears" (docs/decisions/000
 - [ ] Automatic snapshots + the Time Machine (look back, bring back, keep a copy); no changes view yet
 - [ ] One-click export (zip of Markdown with history), one piece as Markdown or PDF, import that never
       overwrites
-- [ ] First-run note about storage safety and backup/export
+- [ ] A quiet export reminder, and Safari's 7-day note (DESIGN.md, The library)
 - [ ] Basic settings: theme, font, size, measure
 
 ### After dogfooding (only once the maintainer has used the MVP for ~2-3 weeks)
 - [ ] Sync provider interface + GitHub provider (OAuth via tiny stateless worker, REST API based)
-- [ ] Optional drafts/branches UX polish
+- [ ] Optional drafts/branches UX polish, including keeping a copy of a whole book as it was
 - [ ] Search across pieces (local, simple)
 - [ ] Collections: group pieces like folders (a series, a project, a year of journals)
 
@@ -170,7 +173,7 @@ escape hatch and the answer to "what if this app disappears" (docs/decisions/000
 
 ### 6.3 Data model (sketch)
 Decided in docs/decisions/0005.
-- `Piece { id, title, createdAt, updatedAt, kind: 'journal' | 'essay' | 'book' }`
+- `Piece { id, title, lang, createdAt, updatedAt, kind: 'journal' | 'essay' | 'book' }`
 - `Section` = a journal day, a book chapter, or the whole of an essay.
 - `Version { id, pieceId, sectionId, parentId, createdAt, content, label? }`: one section's full
   Markdown (its body; titles are not in the text). **Immutable** and append-only; ids are UUIDs.
@@ -178,9 +181,10 @@ Decided in docs/decisions/0005.
   its title and its chapter titles, also immutable. `Piece.title` is a copy of the latest, for the library. The piece at a moment = outline + each section's latest version at
   or before it.
 - `Working { sectionId, content, title?, baseVersionId, updatedAt }`: the one mutable copy of a
-  section's text and title, saved about a second after typing stops; a moment turns it into a
-  version, and a changed title into a new outline version.
-- Snapshot policy: on 3 s idle, blur, switching pieces and "keep this moment", for each changed section.
+  section's text and title, saved about a second after typing stops and at least every 5 s while
+  typing goes on; a moment turns it into a version, and a changed title into a new outline version.
+- Snapshot policy: on 3 s idle at most every 5 minutes; always on blur, switching pieces, closing and
+  "keep this moment"; for each changed section. Order comes from `parentId`, not the clock.
 - Local thinning: every version for the last hour, then one per hour (day), per day (month), per week
   (year), per month (older). Never thinned: latest, first, labeled, and the one before a restore.
 - Reading position is mutable, kept per piece outside the versions; the most recent wins.
@@ -237,7 +241,7 @@ A narrow contract that providers implement, for example:
 ## 8. Licensing and project stance
 
 - Open source from day one, under the **MIT** license: the simplest to understand, and the widest reuse.
-- Provided as-is, no warranty. Say so in the README and on the first-run screen.
+- Provided as-is, no warranty. Say so in the README and in About & privacy.
 - The maintainer hosts a main instance on a best-effort basis. Self-hosting must always be a real option.
 - Donations (GitHub Sponsors / Ko-fi) are optional and never shown inside the writing view.
 - The repo should not talk about pricing or subscriptions.
@@ -280,6 +284,7 @@ Success = the maintainer uses it every day. An audience is a bonus.
 - [x] Fonts, dependencies, state and URLs (0011)
 - [x] License: MIT
 - [x] How the Time Machine appears: from the tools bar or a shortcut, full screen (0008)
+- [x] The Time Machine screen: the whole piece at one moment, a tape of moments, bring back a chapter, a day or a part (0008, DESIGN.md)
 - [x] What one version holds: one section, with an outline for structure (0005)
 - [x] Thinning: by age, local only (0005)
 - [x] Journal: one piece, a page per day

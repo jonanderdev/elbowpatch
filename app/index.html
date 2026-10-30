@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f3f3f0" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0e0e0e" media="(prefers-color-scheme: dark)" />
+    <meta name="description" content="A quiet place to write, with a memory." />
+    <title>Elbowpatch</title>
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Elbowpatch" />
+    <script>
+      // Before the first paint: the theme and text settings, so night never flashes paper.
+      try {
+        var s = JSON.parse(localStorage.getItem('elbowpatch.settings') || '{}')
+        var night = s.theme ? s.theme === 'night' : matchMedia('(prefers-color-scheme: dark)').matches
+        document.documentElement.dataset.theme = night ? 'night' : 'paper'
+      } catch (e) {}
+    </script>
+    <style>
+      html { background: #f3f3f0; }
+      html[data-theme='night'] { background: #0e0e0e; }
+      .launch { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; padding-bottom: 48px; background: inherit; }
+      .launch-mark { width: 54.656px; height: 97.44px; background: #1f1f1f; -webkit-mask: url(launch-mark.svg) center / contain no-repeat; mask: url(launch-mark.svg) center / contain no-repeat; }
+      [data-theme='night'] .launch-mark { background: #e6e6e3; }
+      @media (min-width: 700px) { .launch-mark { width: 70.272px; height: 125.28px; } }
+    </style>
+  </head>
+  <body>
+    <div class="launch" id="launch" role="status" aria-label="Opening Elbowpatch"><div class="launch-mark"></div></div>
+    <div id="app"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -12,6 +12,8 @@ A journal is one piece with a page per day, and a book is one piece made of chap
 - A version holds the full Markdown of **one section**, and is immutable (0001).
 - A piece also has immutable **outline** versions: the ordered list of its sections and their titles. A new outline version is written when a section is added, split (typing `#` mid-chapter), removed or renamed.
 - The piece at any moment = the outline at that moment + each section's latest version at or before it.
+- *Updated 2026-10-27:* a section's newest version is found by following `parentId` from its first version, not by time. `createdAt` is never earlier than the previous version's (now, or the previous plus 1 ms, whichever is later). Device clocks jump; timestamps label moments, they do not order them.
+- *Updated 2026-10-28:* each version and outline also carries `seq`, its parent's plus one. Thinning removes versions from the middle of a chain, which leaves a `parentId` pointing at nothing; `seq` keeps the order without asking the clock.
 
 ### Titles
 *Updated 2026-10-27.*
@@ -22,12 +24,12 @@ A journal is one piece with a page per day, and a book is one piece made of chap
 
 ### The working copy
 *Updated 2026-10-27.*
-- Each section has one mutable **working copy**: `{ sectionId, content, title?, baseVersionId, updatedAt }`. It is written about a second after typing stops, in the text or in a chapter's title, so a crash loses about a second at most.
+- Each section has one mutable **working copy**: `{ sectionId, content, title?, baseVersionId, updatedAt }`. It is written about a second after typing stops, and at least every 5 seconds while typing goes on, in the text or in a chapter's title, so a crash loses a few seconds at most.
 - A snapshot moment turns working copies into versions in the same transaction, and writes one new outline version if any title changed.
 - On launch, a working copy that differs from its base version becomes a version first. This is how text left by a crash enters history.
 
 ### When versions are written
-- A snapshot moment comes on 3 seconds idle, on blur or the page hidden, on switching pieces, and on "keep this moment". At each moment, every section whose text changed since its last version gets a new version, all with the same timestamp. A section that did not change gets nothing.
+- A snapshot moment comes on 3 seconds idle, but at most once every 5 minutes while writing; and always on blur or the page hidden, on switching pieces, on closing, and on "keep this moment". *Updated 2026-10-27:* it was every 3-second pause, which kept far more history than anyone travels back through; the working copy, saved about a second after typing stops, is what protects against a crash, so fewer moments lose nothing. Anything finer than 5 minutes is undo's job (0003), which is on the writing bar on a phone. At each moment, every section whose text changed since its last version gets a new version, all with the same timestamp. A section that did not change gets nothing.
 
 ### Thinning (local only)
 Each section's local history gets sparser with age, keeping the last version in each period:
@@ -45,5 +47,6 @@ Never removed: the latest version of each section, its first version, versions m
 ## Consequences
 - Storage stays bounded: an active section holds at most about 200 versions, and a finished day or chapter very few.
 - "Bring this back" can restore one day or one chapter, not a whole year.
+- Thinning works per section, so after a while the whole piece "at a moment" is each section as it was at or before that moment, which may never have been one exact moment. The section on screen in the Time Machine is always exact: the tape steps through its own versions.
 - Thinning is the one place the app deletes history. It lives in `domain/` and carries the heaviest tests.
 - With a connector that keeps history, the far past also lives there (0004).
