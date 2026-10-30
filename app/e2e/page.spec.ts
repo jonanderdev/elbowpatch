@@ -344,15 +344,29 @@ test('on desktop a turn always leaves the caret ready to type, even while readin
     await page.keyboard.press(key)
     await expect(page.locator('.page-button')).toHaveText(String(before + (key === 'PageDown' ? 1 : -1)))
     await expect(page.locator('.body')).toBeFocused()
-    // A letter typed at once lands on the page shown.
+    // A letter typed at once lands on the page shown, which stays: a full last line must not
+    // wrap it on to the next page. Measured from the letter, not the caret, which Firefox gives
+    // no box in an empty paragraph.
     await page.keyboard.type('Q')
+    await expect(page.locator('.page-button')).toHaveText(String(before + (key === 'PageDown' ? 1 : -1)))
     const shown = await page.evaluate(() => {
-      const rects = getSelection()!.getRangeAt(0).getClientRects()
-      const r = rects[rects.length - 1]
+      const s = getSelection()!
+      const range = document.createRange()
+      // The letter before the caret: in its text node, or the last letter of the node before it.
+      let t: Node | undefined = s.focusNode!
+      let at = s.focusOffset
+      if (t.nodeType !== 3) {
+        t = t.childNodes[at - 1]
+        at = t?.textContent?.length ?? 0
+      }
+      if (t?.nodeType !== 3 || at < 1 || t.textContent![at - 1] !== 'Q') return 'no Q before the caret'
+      range.setStart(t, at - 1)
+      range.setEnd(t, at)
+      const r = range.getBoundingClientRect()
       const col = document.querySelector('.pager')!.getBoundingClientRect()
-      return !!r && r.left >= col.left - 2 && r.left <= col.right + 8
+      return r.left >= col.left - 2 && r.right <= col.right + 2 ? 'shown' : `at ${Math.round(r.left)} of ${Math.round(col.left)}-${Math.round(col.right)}`
     })
-    expect(shown).toBe(true)
+    expect(shown).toBe('shown')
     await page.keyboard.press('Backspace')
   }
 })
@@ -385,9 +399,26 @@ test("← and → across a page break never leave the caret where it is painted 
   await expect(page.locator('.page-button')).toHaveText('1')
   await page.keyboard.press('PageDown')
   await page.keyboard.press('PageUp') // the end of page 1's text
-  for (const key of ['ArrowRight', 'ArrowRight', 'ArrowRight', 'ArrowLeft', 'ArrowLeft', 'ArrowLeft', 'ArrowLeft']) {
-    await page.keyboard.press(key)
-    await expect.poll(atBadBreak, { message: `after ${key}` }).toBe(false)
+  // The page the letter before the caret is on, counted from the text's first.
+  const letterPage = () =>
+    page.evaluate(() => {
+      const s = getSelection()!
+      const r = document.createRange()
+      r.setStart(s.focusNode!, Math.max(s.focusOffset - 1, 0))
+      r.setEnd(s.focusNode!, s.focusOffset)
+      return Math.floor((r.getBoundingClientRect().left - document.querySelector('.flow')!.getBoundingClientRect().left + 40) / innerWidth)
+    })
+  const start = await letterPage()
+  // That end may be a word back, where the last line is full: enough steps to cross either way.
+  for (const [key, steps, to] of [
+    ['ArrowRight', 12, start + 1],
+    ['ArrowLeft', 14, start],
+  ] as const) {
+    for (let i = 0; i < steps; i++) {
+      await page.keyboard.press(key)
+      await expect.poll(atBadBreak, { message: `after ${key}` }).toBe(false)
+    }
+    expect(await letterPage(), `${key} crosses the break`).toBe(to)
   }
 })
 
