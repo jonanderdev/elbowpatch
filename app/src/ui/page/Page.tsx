@@ -319,8 +319,8 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
         </div>
       </div>
 
-      {editor && !readOnly && writing && keyboard > 0 && selection ? <WritingBar editor={editor} active={selection.active} keyboard={keyboard} /> : null}
-      {editor && !readOnly && keyboard === 0 && selection?.rect ? (
+      {editor && !readOnly && writing && keyboard !== null && selection ? <WritingBar editor={editor} active={selection.active} keyboard={keyboard} /> : null}
+      {editor && !readOnly && keyboard === null && selection?.rect ? (
         <SelectionMenu editor={editor} rect={selection.rect} active={selection.active} onKeep={() => void keepMoment()} />
       ) : null}
 
