@@ -124,7 +124,17 @@ export function usePageTurns({ screen, viewport, bookTitle, editor, pager, cover
       onMouseMove(e)
     }
 
+    // A tap below the text (under its last line, or on a short page) is not on anything editable:
+    // the caret goes to the end of the text on this page, as a turn takes it, and on a phone the
+    // keyboard comes up, since the focus is inside the tap.
+    const onPagerClick = (e: MouseEvent): void => {
+      if (now.current.readOnly || (e.target as HTMLElement).closest('[contenteditable]') || !getSelection()?.isCollapsed) return
+      const view = editor.view
+      if (caretToEnd(view, viewportEl)) view.focus()
+    }
+
     window.addEventListener('keydown', onKey)
+    viewportEl.addEventListener('click', onPagerClick)
     el.addEventListener('touchstart', onTouchStart, { passive: true })
     el.addEventListener('touchend', onTouchEnd)
     el.addEventListener('mousedown', onMouseDown)
@@ -133,6 +143,7 @@ export function usePageTurns({ screen, viewport, bookTitle, editor, pager, cover
     return () => {
       el.dataset.turn = ''
       window.removeEventListener('keydown', onKey)
+      viewportEl.removeEventListener('click', onPagerClick)
       el.removeEventListener('touchstart', onTouchStart)
       el.removeEventListener('touchend', onTouchEnd)
       el.removeEventListener('mousedown', onMouseDown)

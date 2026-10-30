@@ -799,12 +799,16 @@ button {
   }
 }
 
+/* Held at the sheet's foot while a short screen scrolls the sheet, so Done is always in reach. */
 .sheet-foot {
+  position: sticky;
+  bottom: 0;
   display: flex;
   justify-content: flex-end;
-  padding-top: 12px;
-  margin-top: 4px;
+  padding: 12px 20px 16px;
+  margin: 4px -20px -16px;
   border-top: 1px solid var(--surface-line);
+  background: var(--surface);
 }
 
 /* ——— The library ——— */
@@ -1306,6 +1310,12 @@ button {
 /* The piece menu floats just above its piece, which takes the pressed tint. */
 .piece {
   position: relative;
+}
+/* A long press opens the piece menu, never the system's text selection. */
+.piece > button {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 .row.pressed {
   background: var(--pressed);

@@ -3,6 +3,26 @@ import type { Editor } from '../../page/editor'
 import type { Opened, TitleRefs } from './fields'
 import type { Saving } from './saving'
 
+/**
+ * iOS raises the keyboard only for a focus inside the tap itself, and a new piece's title is focused
+ * later, once its page is laid out. Called from the tap that starts it, a stand-in field takes the
+ * focus and the keyboard, and hands both on when the title takes the focus. Touch screens only.
+ */
+export function raiseKeyboard(): void {
+  if (!matchMedia('(pointer: coarse)').matches) return
+  const stand = document.createElement('input')
+  stand.setAttribute('aria-hidden', 'true')
+  stand.tabIndex = -1
+  // 16px, so iOS does not zoom to it.
+  stand.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;font-size:16px;border:0;padding:0'
+  document.body.append(stand)
+  const done = (): void => stand.remove()
+  stand.addEventListener('blur', done, { once: true })
+  stand.focus()
+  // Nothing took the focus on (a page opened read only): the keyboard goes down again.
+  setTimeout(() => stand.blur(), 1500)
+}
+
 interface Options {
   opened: Opened
   editor: Editor | null
