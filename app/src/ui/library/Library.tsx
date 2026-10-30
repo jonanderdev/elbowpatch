@@ -3,11 +3,14 @@ import type { Kind, Piece } from '../../domain/model'
 import { screenOf } from '../../page/pager'
 import { ExportSheet } from '../components/ExportSheet'
 import { IconButton } from '../components/Icon'
+import { ThemeButton } from '../components/ThemeButton'
+import { useGoneUnder, useScrolled } from '../components/useScrolled'
 import { update, useSettings } from '../stores/settings'
 import { Colophon } from './Colophon'
-import { Empty, KINDS, NewPiece } from './NewPiece'
+import { Empty, EmptyKind, KINDS, NewPiece } from './NewPiece'
 import { ExportReminder, SafariNote, UnsavedLine, UpdateLine } from './Notes'
 import { PieceRow } from './PieceRow'
+import { type Place, Rail } from './Rail'
 import { continueMeta, excerpt, meta, shelfMeta } from './text'
 
 interface Props {
@@ -23,6 +26,9 @@ interface Props {
   onPutAway(piece: Piece): Promise<void>
   onRestore(piece: Piece): Promise<void>
   onSettings(): void
+  /** How many pieces are put away, and the way to them. */
+  away: number
+  onPutAwayPlace(): void
   /** Downloads everything as one zip; gives its file name. */
   onExportEverything(): Promise<string>
 }
@@ -38,13 +44,25 @@ export function Library({
   onPutAway,
   onRestore,
   onSettings,
+  away,
+  onPutAwayPlace,
   onExportEverything,
 }: Props): ReactElement | null {
   const settings = useSettings()
   const headingRef = useRef<HTMLHeadingElement>(null)
+  const scroller = useRef<HTMLElement>(null)
+  // On a phone the head stays as the list scrolls; once the big title has gone, "§ Library" shows small in it.
+  const scrolled = useScrolled(scroller)
+  const titleGone = useGoneUnder(headingRef, scroller, 54)
   useEffect(() => headingRef.current?.focus(), [])
   const empty = pieces.length === 0
   const onShelf = settings.libraryView === 'shelf'
+  // On desktop the rail opens one kind's pieces alone; on a phone it is always the whole library.
+  const [place, setPlace] = useState<Place>('all')
+  const counts: Record<Place, number> = { all: pieces.length, book: 0, journal: 0, essay: 0 }
+  for (const p of pieces) counts[p.kind]++
+  const kinds = place === 'all' ? KINDS : KINDS.filter((k) => k.kind === place)
+  const showContinue = last && place === 'all'
   const now = Date.now()
   // A book's pages are those of this screen's page: a phone and a desktop count them apart (DESIGN.md, Layout).
   const screen = screenOf(document.documentElement.clientWidth)
@@ -107,33 +125,48 @@ export function Library({
   undoNow.current = undoPutAway
 
   return (
-    <main className="library">
+    <main ref={scroller} className="library">
+      {/* One head on every screen (DESIGN.md, Layout): the screen's actions at the head's right. */}
+      <div className="library-top head-line" data-scrolled={scrolled || undefined}>
+        <p className="library-path" aria-hidden="true" hidden={!titleGone}>
+          <span className="home">§</span> Library
+        </p>
+        <div className="library-actions">
+          {/* The switch shows the view it leads to; an empty library has none. */}
+          {!empty && (
+            <IconButton
+              icon={onShelf ? 'viewList' : 'viewShelf'}
+              label={onShelf ? 'Show as a list' : 'Show as a shelf'}
+              quiet
+              onClick={() => update({ libraryView: onShelf ? 'list' : 'shelf' })}
+            />
+          )}
+          <ThemeButton />
+          {/* On desktop Settings is at the rail's foot. */}
+          <span className="phone-only">
+            <IconButton icon="settings" label="Settings" quiet onClick={onSettings} />
+          </span>
+        </div>
+      </div>
+      <Rail place={place} counts={counts} away={away} today={today} onPlace={setPlace} onNew={onNew} onPutAway={onPutAwayPlace} onSettings={onSettings} />
       <div className="library-inner">
+        {/* On a phone, "§ Library" set like a piece title; on desktop the rail says where you are. */}
         <div className="library-head">
           <h1 ref={headingRef} tabIndex={-1}>
+            <span aria-hidden="true">§ </span>
             Library
           </h1>
-          <div className="library-actions">
-            {/* The switch shows the view it leads to; an empty library has none. */}
-            {!empty && (
-              <IconButton
-                icon={onShelf ? 'viewList' : 'viewShelf'}
-                label={onShelf ? 'Show as a list' : 'Show as a shelf'}
-                quiet
-                onClick={() => update({ libraryView: onShelf ? 'list' : 'shelf' })}
-              />
-            )}
-            <IconButton icon="settings" label="Settings" quiet onClick={onSettings} />
-          </div>
         </div>
 
         {empty ? (
           <Empty today={today} onNew={onNew} firstRun={!settings.firstRunDone} />
+        ) : place !== 'all' && counts[place] === 0 ? (
+          <EmptyKind kind={place} today={today} onNew={onNew} />
         ) : (
           <>
-            {last && (
-              <>
-                <div className="continue-heading">Where you left off</div>
+            <div className="library-list">
+              {showContinue && <div className="continue-heading">Where you left off</div>}
+              {showContinue && (
                 <PieceRow
                   {...handlers(last, 'continue')}
                   card={
@@ -149,30 +182,30 @@ export function Library({
                     </>
                   }
                 />
-              </>
-            )}
-            {KINDS.map(({ kind, group }) => {
-              // The piece in Continue stays in its group too: every piece is where its kind is.
-              const rows = pieces.filter((p) => p.kind === kind)
-              if (rows.length === 0) return null
-              return (
-                <section className="group" key={kind} aria-labelledby={`group-${kind}`}>
-                  <h2 className="group-heading" id={`group-${kind}`}>
-                    {group}
-                  </h2>
-                  {/* On a phone the shelf scrolls sideways: the piece menu floats over this box, not inside it. */}
-                  <div className={onShelf ? 'shelf-row' : undefined}>
-                    <ul className={onShelf ? 'shelf' : 'rows'}>
-                      {rows.map((piece) => (
-                        <PieceRow key={piece.id} {...handlers(piece, 'row')} onShelf={onShelf} />
-                      ))}
-                    </ul>
-                  </div>
-                </section>
-              )
-            })}
-            {!settings.firstRunDone && <SafariNote atFoot />}
-            <ExportReminder pieces={pieces} onExport={onExportEverything} onDone={setLine} />
+              )}
+              {kinds.map(({ kind, group }) => {
+                // The piece in Continue stays in its group too: every piece is where its kind is.
+                const rows = pieces.filter((p) => p.kind === kind)
+                if (rows.length === 0) return null
+                return (
+                  <section className="group" key={kind} aria-labelledby={`group-${kind}`}>
+                    <h2 className="group-heading" id={`group-${kind}`}>
+                      {group}
+                    </h2>
+                    {/* On a phone the shelf scrolls sideways: the piece menu floats over this box, not inside it. */}
+                    <div className={onShelf ? 'shelf-row' : undefined}>
+                      <ul className={onShelf ? 'shelf' : 'rows'}>
+                        {rows.map((piece) => (
+                          <PieceRow key={piece.id} {...handlers(piece, 'row')} onShelf={onShelf} />
+                        ))}
+                      </ul>
+                    </div>
+                  </section>
+                )
+              })}
+              {!settings.firstRunDone && <SafariNote atFoot />}
+              <ExportReminder pieces={pieces} onExport={onExportEverything} onDone={setLine} />
+            </div>
             <Colophon />
           </>
         )}

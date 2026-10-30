@@ -71,7 +71,7 @@ user-owned data + runs everywhere**. Beauty and feel are the product. Code is th
   turn to it (docs/decisions/0003).
 - Markdown-based, but gentle: render nicely while typing, never intimidating. Only Markdown is stored.
 - Zero chrome while writing. On a phone, controls appear on a tap and leave when dismissed; on desktop,
-  a quiet rail and head stay while you read and fade while you type (DESIGN.md).
+  a quiet rail and head stay, reading and writing alike (DESIGN.md).
 
 ### 4.2 Pieces
 The unit of writing is a **piece** (a document). A **journal** is one piece where each day starts on a

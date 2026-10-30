@@ -1,11 +1,12 @@
 import { type ReactElement, type ReactNode, useEffect, useRef, useState } from 'react'
 import type { Kind } from '../../domain/model'
 import { ordinal } from '../../domain/words'
-import { Icon, IconButton } from '../components/Icon'
+import { IconButton } from '../components/Icon'
+import { WordButton } from '../components/WordButton'
 import { FootLinks } from './Colophon'
 import { SafariNote } from './Notes'
 
-/** The three kinds, in the order the library and the new-piece bar show them. */
+/** The three kinds, in the order the library and the Write bar show them. */
 export const KINDS: { kind: Kind; group: string; word: string }[] = [
   { kind: 'book', group: 'Books', word: 'Book' },
   { kind: 'journal', group: 'Journal', word: 'Journal' },
@@ -35,21 +36,25 @@ export function KindMark({ kind, today }: { kind: Kind; today: string }): ReactE
   )
 }
 
+/**
+ * Write, on a phone (DESIGN.md, The library): a raised word at the bottom right, in the page button's
+ * place. Tapped, it opens into a bar: Book, Journal, Essay, then close.
+ */
 export function NewPiece({ today, onNew }: { today: string; onNew(kind: Kind): void }): ReactElement {
   const [open, setOpen] = useState(false)
   const bar = useRef<HTMLDivElement>(null)
-  const plus = useRef<HTMLButtonElement>(null)
+  const write = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     if (open) bar.current?.querySelector('button')?.focus()
   }, [open])
   const close = () => {
     setOpen(false)
-    requestAnimationFrame(() => plus.current?.focus())
+    requestAnimationFrame(() => write.current?.focus())
   }
   return (
     <div className="foot library-foot">
       {open ? (
-        <div ref={bar} className="bar surface new-piece-bar" role="toolbar" aria-label="New piece" onKeyDown={(e) => e.key === 'Escape' && close()}>
+        <div ref={bar} className="bar surface new-piece-bar" role="toolbar" aria-label="Write" onKeyDown={(e) => e.key === 'Escape' && close()}>
           {KINDS.map(({ kind, word }) => (
             <button key={kind} type="button" className="menu-item" onClick={() => onNew(kind)}>
               <KindMark kind={kind} today={today} />
@@ -60,9 +65,51 @@ export function NewPiece({ today, onNew }: { today: string; onNew(kind: Kind): v
           <IconButton icon="close" label="Close" onClick={close} />
         </div>
       ) : (
-        <button ref={plus} type="button" className="page-button surface" aria-label="New piece" onClick={() => setOpen(true)}>
-          <Icon name="add" />
+        <button ref={write} type="button" className="write surface" onClick={() => setOpen(true)}>
+          Write
         </button>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Write, on desktop: a word button at the right of the rail's top line. Pressed, it keeps the pressed tint
+ * and drops a small menu under itself: Book, Journal, Essay. Escape or a click elsewhere closes it.
+ */
+export function WriteMenu({ today, onNew }: { today: string; onNew(kind: Kind): void }): ReactElement {
+  const [open, setOpen] = useState(false)
+  const box = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    box.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus()
+    const away = (e: Event): void => {
+      if (!box.current?.contains(e.target as Node)) setOpen(false)
+    }
+    const esc = (e: KeyboardEvent): void => {
+      if (e.key !== 'Escape') return
+      setOpen(false)
+      box.current?.querySelector<HTMLElement>('.word-button')?.focus()
+    }
+    document.addEventListener('pointerdown', away)
+    window.addEventListener('keydown', esc)
+    return () => {
+      document.removeEventListener('pointerdown', away)
+      window.removeEventListener('keydown', esc)
+    }
+  }, [open])
+  return (
+    <div ref={box} className="write-menu-anchor">
+      <WordButton word="Write" expanded={open} onClick={() => setOpen((o) => !o)} />
+      {open && (
+        <div className="write-menu surface" role="menu" aria-label="Write">
+          {KINDS.map(({ kind, word }) => (
+            <button key={kind} type="button" role="menuitem" className="menu-item" onClick={() => onNew(kind)}>
+              <KindMark kind={kind} today={today} />
+              {word}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   )
@@ -96,8 +143,22 @@ const OUTLINES: Record<Kind, ReactNode> = {
   ),
 }
 
+const STARTS: Record<Kind, string> = { book: 'Start a book', journal: 'Start a journal', essay: 'Start an essay' }
+
+/** A start object: the kind's shelf shape, dashed, with its words inside. The dashed shape is the button. */
+export function Start({ kind, today, onNew }: { kind: Kind; today: string; onNew(kind: Kind): void }): ReactElement {
+  return (
+    <button type="button" className={`start ${kind}`} onClick={() => onNew(kind)}>
+      <svg className="start-outline" viewBox="0 0 100 140" width="100" height="140" aria-hidden="true">
+        {OUTLINES[kind]}
+      </svg>
+      {STARTS[kind]}
+      <KindMark kind={kind} today={today} />
+    </button>
+  )
+}
+
 export function Empty({ today, onNew, firstRun }: { today: string; onNew(kind: Kind): void; firstRun: boolean }): ReactElement {
-  const words = { book: 'Start a book', journal: 'Start a journal', essay: 'Start an essay' }
   return (
     <div className="empty-library">
       <div className="empty-mark" aria-hidden="true">
@@ -105,19 +166,30 @@ export function Empty({ today, onNew, firstRun }: { today: string; onNew(kind: K
       </div>
       <p className="empty-line">Begin anywhere.</p>
       <div className="starts">
-        {(['book', 'journal', 'essay'] as const).map((kind) => (
-          <button key={kind} type="button" className={`start ${kind}`} onClick={() => onNew(kind)}>
-            <svg className="start-outline" viewBox="0 0 100 140" width="100" height="140" aria-hidden="true">
-              {OUTLINES[kind]}
-            </svg>
-            {words[kind]}
-            <KindMark kind={kind} today={today} />
-          </button>
+        {KINDS.map(({ kind }) => (
+          <Start key={kind} kind={kind} today={today} onNew={onNew} />
         ))}
       </div>
       {firstRun && <SafariNote />}
-      {/* The large § is the mark here: the links stand alone, on the +'s row. */}
+      {/* The large § is the mark here: the links stand alone at the foot, on Write's row on a phone. */}
       <FootLinks atFoot />
+    </div>
+  )
+}
+
+const NONE: Record<Kind, string> = { book: 'No books yet.', journal: 'No journal yet.', essay: 'No essays yet.' }
+
+/** A place in the rail with nothing in it: the kind's mark large, one line, and its one start object. */
+export function EmptyKind({ kind, today, onNew }: { kind: Kind; today: string; onNew(kind: Kind): void }): ReactElement {
+  return (
+    <div className="empty-library empty-kind">
+      <div className="empty-mark" aria-hidden="true">
+        <KindMark kind={kind} today={today} />
+      </div>
+      <p className="empty-line">{NONE[kind]}</p>
+      <div className="starts">
+        <Start kind={kind} today={today} onNew={onNew} />
+      </div>
     </div>
   )
 }

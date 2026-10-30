@@ -1,6 +1,7 @@
-import { type ReactElement, type ReactNode, useEffect, useRef } from 'react'
+import { type CSSProperties, type ReactElement, type ReactNode, useEffect, useRef } from 'react'
 import { number } from '../../domain/words'
 import { Icon, IconButton } from '../components/Icon'
+import { ThemeButton } from '../components/ThemeButton'
 import { type Settings, theme, update, useSettings } from '../stores/settings'
 
 export function ToolsBar(props: { page: number; count: number; words: number; onClose(): void; onTextSettings(): void; onExport(): void }): ReactElement {
@@ -32,6 +33,50 @@ export function ToolsBar(props: { page: number; count: number; words: number; on
       <IconButton icon={night ? 'sun' : 'moon'} label={night ? 'Paper' : 'Night'} onClick={() => update({ theme: night ? 'paper' : 'night' })} />
       <span className="bar-separator" />
       <IconButton icon="close" label="Close tools" onClick={props.onClose} />
+    </div>
+  )
+}
+
+/**
+ * The tools in the desktop head (DESIGN.md, Layout): the count, then the icon buttons, unraised and
+ * resting in secondary grey. The one whose sheet is open keeps the pressed tint.
+ */
+export function HeadTools(props: {
+  page: number
+  count: number
+  words: number
+  sheet: 'text' | 'export' | null
+  onTextSettings(from: HTMLElement): void
+  onExport(from: HTMLElement): void
+}): ReactElement {
+  return (
+    <div className="head-tools" role="toolbar" aria-label="Tools">
+      <span className="count">
+        <span aria-hidden="true">{`${props.page} of ${props.count}  ·  ${number(props.words)} words`}</span>
+        <span className="visually-hidden">{`Page ${props.page} of ${props.count}, ${number(props.words)} words`}</span>
+      </span>
+      <span className="bar-separator" />
+      <button
+        type="button"
+        className="icon-button quiet"
+        aria-label="Export"
+        aria-pressed={props.sheet === 'export'}
+        onClick={(e) => props.onExport(e.currentTarget)}
+      >
+        <Icon name="export" />
+      </button>
+      <button
+        type="button"
+        className="icon-button quiet"
+        aria-label="Text settings"
+        aria-pressed={props.sheet === 'text'}
+        onClick={(e) => props.onTextSettings(e.currentTarget)}
+      >
+        <span className="aa" aria-hidden="true">
+          Aa
+        </span>
+      </button>
+      <ThemeButton />
     </div>
   )
 }
@@ -98,13 +143,13 @@ function Toggle(props: { label: string; setting: 'dropcap' | 'indent' }) {
 }
 
 /** Text settings: a sheet over the page, applied live (DESIGN.md, Control). */
-export function TextSettings(props: { onDone(): void }): ReactElement {
+export function TextSettings(props: { onDone(): void; style?: CSSProperties }): ReactElement {
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
     ;(ref.current?.querySelector('[aria-checked="true"]') as HTMLElement | null)?.focus()
   }, [])
   return (
-    <div ref={ref} className="sheet surface" role="dialog" aria-label="Text settings">
+    <div ref={ref} className="sheet surface" role="dialog" aria-label="Text settings" style={props.style}>
       <Segments
         legend="Text size"
         setting="size"

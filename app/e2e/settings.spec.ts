@@ -1,19 +1,18 @@
 import { expect, type Page, test } from '@playwright/test'
-import { saved } from './helpers'
+import { openTools, saved, write } from './helpers'
 
 async function essay(page: Page, title: string, text: string) {
   await page.goto('./#/')
   if (await page.locator('.start.essay').count()) await page.locator('.start.essay').click()
   else {
-    await page.getByRole('button', { name: 'New piece' }).click()
-    await page.getByRole('toolbar', { name: 'New piece' }).getByRole('button', { name: 'Essay' }).click()
+    await write(page, 'Essay')
   }
   await expect(page.locator('.title')).toBeFocused()
   await page.keyboard.type(title)
   await page.keyboard.press('Enter')
   await page.keyboard.type(text)
   await saved(page, text)
-  await page.locator('.head .word-button').click()
+  await page.locator('.head .home').click()
   await expect(page.locator('.continue')).toContainText(text)
 }
 
@@ -24,8 +23,8 @@ test('export everything, and bring it all back in another browser', async ({ pag
   await page.keyboard.press('End')
   await page.keyboard.type(' More words.')
   await saved(page, 'More words.')
-  await page.locator('.head .word-button').click()
-  await page.getByRole('button', { name: 'Settings' }).click()
+  await page.locator('.head .home').click()
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
   await page.getByRole('button', { name: /Export & import/ }).click()
   const download = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Export' }).click()
@@ -64,14 +63,14 @@ test('put away, undo; put away, bring back from Settings', async ({ page }) => {
   await row.click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Put away' }).click()
   await expect(row).toHaveCount(0)
-  await page.getByRole('button', { name: 'Settings' }).click()
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
   await expect(page.getByRole('button', { name: /Put away 1 piece · the next goes in 30 days/ })).toBeVisible()
   await page.getByRole('button', { name: /Put away/ }).click()
   await expect(page.getByText('Essay · put away')).toBeVisible()
   await page.getByRole('button', { name: 'Bring back' }).click()
   await expect(page.getByText('Brought back to the library.')).toBeVisible()
   await expect(page.getByText('Nothing is put away.')).toBeVisible()
-  await page.getByRole('button', { name: 'Settings' }).click()
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
   await page.getByRole('button', { name: 'Library' }).click()
   await page.locator('.row', { hasText: 'Going away' }).click()
   await expect(page.locator('.body')).toContainText('Still here.')
@@ -98,7 +97,7 @@ test('a put-away piece cannot be reopened with the Back button', async ({ page }
   await essay(page, 'Here', 'Other.')
   await page.locator('.row', { hasText: 'Gone for now' }).click()
   await expect(page.locator('.title')).toHaveText('Gone for now')
-  await page.locator('.head .word-button').click()
+  await page.locator('.head .home').click()
   await page
     .locator('.continue')
     .click({ button: 'right' })
@@ -106,7 +105,7 @@ test('a put-away piece cannot be reopened with the Back button', async ({ page }
   await page.keyboard.press('Escape')
   // "Gone for now" is in Continue now; open "Here" and come back so it is a row.
   await page.locator('.row', { hasText: 'Here' }).click()
-  await page.locator('.head .word-button').click()
+  await page.locator('.head .home').click()
   await page.locator('.row', { hasText: 'Gone for now' }).click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Put away' }).click()
   await page.goBack()
@@ -134,20 +133,31 @@ test('the only piece can be put away from Continue', async ({ page }) => {
   await expect(page.locator('.continue')).toContainText('Renamed alone')
 })
 
-test('the + and the page button are circles, and text settings sit above the tools', async ({ page }) => {
+test('the page button is a circle; text settings sit above the tools bar, or under their control on desktop', async ({ page }) => {
   await page.goto('./')
-  const plus = await page.getByRole('button', { name: 'New piece' }).boundingBox()
-  expect(Math.round(plus!.width)).toBe(Math.round(plus!.height))
   await page.locator('.start.essay').click()
   await expect(page.locator('.title')).toBeFocused()
   await page.keyboard.type('Shapes')
-  const button = await page.locator('.page-button').boundingBox()
-  expect(Math.round(button!.width)).toBe(Math.round(button!.height))
-  await page.locator('.page-button').click()
+  await openTools(page)
   await page.getByRole('button', { name: 'Text settings' }).click()
-  const sheet = await page.getByRole('dialog', { name: 'Text settings' }).boundingBox()
-  const bar = await page.getByRole('toolbar', { name: 'Tools' }).boundingBox()
-  expect(sheet!.y + sheet!.height).toBeLessThanOrEqual(bar!.y)
+  const sheet = (await page.getByRole('dialog', { name: 'Text settings' }).boundingBox())!
+  if (page.viewportSize()!.width < 700) {
+    const bar = (await page.getByRole('toolbar', { name: 'Tools' }).boundingBox())!
+    expect(sheet.y + sheet.height).toBeLessThanOrEqual(bar.y)
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Escape')
+    const button = (await page.locator('.page-button').boundingBox())!
+    expect(Math.round(button.width)).toBe(Math.round(button.height))
+    return
+  }
+  const control = page.getByRole('button', { name: 'Text settings' })
+  const c = (await control.boundingBox())!
+  expect(sheet.y).toBeGreaterThanOrEqual(c.y + c.height)
+  expect(Math.round(sheet.x + sheet.width)).toBe(Math.round(c.x + c.width))
+  await expect(control).toHaveAttribute('aria-pressed', 'true')
+  await page.keyboard.press('Escape')
+  await expect(control).toBeFocused()
+  await expect(control).toHaveAttribute('aria-pressed', 'false')
 })
 
 test('no storage warning; a quiet export reminder after 30 days without a copy', async ({ page }) => {

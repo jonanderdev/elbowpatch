@@ -9,6 +9,7 @@ import { download } from '../files/download'
 import { downloadEverything } from '../files/everything'
 import { Library } from '../library/Library'
 import { type Opened, Page } from '../page/Page'
+import { waiting } from '../settings/PutAway'
 import { type Area, Settings } from '../settings/Settings'
 import { readLast, writeLast } from '../stores/last'
 import { askToPersist } from './persist'
@@ -201,6 +202,8 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
             }
           }}
           onSettings={() => go('/settings')}
+          away={waiting(everything).length}
+          onPutAwayPlace={() => go('/settings/put-away')}
           onExportEverything={async () => {
             await flushPage.current?.()
             return downloadEverything(deps)

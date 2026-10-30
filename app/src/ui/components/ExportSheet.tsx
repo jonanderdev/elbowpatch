@@ -1,11 +1,11 @@
-import { type ReactElement, useEffect, useRef } from 'react'
+import { type CSSProperties, type ReactElement, useEffect, useRef } from 'react'
 
 // shortcut: Markdown only. The PDF row waits for the print stylesheet, which DESIGN.md (Gaps) says to try in Safari and Chrome first.
-export function ExportSheet(props: { title: string; onMarkdown(): void; onDone(): void }): ReactElement {
+export function ExportSheet(props: { title: string; onMarkdown(): void; onDone(): void; style?: CSSProperties }): ReactElement {
   const first = useRef<HTMLButtonElement>(null)
   useEffect(() => first.current?.focus(), [])
   return (
-    <div className="sheet surface" role="dialog" aria-label="Export">
+    <div className="sheet surface" role="dialog" aria-label="Export" style={props.style}>
       <div className="sheet-title">
         <span>Export</span>
         <span className="sheet-aside">{props.title}</span>
