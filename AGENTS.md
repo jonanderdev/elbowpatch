@@ -46,3 +46,17 @@ Check `git diff --cached` against this list before committing. Mention it only i
 # Versions and releases
 
 Versions and releases follow `docs/decisions/0012-versioning-and-releases.md`. Change `SCHEMA_VERSION` or `FORMAT_VERSION` only with a migration and its test. Bump the app version or push a release tag only when asked. Write PR titles for someone who uses the app, since they become the release notes.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in this repo's GitHub Issues, handled with the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five default labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single context: one `GLOSSARY.md` at the root, and decision records in `docs/decisions/`. See `docs/agents/domain.md`.
