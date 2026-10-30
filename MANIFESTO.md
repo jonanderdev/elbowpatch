@@ -1,10 +1,11 @@
 # Why Elbowpatch
 
-We live among subscriptions and assistants. Every tool wants a monthly fee, and more and more of them offer to do the creative part for you: write the paragraph, finish the thought, polish the voice until it is no longer yours.
+We now live among subscriptions and assistants. Every tool wants a monthly fee, and more and more of them offer to do the creative part for you: write the paragraph, finish the thought, polish the voice until it is no longer yours.
 
 Elbowpatch goes the other way.
 
-It is a quiet room for doing that part yourself. No one finishes your sentences. Nothing hurries you, measures you or asks you to upgrade. You sit down, the page is there, and the words that end up on it are the ones you found. That slow, uncertain, sometimes difficult work is not a problem to be automated. It is the point.
+It is a quiet room for doing that part yourself. No one finishes your sentences. Nothing hurries you, measures you or asks you to upgrade.  
+You sit down, the page is there, and the words that end up on it are the ones you found. That slow, uncertain, sometimes difficult work is not a problem to be automated. It is the point.
 
 ## What we believe
 
@@ -22,7 +23,9 @@ It is a quiet room for doing that part yourself. No one finishes your sentences.
 
 ## Free, open, and staying that way
 
-Elbowpatch is free, and it always will be. There is no subscription, no paid tier and no feature held back for money. It is open source under the MIT License, and it is a static site anyone can host, so it can never be taken away: if this project ever stopped, your writing and the tool would both still be yours.
+Elbowpatch is free, and it always will be.  
+There is no subscription, no paid tier and no feature held back for money.  
+It is open source under the MIT License, and it is a static site anyone can host, so it can never be taken away: if this project ever stopped, your writing and the tool would both still be yours.
 
 It will keep growing, carefully. A feature belongs only if it makes the page quieter, the history more trustworthy, or your writing more your own.
 
