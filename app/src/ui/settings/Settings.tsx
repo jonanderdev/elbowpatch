@@ -11,7 +11,11 @@ import { goesIn, PutAway, waiting } from './PutAway'
 // here are the ones that work today, Export & import and Put away.
 // shortcut: Writing, Appearance, Time Machine, Backup & sync and About & privacy arrive as they are built.
 
-export type Area = 'list' | 'export' | 'put-away'
+// Help and About open from the library's colophon, so they go back to the library.
+// shortcut: Help and About are empty until their words are written (DESIGN.md, Gaps).
+export type Area = 'list' | 'export' | 'put-away' | 'help' | 'about'
+
+const TITLES: Record<Area, string> = { list: 'Settings', export: 'Export & import', 'put-away': 'Put away', help: 'Help', about: 'About' }
 
 interface Props {
   deps: Deps
@@ -29,15 +33,15 @@ export function Settings(props: Props): ReactElement {
   // Each area opens with the focus on its heading, for screen readers and the keyboard.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the area is the trigger, not read inside.
   useEffect(() => heading.current?.focus(), [props.area])
-  const title = props.area === 'export' ? 'Export & import' : props.area === 'put-away' ? 'Put away' : 'Settings'
+  const toLibrary = props.area === 'list' || props.area === 'help' || props.area === 'about'
   return (
     <main className="settings">
       <div className="settings-head">
-        <WordButton word={props.area === 'list' ? 'Library' : 'Settings'} onClick={() => props.go(props.area === 'list' ? '/' : '/settings')} />
+        <WordButton word={toLibrary ? 'Library' : 'Settings'} onClick={() => props.go(toLibrary ? '/' : '/settings')} />
       </div>
       <div className="settings-inner">
         <h1 ref={heading} tabIndex={-1} className="settings-title">
-          {title}
+          {TITLES[props.area]}
         </h1>
         {props.area === 'list' && <List pieces={props.pieces} go={props.go} />}
         {props.area === 'export' && <ExportImport deps={props.deps} beforeExport={props.beforeExport} onChanged={props.onChanged} />}

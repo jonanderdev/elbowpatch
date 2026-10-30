@@ -2,6 +2,7 @@ import { type ReactElement, type ReactNode, useEffect, useRef, useState } from '
 import type { Kind } from '../../domain/model'
 import { ordinal } from '../../domain/words'
 import { Icon, IconButton } from '../components/Icon'
+import { FootLinks } from './Colophon'
 import { SafariNote } from './Notes'
 
 /** The three kinds, in the order the library and the new-piece bar show them. */
@@ -115,6 +116,8 @@ export function Empty({ today, onNew, firstRun }: { today: string; onNew(kind: K
         ))}
       </div>
       {firstRun && <SafariNote />}
+      {/* The large § is the mark here: the links stand alone, on the +'s row. */}
+      <FootLinks atFoot />
     </div>
   )
 }
