@@ -42,3 +42,7 @@ This repo is public and open source (MIT). Everything committed is published.
 - Other people's images, fonts or text go in only when their licence allows it, with credit.
 
 Check `git diff --cached` against this list before committing. Mention it only if something is wrong.
+
+# Versions and releases
+
+Versions and releases follow `docs/decisions/0012-versioning-and-releases.md`. Change `SCHEMA_VERSION` or `FORMAT_VERSION` only with a migration and its test. Bump the app version or push a release tag only when asked. Write PR titles for someone who uses the app, since they become the release notes.
