@@ -1,19 +1,21 @@
-import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react'
-import type { Kind, Piece } from '../../domain/model'
+import { type ReactElement, useCallback, useEffect, useRef, useState } from 'react'
 import { pieceAsMarkdown } from '../../domain/export'
-import { forgetPutAway, thin } from '../../domain/thinning'
-import { library, newPiece, openPiece, putAway, recover, rename, restore, withDay, type Deps } from '../../domain/pieces'
+import type { Kind, Piece } from '../../domain/model'
+import { type Deps, library, newPiece, openPiece, putAway, recover, rename, restore, withDay } from '../../domain/pieces'
 import type { WriterLock } from '../../domain/ports'
+import { forgetPutAway, thin } from '../../domain/thinning'
+import { isoDay } from '../../domain/words'
+import { download } from '../files/download'
+import { downloadEverything } from '../files/everything'
+import { Library } from '../library/Library'
+import { type Opened, Page } from '../page/Page'
+import { Settings } from '../settings/Settings'
+import { readLast, writeLast } from '../stores/last'
+import { askToPersist } from './persist'
 import { replayJournal } from './replay'
 import { useRoute } from './useRoute'
 import { useWriterLock } from './useWriterLock'
-import { Library } from '../library/Library'
-import { download } from '../files/download'
-import { downloadEverything } from '../files/everything'
-import { Page, type Opened } from '../page/Page'
-import { Settings } from '../settings/Settings'
 
-const LAST = 'elbowpatch.last'
 /** Counts the sections read from storage, so each reading opens a new page. */
 let reads = 0
 /** The least time the launch screen shows, from the page's start, in ms. */
@@ -76,7 +78,12 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
       document.getElementById('launch')?.setAttribute('hidden', '')
       // Thinning and the end of put-away pieces' 30 days run afterwards, when idle (0010).
       const idle = window.requestIdleCallback ?? ((f: () => void) => setTimeout(f, 3000))
-      idle(() => void forgetPutAway(deps).then(() => thin(deps)).catch(() => {}))
+      idle(
+        () =>
+          void forgetPutAway(deps)
+            .then(() => thin(deps))
+            .catch(() => {}),
+      )
     })()
   }, [])
 
@@ -115,7 +122,6 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
   }
 
   if (!ready) return null
-  // shortcut: Save a copy here holds the unsaved section only, not the whole piece.
   const inSettings = route.startsWith('/settings')
   // The library stays over the page until the piece asked for is the one open: never a frame
   // of the piece open before it.
@@ -215,44 +221,15 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
           onOpen={(piece) => {
             // The piece behind the library is already laid out: Continue is instant.
             if (opened?.piece.id === piece.id) go(`/p/${piece.id}`)
-            else void open(piece.id).then((next) => {
-              if (!next) return
-              setOpened(next)
-              go(`/p/${piece.id}`)
-            })
+            else
+              void open(piece.id).then((next) => {
+                if (!next) return
+                setOpened(next)
+                go(`/p/${piece.id}`)
+              })
           }}
         />
       )}
     </>
   )
-}
-
-export function isoDay(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-}
-
-function readLast(): string | undefined {
-  try {
-    return localStorage.getItem(LAST) || undefined
-  } catch {
-    return undefined
-  }
-}
-
-function writeLast(id: string) {
-  try {
-    localStorage.setItem(LAST, id)
-  } catch {}
-}
-
-/**
- * Asks the browser to keep this site's storage, once there is something to keep.
- * Not at launch: some browsers ask the writer, and a first visit is no time for it (0010).
- */
-let asked = false
-function askToPersist() {
-  if (asked) return
-  asked = true
-  void navigator.storage?.persist?.().catch(() => {})
 }

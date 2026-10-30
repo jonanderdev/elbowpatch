@@ -1,5 +1,5 @@
-import { type ReactElement, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { TextSelection } from 'prosemirror-state'
+import { type ReactElement, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { countWords } from '../../domain/markdown'
 import type { Piece } from '../../domain/model'
 import type { Deps } from '../../domain/pieces'
@@ -78,7 +78,11 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
   const flow = useRef<HTMLDivElement>(null)
   const mount = useRef<HTMLDivElement>(null)
   const pageButton = useRef<HTMLButtonElement>(null)
-  const titles: TitleRefs = { title: useRef<HTMLHeadingElement>(null), bookTitle: useRef<HTMLHeadingElement>(null), subtitle: useRef<HTMLParagraphElement>(null) }
+  const titles: TitleRefs = {
+    title: useRef<HTMLHeadingElement>(null),
+    bookTitle: useRef<HTMLHeadingElement>(null),
+    subtitle: useRef<HTMLParagraphElement>(null),
+  }
   // The editor, for what runs outside a render (a save, a relayout).
   const editorNow = useRef<Editor | null>(null)
   /** The writer typed, clicked into the text or turned a page since the last moment: their place is kept. */
@@ -104,7 +108,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
   const { saving, failed } = useSaving({
     deps,
     opened,
-    editor: editorNow.current,
+    editor: () => editorNow.current,
     titles,
     readOnly,
     place: () => {
@@ -201,7 +205,6 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     const t = setTimeout(() => setLine(null), 4000)
     return () => clearTimeout(t)
   }, [line])
-
 
   async function exportMarkdown(): Promise<string | undefined> {
     if (!editor) return undefined
@@ -303,6 +306,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
         />
       ) : null}
 
+      {/* shortcut: Save a copy holds the unsaved section only, not the whole piece. */}
       <StatusLine writer={writer} failed={failed} line={line} onWriteHere={onWriteHere} onSaveCopy={() => void exportMarkdown()} />
 
       <div className="visually-hidden" aria-live="polite">

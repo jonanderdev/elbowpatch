@@ -2,13 +2,14 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { Piece, Place } from '../../domain/model'
 import type { Deps } from '../../domain/pieces'
 import type { Editor } from '../../page/editor'
-import { keptFor, titleOf, type Opened, type TitleRefs } from './fields'
+import { keptFor, type Opened, type TitleRefs, titleOf } from './fields'
 import { createSaving, type Held, type Saving } from './saving'
 
 interface Options {
   deps: Deps
   opened: Opened
-  editor: Editor | null
+  /** The editor as it is when a save runs. */
+  editor(): Editor | null
   titles: TitleRefs
   readOnly: boolean
   /** The writer's place, when they moved since the last moment. */
@@ -25,7 +26,10 @@ interface Options {
  * hiding or closing the window, the words not stored yet go to the journal first. Declare it
  * before useEditor: its last save, as the page closes, reads the editor's text.
  */
-export function useSaving({ deps, opened, editor, titles, readOnly, place, onStored, flushRef, closingRef }: Options): { saving: Saving | null; failed: boolean } {
+export function useSaving({ deps, opened, editor, titles, readOnly, place, onStored, flushRef, closingRef }: Options): {
+  saving: Saving | null
+  failed: boolean
+} {
   const [saving, setSaving] = useState<Saving | null>(null)
   const [failed, setFailed] = useState(false)
   // Read when a save runs, long after this render.
@@ -39,7 +43,7 @@ export function useSaving({ deps, opened, editor, titles, readOnly, place, onSto
     const read = (): Held => {
       const f = now.current.titles
       return {
-        markdown: now.current.editor?.markdown() ?? opened.content,
+        markdown: now.current.editor()?.markdown() ?? opened.content,
         // A journal day's title is its date: never read back from the page.
         title: piece.kind === 'journal' ? null : (f.title.current?.textContent ?? null),
         bookTitle: f.bookTitle.current ? (f.bookTitle.current.textContent ?? '') : null,

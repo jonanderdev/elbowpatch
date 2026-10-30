@@ -45,3 +45,9 @@ export function ordinal(day: number): string {
   if (tens >= 11 && tens <= 13) return 'th'
   return ['th', 'st', 'nd', 'rd'][day % 10] ?? 'th'
 }
+
+/** "2026-10-30": a day in the writer's own time zone, as a journal's sections are titled. */
+export function isoDay(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}

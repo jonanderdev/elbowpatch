@@ -6,7 +6,7 @@
 import { debounced, moments, type Scheduled } from '../../adapters/schedule'
 import { pieceAsMarkdown } from '../../domain/export'
 import type { Piece, Place } from '../../domain/model'
-import { openPiece, rename, renameSection, savePlace, setSubtitle, takeMoment, write, type Deps } from '../../domain/pieces'
+import { type Deps, openPiece, rename, renameSection, savePlace, setSubtitle, takeMoment, write } from '../../domain/pieces'
 import { type Unsaved, unsaved } from '../stores/unsaved'
 
 /** What the page holds now. A title is null when the page has no such field. */
@@ -156,8 +156,10 @@ export function createSaving(o: SavingOptions): Saving {
     async keep(): Promise<boolean> {
       await save.flush().catch(() => {})
       if (failed || o.readOnly()) return false
-      await takeMoment(o.deps, o.piece.id, { kept: true })
-      return true
+      return takeMoment(o.deps, o.piece.id, { kept: true }).then(
+        () => true,
+        () => false,
+      )
     },
     journal(): void {
       if (closed || o.readOnly()) return
