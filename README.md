@@ -32,7 +32,7 @@ Not ready for writing you cannot afford to lose yet.
 
 ## Trying it
 
-You need [Node.js](https://nodejs.org) (version 24 is what we test on). The app lives in [`app/`](app/).
+You need [Node.js](https://nodejs.org) (version 24 or newer, as set in `app/package.json`). The app lives in [`app/`](app/).
 
 **Run it on your computer:**
 
