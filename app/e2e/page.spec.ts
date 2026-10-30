@@ -166,6 +166,17 @@ test('formatting from the selection menu, without Markdown', async ({ page, isMo
   await expect(page.locator('.body blockquote.pull strong em, .body blockquote.pull em strong')).toHaveCount(1)
 })
 
+test('a selection grown back across pages shows where it now ends', async ({ page }) => {
+  await newEssay(page)
+  await fill(page, 8)
+  await page.keyboard.type('The end.')
+  expect(Number(await page.locator('.page-button').textContent())).toBeGreaterThan(1)
+  // Selected to the start: the page turns to it, so nothing selected is out of sight behind the page in view.
+  await page.keyboard.press('ControlOrMeta+Shift+ArrowUp')
+  expect(await page.evaluate(() => getSelection()!.toString())).toContain('1. Nobody')
+  await expect(page.locator('.page-button')).toHaveText('1')
+})
+
 test('the caret and the pages move together', async ({ page }) => {
   await newEssay(page)
   await fill(page, 8)

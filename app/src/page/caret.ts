@@ -14,15 +14,16 @@ import { type Line, linesOf, type Pager, pageAt } from './pager'
 export const PAGED = 'elbowpatch-paged'
 
 /**
- * Where the caret is drawn. At a soft line break the same position is the end of one line and the
- * start of the next; the browser's own caret says which.
+ * Where the caret is drawn: for a selection, its moving end, so the page shows all it grows to. At a
+ * soft line break the same position is the end of one line and the start of the next; the browser's
+ * own caret says which.
  */
 export function caretRect(view: EditorView): DOMRect | null {
   if (view.hasFocus()) {
     const selection = view.dom.ownerDocument.getSelection()
     if (selection?.rangeCount) {
       const range = selection.getRangeAt(0).cloneRange()
-      range.collapse(selection.focusNode === range.endContainer && selection.focusOffset === range.endOffset)
+      range.collapse(selection.focusNode !== range.endContainer || selection.focusOffset !== range.endOffset)
       const rects = range.getClientRects()
       const r = rects[rects.length - 1] ?? range.getBoundingClientRect()
       if (r && (r.width || r.height)) return r
