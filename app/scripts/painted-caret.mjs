@@ -124,7 +124,14 @@ async function run(engine) {
           r = { left: b.right, top: b.top }
         } else r = (n.nodeType === 1 ? n : n.parentElement).getBoundingClientRect()
       }
-      return { x: Math.round(r.left), y: Math.round(r.top), page: document.querySelector('.page-button')?.getAttribute('aria-label')?.match(/^Page (\d+)/)?.[1] }
+      return {
+        x: Math.round(r.left),
+        y: Math.round(r.top),
+        page: document
+          .querySelector('.page-button')
+          ?.getAttribute('aria-label')
+          ?.match(/^Page (\d+)/)?.[1],
+      }
     })
 
   let checks = 0
@@ -137,7 +144,10 @@ async function run(engine) {
       // Write: a bar on a phone, a menu from the rail on desktop.
       const word = kind === 'book' ? 'Book' : 'Essay'
       await page.getByRole('button', { name: 'Write' }).click()
-      await page.getByRole('button', { name: word, exact: true }).or(page.getByRole('menuitem', { name: word, exact: true })).click()
+      await page
+        .getByRole('button', { name: word, exact: true })
+        .or(page.getByRole('menuitem', { name: word, exact: true }))
+        .click()
     }
     await page.waitForTimeout(400)
     if (kind === 'book') {
