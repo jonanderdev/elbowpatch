@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { type Block, countWords, parse, serialize } from './markdown'
+import { type Block, countWords, INKS, type Mark, parse, type Span, serialize } from './markdown'
 
 const roundTrip = (md: string) => serialize(parse(md))
 
@@ -45,6 +45,8 @@ describe('markdown', () => {
     '<b>html</b>',
     '> quote\nnot quoted',
     '  indented text',
+    // A highlight in another order than the writer's.
+    '**==bold outside==**',
   ])('gives back the same text: %j', (md) => {
     expect(roundTrip(md)).toBe(md)
   })
@@ -82,6 +84,98 @@ describe('markdown', () => {
       },
     ]
     expect(parse(serialize(blocks))).toEqual(blocks)
+  })
+
+  it('reads highlights and their inks', () => {
+    expect(parse('A ==marked== word and ==another=={.iris}.')).toEqual([
+      {
+        type: 'paragraph',
+        spans: [
+          { text: 'A ', marks: [] },
+          { text: 'marked', marks: [], ink: 'amber' },
+          { text: ' word and ', marks: [] },
+          { text: 'another', marks: [], ink: 'iris' },
+          { text: '.', marks: [] },
+        ],
+      },
+    ])
+  })
+
+  it.each([
+    '==amber==',
+    '==iris=={.iris} and ==sky=={.sky}',
+    '==**bold highlight**==',
+    '==amber=={.amber}==iris=={.iris}',
+    '==highlight with **bold** and *italic*==',
+    '*a ==b== c*',
+    '==a *b*==*c*',
+    '> A quote with ==a highlight=={.sage}.',
+    // Written before highlights, or not a highlight: kept as text.
+    'a = b',
+    'a == b',
+    'x==y',
+    'a==b == c',
+    '== spaced ==',
+    '=== three ===',
+    'an ==unknown=={.teal} ink',
+    'a {.iris} brace',
+    'a < b',
+  ])('gives back the same text, as a paragraph: %j', (md) => {
+    expect(roundTrip(md)).toBe(md)
+    expect(parse(md)[0]?.type).not.toBe('raw')
+  })
+
+  it('escapes = and { only where they would read back as a highlight', () => {
+    const typed: Block[] = [
+      { type: 'paragraph', spans: [{ text: '==not marked== and a = b', marks: [] }] },
+      {
+        type: 'paragraph',
+        spans: [
+          { text: 'marked', marks: [], ink: 'amber' },
+          { text: '{.iris} typed', marks: [] },
+        ],
+      },
+    ]
+    const md = serialize(typed)
+    expect(md).toBe('\\=\\=not marked\\=\\= and a \\= b\n\n==marked==\\{.iris} typed')
+    expect(parse(md)).toEqual(typed)
+  })
+
+  it('leaves spaces at the edges of a highlight out of it', () => {
+    const blocks: Block[] = [
+      {
+        type: 'paragraph',
+        spans: [
+          { text: 'a', marks: [] },
+          { text: ' marked ', marks: [], ink: 'coral' },
+          { text: 'b', marks: [] },
+        ],
+      },
+    ]
+    expect(serialize(blocks)).toBe('a ==marked=={.coral} b')
+  })
+
+  it('writes any mix of marks, highlights and symbols so it reads back', () => {
+    // A seeded walk over short texts: every block the writer makes must read back as itself.
+    let seed = 7
+    const next = (n: number) => {
+      seed = (seed * 48271) % 2147483647
+      return seed % n
+    }
+    const pieces = ['a', 'b c', ' ', '=', '==', '{.iris}', '*', '\\', '#', 'x']
+    const allMarks: Mark[][] = [[], ['em'], ['strong'], ['em', 'strong']]
+    for (let round = 0; round < 2000; round++) {
+      const spans: Span[] = Array.from({ length: 1 + next(5) }, () => {
+        const ink = next(3) === 0 ? INKS[next(INKS.length)] : undefined
+        return { text: pieces[next(pieces.length)]! + pieces[next(pieces.length)]!, marks: allMarks[next(4)]!, ...(ink && { ink }) }
+      })
+      const md = serialize([{ type: 'paragraph', spans }])
+      const back = parse(md)
+      expect(back.length <= 1 && back[0]?.type !== 'raw', md).toBe(true)
+      expect(serialize(back), md).toBe(md)
+      const words = (b: Block | undefined) => (b && b.type !== 'raw' ? b.spans.map((s) => s.text).join('') : '')
+      expect(words(back[0]), md).toBe(spans.map((s) => s.text).join(''))
+    }
   })
 
   it('counts words, not symbols', () => {

@@ -3,6 +3,7 @@ import add from './icons/add.svg'
 import alignLeft from './icons/align-left.svg'
 import close from './icons/close.svg'
 import exportIcon from './icons/export.svg'
+import highlight from './icons/highlight.svg'
 import history from './icons/history.svg'
 import justify from './icons/justify.svg'
 import keep from './icons/keep.svg'
@@ -22,6 +23,7 @@ export type IconName =
   | 'alignLeft'
   | 'close'
   | 'export'
+  | 'highlight'
   | 'history'
   | 'justify'
   | 'keep'
@@ -41,6 +43,7 @@ const icons: Record<IconName, string> = {
   alignLeft,
   close,
   export: exportIcon,
+  highlight,
   history,
   justify,
   keep,
