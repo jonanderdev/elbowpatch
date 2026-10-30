@@ -9,6 +9,7 @@ import { download } from '../files/download'
 import { downloadEverything } from '../files/everything'
 import { Library } from '../library/Library'
 import { type Opened, Page } from '../page/Page'
+import { raiseKeyboard } from '../page/useFocusOnOpen'
 import { waiting } from '../settings/PutAway'
 import { type Area, Settings } from '../settings/Settings'
 import { readLast, writeLast } from '../stores/last'
@@ -122,6 +123,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
   const { writer, writeHere } = useWriterLock(lock, opened?.piece.id, flushPage, closing)
 
   const startNew = (kind: Kind) => {
+    raiseKeyboard()
     let piece = newPiece(deps, kind, navigator.language || 'en')
     let sectionId = piece.sections[0]?.sectionId ?? ''
     if (kind === 'journal') ({ piece, sectionId } = withDay(deps, piece, today))

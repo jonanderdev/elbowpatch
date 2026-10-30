@@ -47,8 +47,9 @@ export function PageFoot({
         </div>
       )}
       <div className={keyboard !== null ? 'foot raised' : 'foot'} style={keyboard !== null ? { bottom: keyboard } : undefined}>
-        {/* The day's words, at the text's left edge, level with the page button. */}
-        {journal && !tools && <span className="day-words">{wordsLine(words)}</span>}
+        {/* The day's words, at the text's left edge, level with the page button; down with the folio
+            while the keyboard is up, so they never sit over the text. */}
+        {journal && !tools && keyboard === null && <span className="day-words">{wordsLine(words)}</span>}
         {tools ? (
           <ToolsBar page={page + 1} count={count} words={words} onClose={onCloseTools} onTextSettings={onTextSettings} onExport={onExport} />
         ) : (

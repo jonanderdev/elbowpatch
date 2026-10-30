@@ -855,3 +855,14 @@ test('in a window smaller than the page, the head stands on its strip and the fo
   await expect(page.locator('.library')).toBeVisible()
   expect(await page.evaluate(() => document.scrollingElement!.scrollHeight <= document.scrollingElement!.clientHeight)).toBe(true)
 })
+
+test('a tap below the text puts the caret at its end, ready to type', async ({ page }) => {
+  await newEssay(page)
+  await page.keyboard.type('A short page.')
+  await page.locator('.body').evaluate((el) => (el as HTMLElement).blur())
+  const pager = await page.locator('.pager').boundingBox()
+  await page.mouse.click(pager!.x + pager!.width / 2, pager!.y + pager!.height - 20)
+  await expect(page.locator('.body')).toBeFocused()
+  await page.keyboard.type(' More.')
+  await expect(page.locator('.body')).toHaveText('A short page. More.')
+})
