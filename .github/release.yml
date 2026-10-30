@@ -1,0 +1,13 @@
+# Groups for generated release notes (docs/decisions/0012).
+changelog:
+  categories:
+    - title: New
+      labels: [enhancement]
+    - title: Fixed
+      labels: [bug]
+    - title: Accessibility
+      labels: [accessibility]
+    - title: Docs
+      labels: [documentation]
+    - title: Other changes
+      labels: ['*']

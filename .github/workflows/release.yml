@@ -1,0 +1,45 @@
+name: Release
+
+# Pushing a vX.Y.Z tag on main publishes a GitHub Release (docs/decisions/0012).
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: app/package.json
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Tag matches app/package.json
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match app/package.json version $version"
+            exit 1
+          fi
+      - run: npm ci
+      - run: npm run lint
+      # Build runs the typecheck.
+      - run: npm test
+      - run: npm run build
+      - name: Zip the built site
+        run: cd dist && zip -r "../elbowpatch-$GITHUB_REF_NAME.zip" .
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prerelease=""
+          case "$GITHUB_REF_NAME" in *-*) prerelease="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" "elbowpatch-$GITHUB_REF_NAME.zip" \
+            --verify-tag --generate-notes --title "$GITHUB_REF_NAME" $prerelease
