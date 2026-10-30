@@ -47,17 +47,21 @@ export interface Fit extends Geometry {
 
 /**
  * The screen's page at the largest scale that fits it, up to MAX_SCALE. The text fits between the head and
- * the foot, which keep their size, and sits centred between them. The stride stays whole pixels, so page 300
- * lands where page 1 does.
+ * the foot, which keep their size, and sits centred between them. On a phone the page fills the screen's
+ * width and the text all the height between the head and the foot: only the width scales it. The stride
+ * stays whole pixels, so page 300 lands where page 1 does.
  */
 export function geometry(screenWidth: number, screenHeight: number, wide = false, journal = false): Fit {
   const stride = Math.floor(screenWidth)
-  const page = PAGES[screenOf(stride)]
+  const phone = screenOf(stride) === 'phone'
+  const page = PAGES[phone ? 'phone' : 'desktop']
   const right = wide ? page.wide : page.side
   const left = journal ? page.journal : right
-  const text = page.height - page.top - page.bottom
   const room = screenHeight - page.top - page.bottom
-  const k = Math.min(MAX_SCALE, stride / page.width, room / text)
+  const designed = page.height - page.top - page.bottom
+  const k = phone ? Math.min(MAX_SCALE, stride / page.width) : Math.min(MAX_SCALE, stride / page.width, room / designed)
+  // The text's height in the page's own px.
+  const text = phone ? room / k : designed
   const top = page.top + (room - text * k) / 2
   return {
     measure: (page.width - left - right) * k,

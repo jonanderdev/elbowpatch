@@ -6,11 +6,13 @@ describe('paging maths', () => {
     expect(geometry(390, 826)).toMatchObject({ k: 1, measure: 342, side: 24, stride: 390, top: 64, height: 670 })
   })
 
-  it('a shorter phone shows it smaller, between the head and the foot', () => {
-    const g = geometry(375, 667)
-    expect(g.k).toBeCloseTo((667 - 64 - 92) / 670)
+  it('a phone fills its width, and its text all the height between the head and the foot', () => {
+    const g = geometry(402, 670)
+    expect(g.k).toBeCloseTo(402 / 390)
     expect(g.measure / g.k).toBeCloseTo(342)
-    expect(g.top).toBeCloseTo(64)
+    expect(g.top).toBe(64)
+    expect(g.height).toBeCloseTo(670 - 64 - 92)
+    expect(g.bottom).toBeCloseTo(92)
   })
 
   it('a desktop takes the paperback page, scaled up to MAX_SCALE at most, centred', () => {
