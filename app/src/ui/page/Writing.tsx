@@ -95,16 +95,27 @@ export function WritingBar({ editor, active, keyboard }: { editor: Editor; activ
   )
 }
 
-/** How much of the screen the on-screen keyboard covers, in px (0 when it is down). */
-export function useKeyboard(): number {
-  const [covered, setCovered] = useState(0)
+/**
+ * While the on-screen keyboard is up, how far above the foot of the window fixed controls must sit to
+ * stand on it, in px; null when it is down. The keyboard may shrink the window itself (iPhone, and
+ * Android with `interactive-widget=resizes-content`), leaving 0 to rise, so it is told by the visible
+ * height falling below the tallest it has been at this width.
+ */
+export function useKeyboard(): number | null {
+  const [covered, setCovered] = useState<number | null>(null)
   useEffect(() => {
     const vv = window.visualViewport
     if (!vv) return
+    let tallest = { width: 0, height: 0 }
     const on = () => {
-      const hidden = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
+      const width = document.documentElement.clientWidth
+      // A pinch zoom shrinks the visible height too: measure at scale 1.
+      const height = vv.height * vv.scale
+      if (width !== tallest.width) tallest = { width, height }
+      tallest.height = Math.max(tallest.height, height)
       // A few px of browser chrome is not a keyboard.
-      setCovered(hidden > 80 ? hidden : 0)
+      const up = tallest.height - height > 80
+      setCovered(up ? Math.max(0, document.documentElement.clientHeight - vv.height - vv.offsetTop) : null)
     }
     on()
     vv.addEventListener('resize', on)
