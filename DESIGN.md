@@ -26,8 +26,8 @@ Two themes, both first-class. Paper follows light system appearance, night follo
 ### Paper
 - #f3f3f0: the page — soft paper, a light grey rather than white, so a long session on a lit screen does not glare. (Changed on 2026-10-28 from #fbfbf9, which read as a bright white sheet.)
 - #1f1f1f: titles and body text. 14.83:1 (AAA). Also the focus ring (a mark, ≥ 3:1).
-- #676767: secondary text (the folio, word count, running head) and icons at rest (see Control, Icons). 5.09:1 on the page, 5.66:1 on a surface (AA).
-- #ffffff: surfaces — the page button, *Write* on a phone, the tools bar, the settings sheet, the selection menu — lifted by a soft shadow and a 1px hairline edge. Against the grey page they stand clear of it.
+- #676767: secondary text (the folio, word count, running head) and icons at rest (see Control, Icons). 5.09:1 on the page, 5.41:1 on a surface (AA).
+- #fafaf8: surfaces — the page button, *Write* on a phone, the tools bar, the settings sheet, the selection menu — lifted by a soft shadow and a 1px hairline edge, which are what set them apart: the colour is only a whisper above the page (1.06:1). Titles on a surface 15.77:1. (Changed on 2026-10-30 from #ffffff, which glowed against the grey page and pulled the eye to the page button.)
 - #e2e2de: the hairline edge of a surface and the separator in the tools bar only — never text.
 - #c9c9c4: the outline of a word button (see Control) — never text. Decorative: its word already names it.
 - #e9e9e5: a pressed or hovered button. Title text on it 13.54:1, secondary 4.65:1.
@@ -38,11 +38,11 @@ Two themes, both first-class. Paper follows light system appearance, night follo
 - #0e0e0e: the page — a true black, slightly lifted.
 - #e6e6e3: titles, the drop cap, the caret and the focus ring. 15.44:1 (AAA).
 - #b5b5b2: body text. 9.39:1 (AAA).
-- #8c8c8a: secondary text and dimmed earlier paragraphs. 5.73:1 on the page, 5.17:1 on a surface (AA) — dimming never goes below this.
-- #1a1a1a: surfaces (as in paper), lifted by a deeper shadow.
+- #8c8c8a: secondary text and dimmed earlier paragraphs. 5.73:1 on the page, 4.95:1 on a surface (AA) — dimming never goes below this.
+- #1e1e1e: surfaces (as in paper), lifted by a deeper shadow; one step clearer of the page than paper's (1.16:1), since a step on black reads smaller. Body on a surface 8.11:1, titles 13.33:1. (Changed on 2026-10-30 from #1a1a1a, which left the bars flat on the black page.)
 - #2a2a2a: the hairline edge of a surface and the bar separator only.
 - #3a3a38: the outline of a word button (as in paper).
-- #242424: a pressed or hovered button.
+- #252525: a pressed or hovered button. Secondary text on it 4.55:1. (Moved from #242424 with the surface on 2026-10-30, so it still shows on one; #282828 was tried and left: secondary text on it fell to 4.38:1.)
 - #3a3a38: text selection. Body on it 5.55:1, titles 9.12:1.
 
 ### Not defined yet
@@ -93,7 +93,7 @@ Two themes, both first-class. Paper follows light system appearance, night follo
 - Margins, on the page: on the phone's, 64px above the text, 92px below, 24px each side; on the desktop's, 64px above, 84px below, 36px each side. The wide measure halves the side margins. With the keyboard up, the page keeps its size and slides up (see Control).
 - **On a phone:** § at the top left on the text's left edge, the running head centred, the page button at the bottom right 16px from the edge, the folio centred at the foot. That is all the page carries besides the text.
 - **On desktop: a rail and a quiet head.** (Chosen on 2026-10-30, replacing two controls in opposite corners of the screen, which left a wide screen feeling like a phone layout in the middle of a desktop: you had to know the corners were there.)
-  - **The rail:** a column 336px wide at the left of the window, in page colour, with no surface and no shadow. It is the same width in the library and on every page, so nothing jumps between them, and it never pushes the text: the text column stays centred on the window, open rail or not. Its edge is a hairline you can barely see — the pressed tint (#e9e9e5) at 70%, about #ecece8 on the paper page (1.07:1; night, #242424 at 70%, about #1d1d1d, 1.15:1). It is decorative, never the only sign of anything: the rail reads as a rail without it. The journal draws no edge, since its margin rule already is its line. (Chosen on 2026-10-30 at 1.07:1 after a visible line felt like a frame.)
+  - **The rail:** a column 336px wide at the left of the window, in page colour, with no surface and no shadow. It is the same width in the library and on every page, so nothing jumps between them, and it never pushes the text: the text column stays centred on the window, open rail or not. Its edge is a hairline you can barely see — the pressed tint (#e9e9e5) at 70%, about #ecece8 on the paper page (1.07:1; night, #252525 at 70%, about #1e1e1e, 1.16:1). It is decorative, never the only sign of anything: the rail reads as a rail without it. The journal draws no edge, since its margin rule already is its line. (Chosen on 2026-10-30 at 1.07:1 after a visible line felt like a frame.)
   - **The head:** one line, centred at 35px from the top: the path (§ / piece name / rail toggle) at the left, 20px in; the running head centred over the text column; the tools at the right, 20px in — the count ("18 of 48 · 9.420 words") and the icon buttons export, Time Machine, Aa, paper / night, unraised. Clicking the count does nothing on desktop: Contents and Days are in the rail. Sheets (text settings, export) drop from the head under the control that opened it, right-aligned to it, and that control keeps the pressed tint while its sheet is open.
   - **While you type,** the path and the tools fade out on the first key and come back when the mouse moves or the caret stops; the running head, the folio and an open rail stay.
   - **On a page the rail is the piece:** a book's chapters with the page each starts on, the current one with the pressed tint, then *+ New chapter*; an essay's pages by their first words; the journal's days — *Today* first ("nothing yet" until begun), then each written day with its words, under its month. It starts under the head's line with one line in secondary ("6 chapters · 48 pages"), since the path already names the piece. The rail toggle (an icon: a sheet with a column at its left) folds it away and opens it again; folded, only the path stays, in the same place. Open or folded is remembered per device. On desktop this replaces the Contents and Days sheets.
@@ -235,7 +235,7 @@ Open — treat as undesigned, not as solved by a familiar pattern:
 - Reordering chapters and Collections (folders) are after the MVP.
 - Printed page numbers: a browser's own print cannot number the pages of a contents page, and not every browser prints a number at the foot from a stylesheet. The printed page may need paging by the app before printing. Try it in Safari and Chrome before the PDF is promised as designed.
 - A photo placed inside a piece.
-- The desktop rail and head (2026-10-30), drawn in paper, and at night only for a journal day and an essay: the night hairline (#1d1d1d on #0e0e0e) is unchecked by eye; between 700px and about 1280px wide the rail meets the text column, and whether the rail then folds itself or covers the margin is undecided; keyboard focus order across the path, the rail and the tools is not set; the fade of the head while typing has no timing.
+- The desktop rail and head (2026-10-30), drawn in paper, and at night only for a journal day and an essay: the night hairline (#1e1e1e on #0e0e0e) is unchecked by eye; between 700px and about 1280px wide the rail meets the text column, and whether the rail then folds itself or covers the margin is undecided; keyboard focus order across the path, the rail and the tools is not set; the fade of the head while typing has no timing.
 - Desktop Settings with the rail, the desktop shelf, and the piece menu on desktop are drawn as the simplest analogue of the rail, not reviewed.
 - The journal's Days as it was, dropping from the running head in the Time Machine, is not drawn.
 - On a phone: the top fade is 105px on paper and 103px at night in the Figma file, to be made one value; whether the running head's ⌄ is found without a hint; a chapter title too long for the line beside §; the *Write* bar opening from the pill; the Contents sheet with the keyboard up.
