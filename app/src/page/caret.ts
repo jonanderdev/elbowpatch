@@ -76,6 +76,7 @@ export function caretToEnd(view: EditorView, viewport: HTMLElement): boolean {
     blocks.push({ text: node.textContent, offset })
   })
   let pos: number | null = null
+  let full: number | null = null
   for (const { text, offset } of blocks.reverse()) {
     const dom = view.nodeDOM(offset)
     if (!(dom instanceof HTMLElement) || ![...dom.getClientRects()].some(onPage)) continue
@@ -100,6 +101,14 @@ export function caretToEnd(view: EditorView, viewport: HTMLElement): boolean {
         else hi = mid - 1
       }
       pos = view.posAtDOM(t, lo + 1)
+      // A full last line: a letter added to its last word would not fit, and the word would wrap
+      // on to the next page with it. Then the end of the word before, which stays on this page.
+      const end = /\s/.test(t.data[lo] ?? '') ? lo : lo + 1
+      range.setStart(t, Math.max(end - 1, 0))
+      range.setEnd(t, end)
+      const room = Math.max(...[...dom.getClientRects()].filter(onPage).map((b) => b.right)) - range.getBoundingClientRect().right
+      const space = t.data.slice(0, end).search(/\s\S*$/)
+      if (room < parseFloat(getComputedStyle(dom).fontSize) && space > 0) full = view.posAtDOM(t, space)
       break
     }
     if (pos !== null) break
@@ -108,8 +117,8 @@ export function caretToEnd(view: EditorView, viewport: HTMLElement): boolean {
   // Where the page ends mid-paragraph, the position after its last letter is also the start of the
   // next page, and a browser may paint the caret there, or at the page's top. Just before that
   // letter (mostly the space after the last word) is on this page's last line only.
-  let at: number = pos
-  if (at < view.state.doc.resolve(at).end()) at--
+  let at: number = full ?? pos
+  if (full === null && at < view.state.doc.resolve(at).end()) at--
   view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(at), -1)).setMeta(PAGED, true))
   return true
 }
