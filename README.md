@@ -32,7 +32,21 @@ Not ready for writing you cannot afford to lose yet.
 
 ## Trying it
 
-The app is in [`app/`](app/). It is a static web site: install its dependencies with npm and start the dev server, or build it and put the result on any static host to run your own copy. The available scripts are in [`app/package.json`](app/package.json).
+You need [Node.js](https://nodejs.org) (version 24 is what we test on). The app lives in [`app/`](app/).
+
+**Run it on your computer:**
+
+```sh
+cd app
+npm install
+npm run dev
+```
+
+Then open http://localhost:5173 in your browser and start writing.
+
+**Host your own copy:** run `npm run build` in `app/`. It creates a `dist/` folder of plain files with no server needed, which you can upload to any static host.
+
+The other scripts (tests, lint, typecheck) are listed in [`app/package.json`](app/package.json).
 
 ## Learn more
 
