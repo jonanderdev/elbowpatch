@@ -2,11 +2,11 @@ import { type ReactElement, useEffect, useRef, useState } from 'react'
 import type { Kind, Piece } from '../../domain/model'
 import { ExportSheet } from '../components/ExportSheet'
 import { IconButton } from '../components/Icon'
-import { useSettings } from '../stores/settings'
+import { update, useSettings } from '../stores/settings'
 import { Empty, KINDS, NewPiece } from './NewPiece'
 import { ExportReminder, SafariNote, UnsavedLine, UpdateLine } from './Notes'
 import { PieceRow } from './PieceRow'
-import { continueMeta, excerpt, meta } from './text'
+import { continueMeta, excerpt, meta, shelfMeta } from './text'
 
 interface Props {
   pieces: Piece[]
@@ -42,6 +42,7 @@ export function Library({
   const headingRef = useRef<HTMLHeadingElement>(null)
   useEffect(() => headingRef.current?.focus(), [])
   const empty = pieces.length === 0
+  const onShelf = settings.libraryView === 'shelf'
   const now = Date.now()
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const [exporting, setExporting] = useState<Piece | null>(null)
@@ -77,7 +78,7 @@ export function Library({
   // One menu at a time, by place: the piece in Continue is also in its group.
   const handlers = (piece: Piece, where: 'continue' | 'row') => ({
     piece,
-    meta: meta(piece, today, now),
+    meta: onShelf && where === 'row' ? shelfMeta(piece) : meta(piece, today, now),
     menuOpen: menuFor === `${where}:${piece.id}`,
     onMenu: (open: boolean) => setMenuFor(open ? `${where}:${piece.id}` : null),
     onOpen: () => onOpen(piece),
@@ -108,8 +109,16 @@ export function Library({
           <h1 ref={headingRef} tabIndex={-1}>
             Library
           </h1>
-          {/* shortcut: the view switch arrives with the shelf. */}
           <div className="library-actions">
+            {/* The switch shows the view it leads to; an empty library has none. */}
+            {!empty && (
+              <IconButton
+                icon={onShelf ? 'viewList' : 'viewShelf'}
+                label={onShelf ? 'Show as a list' : 'Show as a shelf'}
+                quiet
+                onClick={() => update({ libraryView: onShelf ? 'list' : 'shelf' })}
+              />
+            )}
             <IconButton icon="settings" label="Settings" quiet onClick={onSettings} />
           </div>
         </div>
@@ -147,11 +156,14 @@ export function Library({
                   <h2 className="group-heading" id={`group-${kind}`}>
                     {group}
                   </h2>
-                  <ul className="rows">
-                    {rows.map((piece) => (
-                      <PieceRow key={piece.id} {...handlers(piece, 'row')} />
-                    ))}
-                  </ul>
+                  {/* On a phone the shelf scrolls sideways: the piece menu floats over this box, not inside it. */}
+                  <div className={onShelf ? 'shelf-row' : undefined}>
+                    <ul className={onShelf ? 'shelf' : 'rows'}>
+                      {rows.map((piece) => (
+                        <PieceRow key={piece.id} {...handlers(piece, 'row')} onShelf={onShelf} />
+                      ))}
+                    </ul>
+                  </div>
                 </section>
               )
             })}
