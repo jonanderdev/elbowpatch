@@ -2,10 +2,10 @@ import { baseKeymap, chainCommands, exitCode, setBlockType, toggleMark } from 'p
 import { history, redo, undo } from 'prosemirror-history'
 import { InputRule, inputRules, textblockTypeInputRule, undoInputRule } from 'prosemirror-inputrules'
 import { keymap } from 'prosemirror-keymap'
-import { Fragment, Slice, type MarkType } from 'prosemirror-model'
-import { EditorState, Plugin, TextSelection, type Command, type Transaction } from 'prosemirror-state'
+import { Fragment, type MarkType, Slice } from 'prosemirror-model'
+import { type Command, EditorState, Plugin, TextSelection, type Transaction } from 'prosemirror-state'
 import { Decoration, DecorationSet, EditorView } from 'prosemirror-view'
-import { parse, serialize, type Block } from '../domain/markdown'
+import { type Block, parse, serialize } from '../domain/markdown'
 import { schema, toBlocks, toDoc } from './schema'
 
 export interface EditorOptions {

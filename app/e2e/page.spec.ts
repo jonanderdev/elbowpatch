@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, type Page, test } from '@playwright/test'
 import { saved } from './helpers'
 
 const PARAGRAPH =
@@ -81,7 +81,7 @@ test('the title opens page 1 and becomes the running head after it', async ({ pa
   await expect(page.locator('.title')).toBeInViewport()
 })
 
-test("when a save fails the words stay, the page says so, and it recovers", async ({ page }) => {
+test('when a save fails the words stay, the page says so, and it recovers', async ({ page }) => {
   await newEssay(page)
   await page.keyboard.type('Before.')
   await saved(page, 'Before.')
@@ -145,7 +145,10 @@ test('formatting from the selection menu, without Markdown', async ({ page, isMo
   test.skip(isMobile, 'phones use the writing bar')
   await newEssay(page)
   await page.keyboard.type('Make this word bold, then italic.')
-  await page.locator('.body p').first().dblclick({ position: { x: 60, y: 10 } })
+  await page
+    .locator('.body p')
+    .first()
+    .dblclick({ position: { x: 60, y: 10 } })
   const menu = page.getByRole('toolbar', { name: 'Formatting' })
   await expect(menu).toBeVisible()
   await menu.getByRole('button', { name: 'Bold' }).click()
@@ -343,7 +346,7 @@ test('on desktop a turn always leaves the caret ready to type, even while readin
   }
 })
 
-test('← and → across a page break never leave the caret where it is painted at the page\'s top', async ({ page }) => {
+test("← and → across a page break never leave the caret where it is painted at the page's top", async ({ page }) => {
   await newEssay(page)
   await fill(page, 10)
   // The caret is wrong when it sits where a page breaks mid-paragraph, after the earlier page's
@@ -426,7 +429,10 @@ test('a book opens on its title page; chapter 1 begins on the next', async ({ pa
   await page.locator('.start.book').click()
   await expect(page.locator('.book-title')).toBeFocused()
   // Both fields say what they are while empty.
-  for (const [field, word] of [['.book-title', 'Untitled'], ['.subtitle', 'Subtitle']] as const) {
+  for (const [field, word] of [
+    ['.book-title', 'Untitled'],
+    ['.subtitle', 'Subtitle'],
+  ] as const) {
     const shown = await page.locator(field).evaluate((el) => {
       const before = getComputedStyle(el, '::before')
       return `${before.content.replace(/"/g, '')}|${before.visibility}`
@@ -524,7 +530,10 @@ test('Library and the page button: text edge on a phone, frame corners on deskto
     expect(Math.round(width - (button.x + button.width))).toBe(Math.round(frame + 20))
   }
   // At an iMac 27" (2560 wide) they are at the edges; on anything wider, within the frame.
-  for (const [w, apart] of [[2560, 2560 - 40], [3440, 2560 - 40]] as const) {
+  for (const [w, apart] of [
+    [2560, 2560 - 40],
+    [3440, 2560 - 40],
+  ] as const) {
     await page.setViewportSize({ width: w, height: 1200 })
     await page.waitForTimeout(100)
     const l = (await page.locator('.head .word-button .word').boundingBox())!
@@ -542,7 +551,14 @@ test('scrolling never turns the page', async ({ page }) => {
   const col = (await page.locator('.pager').boundingBox())!
   await page.mouse.move(col.x + col.width / 2, col.y + 200)
   // Down, up and sideways, short and long.
-  for (const [dx, dy] of [[0, 40], [0, 600], [0, -300], [300, 0], [-300, 0]] as const) await page.mouse.wheel(dx, dy)
+  for (const [dx, dy] of [
+    [0, 40],
+    [0, 600],
+    [0, -300],
+    [300, 0],
+    [-300, 0],
+  ] as const)
+    await page.mouse.wheel(dx, dy)
   await page.waitForTimeout(300)
   await expect(page.locator('.page-button')).toHaveText('1')
   expect(await page.locator('.pager').evaluate((el) => el.scrollLeft)).toBe(0)
@@ -656,7 +672,11 @@ test('a desktop window less than 600 tall keeps the page 600 tall, and scrolls',
 test('at a normal size nothing scrolls the window, and the library covers the page whole', async ({ page }) => {
   await newEssay(page)
   await fill(page, 2)
-  const fits = () => page.evaluate(() => { const r = document.scrollingElement!; return r.scrollHeight <= r.clientHeight && r.scrollWidth <= r.clientWidth })
+  const fits = () =>
+    page.evaluate(() => {
+      const r = document.scrollingElement!
+      return r.scrollHeight <= r.clientHeight && r.scrollWidth <= r.clientWidth
+    })
   expect(await fits()).toBe(true)
   const head = (await page.locator('.head .word-button').boundingBox())!
   await page.locator('.head .word-button').click()
@@ -675,5 +695,5 @@ test('at a normal size nothing scrolls the window, and the library covers the pa
     for (let i = 4; i < d.length; i += 4) if (Math.abs(d[i]! - d[0]!) + Math.abs(d[i + 1]! - d[1]!) + Math.abs(d[i + 2]! - d[2]!) > 24) return false
     return true
   }, shot.toString('base64'))
-  expect(flat, 'the page\'s Library button shows through the library').toBe(true)
+  expect(flat, "the page's Library button shows through the library").toBe(true)
 })

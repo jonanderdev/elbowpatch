@@ -1,5 +1,5 @@
-import { useSyncExternalStore } from 'react'
 import { registerSW } from 'virtual:pwa-register'
+import { useSyncExternalStore } from 'react'
 
 // A new version waits for the next launch. While it waits, the library says
 // so quietly; the page never does (0010).

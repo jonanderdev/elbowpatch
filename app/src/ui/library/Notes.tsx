@@ -1,8 +1,8 @@
-import { useState, type ReactElement } from 'react'
+import { type ReactElement, useState } from 'react'
 import type { Piece } from '../../domain/model'
-import { update } from '../stores/settings'
 import { download } from '../files/download'
 import { lastExport } from '../files/everything'
+import { update } from '../stores/settings'
 import { unsaved, useUnsaved } from '../stores/unsaved'
 import { useUpdateWaiting } from '../stores/updates'
 
@@ -65,7 +65,15 @@ const CAN_CONNECT = false
  * "Last exported 5 weeks ago · Export", and "Connect a place" once there is
  * one to connect (DESIGN.md, The library).
  */
-export function ExportReminder({ pieces, onExport, onDone }: { pieces: Piece[]; onExport(): Promise<string>; onDone(line: string): void }): ReactElement | null {
+export function ExportReminder({
+  pieces,
+  onExport,
+  onDone,
+}: {
+  pieces: Piece[]
+  onExport(): Promise<string>
+  onDone(line: string): void
+}): ReactElement | null {
   const [busy, setBusy] = useState(false)
   const [, refresh] = useState(0)
   const now = Date.now()
@@ -107,7 +115,6 @@ export function ExportReminder({ pieces, onExport, onDone }: { pieces: Piece[]; 
   )
 }
 
-
 const DAY = 86_400_000
 
 /** "12 days ago", "5 weeks ago", "3 months ago". */
@@ -125,4 +132,3 @@ function safariOutsideHomeScreen(): boolean {
   const standalone = matchMedia('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true
   return safari && !standalone
 }
-

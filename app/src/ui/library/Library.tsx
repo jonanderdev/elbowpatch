@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState, type ReactElement } from 'react'
+import { type ReactElement, useEffect, useRef, useState } from 'react'
 import type { Kind, Piece } from '../../domain/model'
 import { ExportSheet } from '../components/ExportSheet'
 import { IconButton } from '../components/Icon'
 import { useSettings } from '../stores/settings'
 import { Empty, KINDS, NewPiece } from './NewPiece'
-import { UnsavedLine, UpdateLine, SafariNote, ExportReminder } from './Notes'
-import { excerpt, continueMeta, meta } from './text'
+import { ExportReminder, SafariNote, UnsavedLine, UpdateLine } from './Notes'
 import { PieceRow } from './PieceRow'
+import { continueMeta, excerpt, meta } from './text'
 
 interface Props {
   pieces: Piece[]
@@ -25,7 +25,19 @@ interface Props {
   onExportEverything(): Promise<string>
 }
 
-export function Library({ pieces, last, today, onOpen, onNew, onRename, onExport, onPutAway, onRestore, onSettings, onExportEverything }: Props): ReactElement | null {
+export function Library({
+  pieces,
+  last,
+  today,
+  onOpen,
+  onNew,
+  onRename,
+  onExport,
+  onPutAway,
+  onRestore,
+  onSettings,
+  onExportEverything,
+}: Props): ReactElement | null {
   const settings = useSettings()
   const headingRef = useRef<HTMLHeadingElement>(null)
   useEffect(() => headingRef.current?.focus(), [])
@@ -180,4 +192,3 @@ export function Library({ pieces, last, today, onOpen, onNew, onRename, onExport
     </main>
   )
 }
-

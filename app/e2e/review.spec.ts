@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, type Page, test } from '@playwright/test'
 import { caretToEnd, saved } from './helpers'
 
 async function newEssay(page: Page, title: string) {
@@ -75,7 +75,9 @@ test('a line break reads back as written', async ({ page }) => {
 test('opening the app keeps the place where you left off', async ({ page }) => {
   await newEssay(page, 'Place')
   for (let i = 0; i < 10; i++) {
-    await page.keyboard.insertText(`${i}. Nobody remembers the first draft. It is written in a hurry, at the kitchen table or on the train, and it is mostly a list of things the writer hopes to say. It has the right shape.`)
+    await page.keyboard.insertText(
+      `${i}. Nobody remembers the first draft. It is written in a hurry, at the kitchen table or on the train, and it is mostly a list of things the writer hopes to say. It has the right shape.`,
+    )
     await page.keyboard.press('Enter')
   }
   await page.keyboard.type('The end.')
@@ -134,7 +136,15 @@ test('words already stored never leave a "Can\'t save" line behind', async ({ pa
   await page.evaluate((sectionId) => {
     localStorage.setItem(
       `elbowpatch.unsaved.${sectionId}`,
-      JSON.stringify({ piece: { id: 'p', kind: 'essay', sections: [] }, pieceId: 'p', sectionId, name: 'Stored.md', markdown: 'All stored.', title: null, at: Date.now() }),
+      JSON.stringify({
+        piece: { id: 'p', kind: 'essay', sections: [] },
+        pieceId: 'p',
+        sectionId,
+        name: 'Stored.md',
+        markdown: 'All stored.',
+        title: null,
+        at: Date.now(),
+      }),
     )
   }, sectionId)
   await page.reload()

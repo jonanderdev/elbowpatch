@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { memoryStore } from '../adapters/memory-store'
 import { history, newPiece, openPiece, putAway, restore, takeMoment, write } from './pieces'
-import { forgetPutAway, thin, toThin, type Thinnable } from './thinning'
+import { forgetPutAway, type Thinnable, thin, toThin } from './thinning'
 
 const MIN = 60_000
 const HOUR = 60 * MIN
@@ -25,7 +25,14 @@ describe('the thinning rule', () => {
 
   it('never removes the first, the latest or a protected version', () => {
     const t = NOW - 40 * DAY
-    const items = [v('first', 1, t), v('kept', 2, t + 1), v('plain', 3, t + 2), v('beforeBack', 4, t + 3, true), v('last-of-day', 5, t + 4), v('latest', 6, t + 5)]
+    const items = [
+      v('first', 1, t),
+      v('kept', 2, t + 1),
+      v('plain', 3, t + 2),
+      v('beforeBack', 4, t + 3, true),
+      v('last-of-day', 5, t + 4),
+      v('latest', 6, t + 5),
+    ]
     items[1]!.protected = true
     const gone = toThin(items, NOW)
     expect(gone.has('first')).toBe(false)

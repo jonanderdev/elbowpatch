@@ -1,7 +1,7 @@
-import { useEffect, useRef, type ReactNode, type ReactElement } from 'react'
+import { type ReactElement, type ReactNode, useEffect, useRef } from 'react'
 import { number } from '../../domain/words'
 import { Icon, IconButton } from '../components/Icon'
-import { theme, update, useSettings, type Settings } from '../stores/settings'
+import { type Settings, theme, update, useSettings } from '../stores/settings'
 
 export function ToolsBar(props: { page: number; count: number; words: number; onClose(): void; onTextSettings(): void; onExport(): void }): ReactElement {
   const settings = useSettings()
@@ -25,7 +25,9 @@ export function ToolsBar(props: { page: number; count: number; words: number; on
       <span className="bar-separator" />
       <IconButton icon="export" label="Export" onClick={props.onExport} />
       <button type="button" className="icon-button" aria-label="Text settings" onClick={props.onTextSettings}>
-        <span className="aa" aria-hidden="true">Aa</span>
+        <span className="aa" aria-hidden="true">
+          Aa
+        </span>
       </button>
       <IconButton icon={night ? 'sun' : 'moon'} label={night ? 'Paper' : 'Night'} onClick={() => update({ theme: night ? 'paper' : 'night' })} />
       <span className="bar-separator" />
@@ -34,15 +36,13 @@ export function ToolsBar(props: { page: number; count: number; words: number; on
   )
 }
 
-function Segments<K extends keyof Settings>(props: {
-  legend: string
-  setting: K
-  options: { value: Settings[K]; label: string; content?: ReactNode }[]
-}) {
+function Segments<K extends keyof Settings>(props: { legend: string; setting: K; options: { value: Settings[K]; label: string; content?: ReactNode }[] }) {
   const settings = useSettings()
   return (
     <div className="setting" role="radiogroup" aria-label={props.legend}>
-      <span className="setting-label" aria-hidden="true">{props.legend}</span>
+      <span className="setting-label" aria-hidden="true">
+        {props.legend}
+      </span>
       <div className="segments">
         {props.options.map((o) => {
           const checked = settings[props.setting] === o.value
@@ -57,7 +57,14 @@ function Segments<K extends keyof Settings>(props: {
               tabIndex={checked ? 0 : -1}
               className="segment"
               onClick={() => update({ [props.setting]: o.value } as Partial<Settings>)}
-              onKeyDown={(e) => arrowsMove(e, props.options.map((x) => x.value), settings[props.setting], (v) => update({ [props.setting]: v } as Partial<Settings>))}
+              onKeyDown={(e) =>
+                arrowsMove(
+                  e,
+                  props.options.map((x) => x.value),
+                  settings[props.setting],
+                  (v) => update({ [props.setting]: v } as Partial<Settings>),
+                )
+              }
             >
               {o.content ?? o.label}
             </button>
@@ -153,7 +160,9 @@ function ThemeSegments() {
   ]
   return (
     <div className="setting" role="radiogroup" aria-label="Page">
-      <span className="setting-label" aria-hidden="true">Page</span>
+      <span className="setting-label" aria-hidden="true">
+        Page
+      </span>
       <div className="segments">
         {options.map((o) => (
           // biome-ignore lint/a11y/useSemanticElements: a segmented control: buttons with radio semantics, in one bar.

@@ -1,6 +1,6 @@
 <div align="center">
   <p><img src="docs/brand/logo.svg" alt="Elbowpatch" width="200"></p>
-  <p><strong>Ebowpatch</strong></p>
+  <p><strong>Elbowpatch</strong></p>
   <p><strong>A quiet place to write, with a memory. <br/> Local-first and private: your words stay close, and every draft is kept safe.</strong></p>
 </div>
 
@@ -26,6 +26,8 @@ cd app
 npm install
 npm run dev        # http://localhost:5173
 npm test           # the domain, paging and Markdown, in Vitest
+npm run lint       # Biome: lint, formatting, import order (npm run format fixes)
+npm run typecheck
 npm run e2e        # the built app in WebKit and Chromium, phone and desktop
 npm run build      # dist/ — host it on any static host
 ```

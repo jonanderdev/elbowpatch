@@ -10,7 +10,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p src/domain/tsconfig.json --noEmit",
     "test": "vitest run",
     "e2e": "playwright test",
-    "lint": "biome lint"
+    "lint": "biome check",
+    "format": "biome check --write"
   },
   "dependencies": {
     "fflate": "^0.8.3",

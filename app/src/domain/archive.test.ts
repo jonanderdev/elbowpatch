@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { memoryStore } from '../adapters/memory-store'
 import { exportAll, FORMAT_VERSION, guessKind, importArchive, importMarkdown, readDay } from './archive'
-import type { Store } from './ports'
 import { newPiece, openPiece, putAway, rename, takeMoment, withDay, write } from './pieces'
+import type { Store } from './ports'
 
 function setup(start = Date.UTC(2026, 9, 1)) {
   let t = start
@@ -64,7 +64,8 @@ describe('export and import', () => {
     const result = await importArchive(b, files)
     expect(result).toEqual({ ok: true, added: 3, alreadyHere: 0 })
     // Identical, except that a put-away piece starts a fresh 30 days where it lands.
-    const away = (d: Awaited<ReturnType<typeof dump>>) => d.map((x) => ({ ...x, piece: { ...x.piece, putAwayAt: x.piece.putAwayAt === undefined ? undefined : 'put away' } }))
+    const away = (d: Awaited<ReturnType<typeof dump>>) =>
+      d.map((x) => ({ ...x, piece: { ...x.piece, putAwayAt: x.piece.putAwayAt === undefined ? undefined : 'put away' } }))
     expect(away(await dump(b.store))).toEqual(away(await dump(a.store)))
   })
 
@@ -146,7 +147,10 @@ describe('export and import', () => {
 
   it('refuses a newer format whole, and what is not an export', async () => {
     const b = setup()
-    expect(await importArchive(b, [{ path: 'index.json', text: JSON.stringify({ formatVersion: FORMAT_VERSION + 1, pieces: [] }) }])).toEqual({ ok: false, reason: 'newer-format' })
+    expect(await importArchive(b, [{ path: 'index.json', text: JSON.stringify({ formatVersion: FORMAT_VERSION + 1, pieces: [] }) }])).toEqual({
+      ok: false,
+      reason: 'newer-format',
+    })
     expect(await importArchive(b, [{ path: 'notes.md', text: '# Hi' }])).toEqual({ ok: false, reason: 'not-an-export' })
     expect(await b.store.transaction((tx) => tx.pieces())).toEqual([])
   })
@@ -179,7 +183,11 @@ describe('loose .md files', () => {
     const book = await importMarkdown(d, 'Winter.md', 'A foreword.\n\n# One\n\nFirst.\n\n# Two\n\n> A quote\n\nSecond.', 'book', 'en')
     const openBook = await openPiece(d, book.id)
     expect(openBook?.piece.title).toBe('Winter')
-    expect(openBook?.sections.map((s) => [s.title, s.content])).toEqual([['', 'A foreword.'], ['One', 'First.'], ['Two', '> A quote\n\nSecond.']])
+    expect(openBook?.sections.map((s) => [s.title, s.content])).toEqual([
+      ['', 'A foreword.'],
+      ['One', 'First.'],
+      ['Two', '> A quote\n\nSecond.'],
+    ])
 
     const essay = await importMarkdown(d, 'x.md', '# The title\n\nBody *here*.\n\n- a list, kept as written', 'essay', 'en')
     const openEssay = await openPiece(d, essay.id)

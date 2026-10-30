@@ -43,20 +43,42 @@
   --bottom: 92px;
   --edge: 16px;
 }
-[data-size='s'] { --body: 16px; }
-[data-size='l'] { --body: 20px; }
-[data-leading='tight'] { --leading: 1.42; }
-[data-leading='loose'] { --leading: 1.72; }
-[data-measure='wide'] { --measure: 40rem; }
+[data-size='s'] {
+  --body: 16px;
+}
+[data-size='l'] {
+  --body: 20px;
+}
+[data-leading='tight'] {
+  --leading: 1.42;
+}
+[data-leading='loose'] {
+  --leading: 1.72;
+}
+[data-measure='wide'] {
+  --measure: 40rem;
+}
 
 /* The frame: on desktop the controls sit in the corners of the screen, 20px in, but within
    a frame at most 2560px wide (an iMac 27"), centred, so on a very wide screen they never drift far apart
    (DESIGN.md, Layout). --frame is how far the frame starts from the screen's left edge. */
-:root { --frame: 0px; }
+:root {
+  --frame: 0px;
+}
 @media (min-width: 700px) {
-  :root { --body: 19px; --top: 88px; --bottom: 96px; --edge: 20px; --frame: max(0px, calc((100vw - 2560px) / 2)); }
-  [data-size='s'] { --body: 17px; }
-  [data-size='l'] { --body: 21px; }
+  :root {
+    --body: 19px;
+    --top: 88px;
+    --bottom: 96px;
+    --edge: 20px;
+    --frame: max(0px, calc((100vw - 2560px) / 2));
+  }
+  [data-size='s'] {
+    --body: 17px;
+  }
+  [data-size='l'] {
+    --body: 21px;
+  }
 }
 
 *,
@@ -91,7 +113,9 @@ body {
 }
 /* On desktop a page needs more height to be a page: below this, the window scrolls. */
 @media (min-width: 700px) {
-  body { min-height: 600px; }
+  body {
+    min-height: 600px;
+  }
 }
 
 #app {
@@ -187,7 +211,10 @@ button {
   border-radius: 22px;
 }
 @media (min-width: 700px) {
-  .bar { gap: 2px; padding: 0 6px; }
+  .bar {
+    gap: 2px;
+    padding: 0 6px;
+  }
 }
 
 .bar-separator {
@@ -198,7 +225,9 @@ button {
   background: var(--surface-line);
 }
 @media (min-width: 700px) {
-  .bar-separator { margin: 0 6px; }
+  .bar-separator {
+    margin: 0 6px;
+  }
 }
 
 .text-link {
@@ -228,16 +257,24 @@ button {
 /* In the side margins, the pointer is the way the page turns, drawn as our icons are (1.5 strokes,
    round ends), in the title colour with a page-coloured edge, so it reads over text too. Only where there is a page to go to. */
 .page-screen[data-turn='back'] {
-  cursor: url('./cursors/turn-back.svg') 12 12, w-resize;
+  cursor:
+    url('./cursors/turn-back.svg') 12 12,
+    w-resize;
 }
 .page-screen[data-turn='on'] {
-  cursor: url('./cursors/turn-on.svg') 12 12, e-resize;
+  cursor:
+    url('./cursors/turn-on.svg') 12 12,
+    e-resize;
 }
 [data-theme='night'] .page-screen[data-turn='back'] {
-  cursor: url('./cursors/turn-back-night.svg') 12 12, w-resize;
+  cursor:
+    url('./cursors/turn-back-night.svg') 12 12,
+    w-resize;
 }
 [data-theme='night'] .page-screen[data-turn='on'] {
-  cursor: url('./cursors/turn-on-night.svg') 12 12, e-resize;
+  cursor:
+    url('./cursors/turn-on-night.svg') 12 12,
+    e-resize;
 }
 
 .head {
@@ -271,7 +308,9 @@ button {
   font-size: 13px;
   line-height: 1;
   color: var(--secondary);
-  transition: color 160ms, background-color 160ms;
+  transition:
+    color 160ms,
+    background-color 160ms;
 }
 .word-button:hover .word,
 .word-button:active .word {
@@ -482,7 +521,10 @@ button {
   font-variant-numeric: lining-nums tabular-nums;
 }
 @media (min-width: 700px) {
-  .count { padding: 0 10px 0 12px; font-size: 12.5px; }
+  .count {
+    padding: 0 10px 0 12px;
+    font-size: 12.5px;
+  }
 }
 
 .line {
@@ -527,8 +569,14 @@ button {
   color: var(--title);
 }
 @media (min-width: 700px) {
-  .sheet { left: auto; right: calc(var(--frame) + var(--edge)); width: 300px; }
-  .sheet[aria-label='Export'] { width: 366px; }
+  .sheet {
+    left: auto;
+    right: calc(var(--frame) + var(--edge));
+    width: 300px;
+  }
+  .sheet[aria-label='Export'] {
+    width: 366px;
+  }
 }
 
 .setting {
@@ -585,8 +633,13 @@ button {
   border-radius: 50%;
   border: 1px solid #b5b5b2;
 }
-.swatch.paper { background: #f3f3f0; }
-.swatch.night { background: #0e0e0e; border-color: #0e0e0e; }
+.swatch.paper {
+  background: #f3f3f0;
+}
+.swatch.night {
+  background: #0e0e0e;
+  border-color: #0e0e0e;
+}
 
 .toggle {
   display: flex;
@@ -622,7 +675,12 @@ button {
   left: 20px;
 }
 @media (prefers-reduced-motion: no-preference) {
-  .switch, .switch::after { transition: left 160ms, background-color 160ms; }
+  .switch,
+  .switch::after {
+    transition:
+      left 160ms,
+      background-color 160ms;
+  }
 }
 
 .sheet-foot {
@@ -651,7 +709,9 @@ button {
   flex-direction: column;
 }
 @media (min-width: 700px) {
-  .library { padding-top: 88px; }
+  .library {
+    padding-top: 88px;
+  }
 }
 
 .library-head {
@@ -847,8 +907,12 @@ button {
 .start {
   isolation: isolate;
 }
-.start.book { padding-left: 20px; }
-.start.journal { padding-right: 26px; }
+.start.book {
+  padding-left: 20px;
+}
+.start.journal {
+  padding-right: 26px;
+}
 .start .mark {
   font-size: 19px;
   color: var(--secondary);
@@ -1137,7 +1201,9 @@ button {
   max-height: calc(100dvh - 24px);
 }
 @media (min-width: 700px) {
-  .import-sheet { width: 366px; }
+  .import-sheet {
+    width: 366px;
+  }
 }
 .import-file {
   display: flex;
@@ -1185,14 +1251,18 @@ button {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transition: opacity 120ms 0s, visibility 0s 120ms;
+  transition:
+    opacity 120ms 0s,
+    visibility 0s 120ms;
 }
 @media (hover: hover) and (min-width: 700px) {
   .tooltip-anchor:hover .tooltip,
   .tooltip-anchor:has(:focus-visible) .tooltip {
     opacity: 1;
     visibility: visible;
-    transition: opacity 120ms 500ms, visibility 0s 500ms;
+    transition:
+      opacity 120ms 500ms,
+      visibility 0s 500ms;
   }
 }
 
@@ -1240,7 +1310,9 @@ button {
   pointer-events: none;
 }
 @media (min-width: 700px) {
-  .page-screen.journal::before { left: calc(var(--side) - 44px); }
+  .page-screen.journal::before {
+    left: calc(var(--side) - 44px);
+  }
 }
 .day-words {
   position: absolute;

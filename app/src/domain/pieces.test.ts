@@ -66,7 +66,10 @@ describe('pieces', () => {
     await takeMoment(deps, piece.id)
     await takeMoment(deps, piece.id, { kept: true })
     const versions = history(await store.transaction((tx) => tx.versionsOf(section)))
-    expect(versions.map((v) => [v.content, v.kept ?? false])).toEqual([['Same.', false], ['Same.', true]])
+    expect(versions.map((v) => [v.content, v.kept ?? false])).toEqual([
+      ['Same.', false],
+      ['Same.', true],
+    ])
   })
 
   it('a renamed piece gets a new outline version at the next moment', async () => {
@@ -119,7 +122,10 @@ describe('pieces', () => {
     expect((await openPiece(deps, journal.id))!.piece.sections.map((s) => s.title)).toEqual(['2026-10-27'])
     await write(deps, b.piece, b.sectionId, 'Monday.')
     const open = await openPiece(deps, journal.id)
-    expect(open!.sections.map((s) => [s.title, s.content])).toEqual([['2026-10-26', 'Monday.'], ['2026-10-27', 'Tuesday.']])
+    expect(open!.sections.map((s) => [s.title, s.content])).toEqual([
+      ['2026-10-26', 'Monday.'],
+      ['2026-10-27', 'Tuesday.'],
+    ])
     expect(totalWords(open!.piece)).toBe(2)
   })
 

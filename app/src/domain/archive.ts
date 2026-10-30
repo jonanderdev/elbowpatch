@@ -73,9 +73,7 @@ export async function exportAll(deps: Pick<Deps, 'store' | 'clock'>): Promise<Ar
   return files
 }
 
-export type ImportResult =
-  | { ok: true; added: number; alreadyHere: number }
-  | { ok: false; reason: 'newer-format' | 'not-an-export' | 'incomplete' }
+export type ImportResult = { ok: true; added: number; alreadyHere: number } | { ok: false; reason: 'newer-format' | 'not-an-export' | 'incomplete' }
 
 /**
  * Our own export comes back as it was, history included. Never overwrites:
@@ -143,7 +141,13 @@ export async function importArchive(deps: Deps, files: ArchiveFile[]): Promise<I
         ...(here ? { copyOf: print } : {}),
       })
       for (const o of outlines)
-        await tx.putOutline({ ...o, id: ids(o.id), pieceId: ids(o.pieceId), parentId: o.parentId && ids(o.parentId), sections: o.sections.map((s) => ({ ...s, sectionId: ids(s.sectionId) })) })
+        await tx.putOutline({
+          ...o,
+          id: ids(o.id),
+          pieceId: ids(o.pieceId),
+          parentId: o.parentId && ids(o.parentId),
+          sections: o.sections.map((s) => ({ ...s, sectionId: ids(s.sectionId) })),
+        })
       for (const { file: _, ...v } of versions)
         await tx.putVersion({ ...v, id: ids(v.id), pieceId: ids(v.pieceId), sectionId: ids(v.sectionId), parentId: v.parentId && ids(v.parentId) })
       for (const { file: _, ...w } of working)
@@ -176,7 +180,9 @@ async function identical(
 
 /** What a piece in an export is, compactly: so the same export imported twice adds one copy, not two. */
 function fingerprint(piece: Piece, versions: Version[], working: Working[]): string {
-  const all = [piece.id, piece.title, ...piece.sections.map((s) => s.title), ...versions.map((v) => v.id).sort(), ...working.map((w) => w.content)].join('\u0000')
+  const all = [piece.id, piece.title, ...piece.sections.map((s) => s.title), ...versions.map((v) => v.id).sort(), ...working.map((w) => w.content)].join(
+    '\u0000',
+  )
   let h = 0x811c9dc5
   for (let i = 0; i < all.length; i++) h = Math.imul(h ^ all.charCodeAt(i), 0x01000193)
   return `${piece.id}:${(h >>> 0).toString(36)}`
@@ -188,7 +194,10 @@ function fingerprint(piece: Piece, versions: Version[], working: Working[]): str
  * anything else an essay.
  */
 export function guessKind(markdown: string): Kind {
-  const headings = markdown.split('\n').filter((l) => l.startsWith('# ')).map((l) => l.slice(2).trim())
+  const headings = markdown
+    .split('\n')
+    .filter((l) => l.startsWith('# '))
+    .map((l) => l.slice(2).trim())
   if (headings.length > 0 && headings.every((h) => readDay(h))) return 'journal'
   return headings.length >= 2 ? 'book' : 'essay'
 }
@@ -263,7 +272,11 @@ function lastTitle(outlines: Outline[], sectionId: string): string {
 
 function safe(name: string): string {
   // No path parts: a title of ".." must not climb out of the export's folder.
-  return name.replace(/[\\/:*?"<>|]/g, '').trim().replace(/^\.+/, '').trim()
+  return name
+    .replace(/[\\/:*?"<>|]/g, '')
+    .trim()
+    .replace(/^\.+/, '')
+    .trim()
 }
 
 /** Unique ignoring case: "Notes" and "notes" are one folder on most disks. */

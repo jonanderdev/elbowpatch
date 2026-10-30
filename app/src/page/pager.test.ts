@@ -43,12 +43,7 @@ describe('paging maths', () => {
       left: flowLeft + page * g.stride + left,
       right: flowLeft + page * g.stride + right,
     })
-    const lines = linesOf(
-      [box(1, 88, 0, 300), box(0, 700, 0, 340), box(1, 88, 300, 330), box(0, 671, 0, 342), box(1, 117, 0, 120)],
-      g,
-      flowLeft,
-      29,
-    )
+    const lines = linesOf([box(1, 88, 0, 300), box(0, 700, 0, 340), box(1, 88, 300, 330), box(0, 671, 0, 342), box(1, 117, 0, 120)], g, flowLeft, 29)
     expect(lines.map((l) => [l.page, l.top, l.left, l.right])).toEqual([
       [0, 671, 0, 342],
       [0, 700, 0, 340],

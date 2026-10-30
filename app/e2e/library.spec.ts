@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, type Page, test } from '@playwright/test'
 
 async function essay(page: Page, title: string, text: string) {
   await page.goto('./#/')

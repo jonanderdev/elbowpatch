@@ -8,7 +8,7 @@
 
 import { TextSelection } from 'prosemirror-state'
 import type { EditorView } from 'prosemirror-view'
-import { linesOf, pageAt, type Line, type Pager } from './pager'
+import { type Line, linesOf, type Pager, pageAt } from './pager'
 
 /** Marks a selection the page set itself, already on the page in view. */
 export const PAGED = 'elbowpatch-paged'

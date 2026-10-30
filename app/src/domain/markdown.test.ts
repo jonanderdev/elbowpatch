@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { countWords, parse, serialize, type Block } from './markdown'
+import { type Block, countWords, parse, serialize } from './markdown'
 
 const roundTrip = (md: string) => serialize(parse(md))
 

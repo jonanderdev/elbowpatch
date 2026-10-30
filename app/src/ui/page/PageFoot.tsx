@@ -1,4 +1,4 @@
-import type { RefObject, ReactElement } from 'react'
+import type { ReactElement, RefObject } from 'react'
 import { words as wordsLine } from '../../domain/words'
 import { ToolsBar } from './Tools'
 
@@ -20,7 +20,20 @@ interface PageFootProps {
 }
 
 /** The foot of the page: the page button, which opens into the tools bar. */
-export function PageFoot({ page, count, words, journal, tools, showWayIn, keyboard, pageButtonRef, onOpenTools, onCloseTools, onTextSettings, onExport }: PageFootProps): ReactElement {
+export function PageFoot({
+  page,
+  count,
+  words,
+  journal,
+  tools,
+  showWayIn,
+  keyboard,
+  pageButtonRef,
+  onOpenTools,
+  onCloseTools,
+  onTextSettings,
+  onExport,
+}: PageFootProps): ReactElement {
   return (
     <div className={keyboard > 0 ? 'foot raised' : 'foot'} style={keyboard > 0 ? { bottom: keyboard } : undefined}>
       {/* The day's words, at the text's left edge, level with the page button. */}
@@ -34,7 +47,13 @@ export function PageFoot({ page, count, words, journal, tools, showWayIn, keyboa
               Your tools are here
             </span>
           )}
-          <button ref={pageButtonRef} type="button" className="page-button surface" aria-label={`Page ${page + 1} of ${count}. Open tools`} onClick={onOpenTools}>
+          <button
+            ref={pageButtonRef}
+            type="button"
+            className="page-button surface"
+            aria-label={`Page ${page + 1} of ${count}. Open tools`}
+            onClick={onOpenTools}
+          >
             {page + 1}
           </button>
         </>

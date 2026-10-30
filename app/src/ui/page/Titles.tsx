@@ -1,4 +1,4 @@
-import type { RefObject, ReactElement } from 'react'
+import type { ReactElement, RefObject } from 'react'
 import { emptied } from './fields'
 
 // The page's title fields. They are uncontrolled: their text is filled when a section opens

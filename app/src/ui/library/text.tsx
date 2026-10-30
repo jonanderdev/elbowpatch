@@ -30,4 +30,3 @@ export function meta(piece: Piece, today: string, now: number): string {
   const todayWords = todays ? (piece.words?.[todays.sectionId] ?? 0) : 0
   return `${number(days)} ${days === 1 ? 'day' : 'days'} · ${todayWords ? `${words(todayWords)} today` : 'nothing yet today'}`
 }
-

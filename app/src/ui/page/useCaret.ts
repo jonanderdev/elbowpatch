@@ -1,6 +1,6 @@
-import { type RefObject, useEffect, useRef } from 'react'
 import { type Selection, TextSelection, type Transaction } from 'prosemirror-state'
 import type { EditorView } from 'prosemirror-view'
+import { type RefObject, useEffect, useRef } from 'react'
 import { drawnBeforeBreak, type LineMemory, moveLine, PAGED, showCaret, stepIfStuck } from '../../page/caret'
 import type { Editor } from '../../page/editor'
 import type { Pager } from '../../page/pager'
@@ -57,7 +57,13 @@ export function useCaretKeys(pager: Pager | null, flow: RefObject<HTMLDivElement
  * once the browser has drawn it, show the page it is drawn on. One rule in one place, since the
  * browser's own moves can land in a column out of view.
  */
-export function useCaretFollowing(editor: Editor | null, pager: Pager | null, flow: RefObject<HTMLDivElement | null>, mount: RefObject<HTMLDivElement | null>, memory: CaretMemory): void {
+export function useCaretFollowing(
+  editor: Editor | null,
+  pager: Pager | null,
+  flow: RefObject<HTMLDivElement | null>,
+  mount: RefObject<HTMLDivElement | null>,
+  memory: CaretMemory,
+): void {
   useEffect(() => {
     const flowEl = flow.current
     const mountEl = mount.current

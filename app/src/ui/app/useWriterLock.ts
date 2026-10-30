@@ -17,7 +17,12 @@ export interface WriterLockState {
   writeHere(reload: () => Promise<void>): Promise<void>
 }
 
-export function useWriterLock(lock: WriterLock, pieceId: string | undefined, flushPage: { current: (() => Promise<void>) | null }, closing: { current: Promise<void> }): WriterLockState {
+export function useWriterLock(
+  lock: WriterLock,
+  pieceId: string | undefined,
+  flushPage: { current: (() => Promise<void>) | null },
+  closing: { current: Promise<void> },
+): WriterLockState {
   // Kept with the piece it is about, so a newly opened piece is never taken for one already held.
   const [writerOf, setWriterOf] = useState<{ pieceId?: string; state: Writer }>({ state: 'waiting' })
   const held = useRef<Held | null>(null)

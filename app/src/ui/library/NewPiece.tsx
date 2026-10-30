@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode, type ReactElement } from 'react'
+import { type ReactElement, type ReactNode, useEffect, useRef, useState } from 'react'
 import type { Kind } from '../../domain/model'
 import { ordinal } from '../../domain/words'
 import { Icon, IconButton } from '../components/Icon'
@@ -13,8 +13,18 @@ export const KINDS: { kind: Kind; group: string; word: string }[] = [
 
 /** Kinds have marks, not drawings: & for a book, today's date for the journal, ¶ for an essay. */
 export function KindMark({ kind, today }: { kind: Kind; today: string }): ReactElement {
-  if (kind === 'book') return <span className="mark" aria-hidden="true">&amp;</span>
-  if (kind === 'essay') return <span className="mark" aria-hidden="true">¶</span>
+  if (kind === 'book')
+    return (
+      <span className="mark" aria-hidden="true">
+        &amp;
+      </span>
+    )
+  if (kind === 'essay')
+    return (
+      <span className="mark" aria-hidden="true">
+        ¶
+      </span>
+    )
   const day = Number(today.slice(8, 10))
   return (
     <span className="mark" aria-hidden="true">

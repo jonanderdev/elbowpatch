@@ -14,10 +14,7 @@ export interface Span {
 /** A line break inside a block (Markdown's single newline). */
 export const BREAK = '\n'
 
-export type Block =
-  | { type: 'paragraph'; spans: Span[] }
-  | { type: 'quote'; spans: Span[] }
-  | { type: 'raw'; text: string }
+export type Block = { type: 'paragraph'; spans: Span[] } | { type: 'quote'; spans: Span[] } | { type: 'raw'; text: string }
 
 export function parse(markdown: string): Block[] {
   const source = markdown.replace(/\r\n?/g, '\n').replace(/^\n+|\n+$/g, '')
@@ -55,7 +52,11 @@ function parseBlock(source: string): Block {
 function serializeBlock(block: Block): string {
   if (block.type === 'raw') return block.text
   const text = serializeInline(block.spans)
-  if (block.type === 'quote') return text.split('\n').map((l) => `> ${l}`).join('\n')
+  if (block.type === 'quote')
+    return text
+      .split('\n')
+      .map((l) => `> ${l}`)
+      .join('\n')
   return text
 }
 
@@ -111,10 +112,11 @@ function serializeInline(spans: Span[]): string {
   for (const span of merge(spans)) {
     // Close what this span does not carry (innermost first), then open what it adds.
     while (open.some((m) => !span.marks.includes(m))) out += marker(open.pop()!)
-    for (const m of ORDER) if (span.marks.includes(m) && !open.includes(m)) {
-      out += marker(m)
-      open.push(m)
-    }
+    for (const m of ORDER)
+      if (span.marks.includes(m) && !open.includes(m)) {
+        out += marker(m)
+        open.push(m)
+      }
     out += escapeText(span.text, out)
   }
   while (open.length) out += marker(open.pop()!)
@@ -127,9 +129,7 @@ const marker = (m: Mark) => (m === 'strong' ? '**' : '*')
 function escapeText(text: string, before: string): string {
   let out = text.replace(/[\\*]/g, '\\$&')
   // `#` or `>` that would start a line means a heading or a quote: escape it (0003).
-  out = out.replace(/(^|\n)([#>])/g, (m, nl: string, c: string, offset: number) =>
-    offset === 0 && !atLineStart(before) ? m : `${nl}\\${c}`,
-  )
+  out = out.replace(/(^|\n)([#>])/g, (m, nl: string, c: string, offset: number) => (offset === 0 && !atLineStart(before) ? m : `${nl}\\${c}`))
   return out
 }
 

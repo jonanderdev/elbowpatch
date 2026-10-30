@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode, type ReactElement } from 'react'
+import { type ReactElement, type ReactNode, useEffect, useRef, useState } from 'react'
 import type { Piece } from '../../domain/model'
 import { IconButton } from '../components/Icon'
 

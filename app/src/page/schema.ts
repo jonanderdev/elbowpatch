@@ -1,5 +1,5 @@
-import { Schema, type Node } from 'prosemirror-model'
-import { BREAK, type Block, type Mark, type Span } from '../domain/markdown'
+import { type Node, Schema } from 'prosemirror-model'
+import { type Block, BREAK, type Mark, type Span } from '../domain/markdown'
 
 // The page's editor schema: the v1 marks of docs/decisions/0003. A `raw` block
 // holds Markdown outside them, shown with its symbols and written back as is.

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, type Page, test } from '@playwright/test'
 import { saved } from './helpers'
 
 async function essay(page: Page, title: string, text: string) {
@@ -99,7 +99,10 @@ test('a put-away piece cannot be reopened with the Back button', async ({ page }
   await page.locator('.row', { hasText: 'Gone for now' }).click()
   await expect(page.locator('.title')).toHaveText('Gone for now')
   await page.locator('.head .word-button').click()
-  await page.locator('.continue').click({ button: 'right' }).catch(() => {})
+  await page
+    .locator('.continue')
+    .click({ button: 'right' })
+    .catch(() => {})
   await page.keyboard.press('Escape')
   // "Gone for now" is in Continue now; open "Here" and come back so it is a row.
   await page.locator('.row', { hasText: 'Here' }).click()

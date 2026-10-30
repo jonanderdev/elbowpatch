@@ -1,5 +1,5 @@
-import type { Kind, Outline, Piece, Place, Version, Working } from './model'
 import { countWords } from './markdown'
+import type { Kind, Outline, Piece, Place, Version, Working } from './model'
 import type { Clock, Ids, Store, Tx } from './ports'
 
 export interface Deps {

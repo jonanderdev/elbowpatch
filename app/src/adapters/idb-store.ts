@@ -1,4 +1,4 @@
-import { openDB, type DBSchema, type IDBPDatabase, type IDBPTransaction } from 'idb'
+import { type DBSchema, type IDBPDatabase, type IDBPTransaction, openDB } from 'idb'
 import type { Outline, Piece, Version, Working } from '../domain/model'
 import type { Store, Tx } from '../domain/ports'
 

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from 'react'
+import { type ReactElement, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { Editor } from '../../page/editor'
 import { Icon, IconButton } from '../components/Icon'
 
@@ -37,7 +37,17 @@ function Formatting({ editor, active }: { editor: Editor; active: ReturnType<Edi
  * The selection menu: the same rounded bar, floating over the selected words
  * (DESIGN.md, Control). § waits for chapters.
  */
-export function SelectionMenu({ editor, rect, active, onKeep }: { editor: Editor; rect: DOMRect; active: ReturnType<Editor['active']>; onKeep(): void }): ReactElement {
+export function SelectionMenu({
+  editor,
+  rect,
+  active,
+  onKeep,
+}: {
+  editor: Editor
+  rect: DOMRect
+  active: ReturnType<Editor['active']>
+  onKeep(): void
+}): ReactElement {
   const ref = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
   useLayoutEffect(() => {

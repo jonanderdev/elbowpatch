@@ -19,7 +19,8 @@ Adapted in part from Vercel's `react-best-practices` and `composition-patterns` 
 
 ## Components
 
-- **One job per component.** If describing it needs "and", or the file passes ~250 lines, split it.
+- **One job per component.** If describing it needs "and", split it. Past ~250 lines, check whether
+  it does; a screen that only composes hooks and lays out its parts may run longer.
   A screen composes smaller components; it does not draw everything itself.
 - **Compose instead of adding boolean props.** `showFoo`, `isCompact`, `withBar` multiply into
   states nobody tests. Pass children, or make explicit variants (`<CardRow>`, `<CardTile>`).
@@ -117,8 +118,9 @@ The editor (ProseMirror) and the pager are imperative and long-lived.
 
 - **Every export states its types**, return types included. TypeScript's `isolatedDeclarations`
   enforces it; local callbacks keep their inferred types.
-- **`npm run lint`** (Biome) checks hook rules, effect dependencies and accessibility. Silence a
-  rule only with a `biome-ignore` comment that says why.
+- **`npm run lint`** (Biome) checks hook rules, effect dependencies, accessibility, formatting and
+  import order; `npm run format` fixes the last two. Silence a rule only with a `biome-ignore`
+  comment that says why.
 
 ## JavaScript
 
@@ -141,7 +143,7 @@ region. (Interface rules in full: the `web-design-guidelines` skill.)
 
 ## Checks
 
-- `npx tsc -b`, and the Playwright suite (`npx playwright test`, run under `caffeinate`) after any
+- `npm run typecheck && npm run lint && npm test` (what CI runs), and the Playwright suite (`npx playwright test`, run under `caffeinate`) after any
   change to a screen; it is the safety net for behaviour moved between components.
 - For changes that touch the caret or paging, also `node scripts/painted-caret.mjs all`
   (docs/decisions/0007).
