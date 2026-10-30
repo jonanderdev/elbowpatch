@@ -47,6 +47,10 @@ const OFF_TOPIC = [
   "logo", "logotype", "branding", "brand identity", "packaging",
   "poster", "book cover", "sticker", "mockup",
   "chatbot", "mood tracker", "habit tracker",
+  // "Editor" on Dribbble is mostly code, video, and photo tools and AI products.
+  "video editor", "photo editor", "code editor", "ide",
+  "agent", "assistant", "copilot", "generator",
+  "dashboard", "saas", "crm",
 ];
 const keep = words(flag("keep", ""));
 const dropWords = [...OFF_TOPIC.filter((w) => !keep.includes(w)), ...words(flag("drop", ""))];

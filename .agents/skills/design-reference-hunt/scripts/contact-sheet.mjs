@@ -37,9 +37,10 @@ const lines = readFileSync(tsvPath, "utf8")
   .map((l) => l.trim())
   .filter(Boolean)
   .map((l) => {
-    const tab = l.indexOf("\t");
-    if (tab === -1) return { label: l, url: l };
-    return { label: l.slice(0, tab).trim(), url: l.slice(tab + 1).trim() };
+    // label\timageURL, and any columns after that (a listing URL) are ignored.
+    const cols = l.split("\t").map((c) => c.trim());
+    if (cols.length === 1) return { label: l, url: l };
+    return { label: cols[0], url: cols[1] };
   })
   .filter((r) => /^https?:\/\//i.test(r.url));
 

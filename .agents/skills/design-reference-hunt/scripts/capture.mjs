@@ -7,6 +7,7 @@
 //   node capture.mjs <url> --out .design/refs/name.jpg --clip x,y,w,h
 //   node capture.mjs <url> --out .design/refs/name.jpg --clip-selector "main"
 //   node capture.mjs file:///abs/path/moodboard.html --out /tmp/moodboard.jpg
+//   node capture.mjs file:///abs/path/shot.jpg --out .design/refs/name.jpg --clip x,y,w,h
 import { spawn, execSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -200,7 +201,14 @@ await page("Emulation.setDeviceMetricsOverride", {
   deviceScaleFactor: 1,
   mobile: false,
 });
-await page("Page.navigate", { url }, 40000);
+// Chrome centres an image file and shrinks it to the window. A page that holds
+// it at full size from 0,0 makes --clip x,y,w,h the image's own pixels.
+let target = url;
+if (/^file:\/\/.*\.(png|jpe?g|webp|gif)$/i.test(url)) {
+  target = `file://${join(dir, "image.html")}`;
+  writeFileSync(join(dir, "image.html"), `<!doctype html><body style="margin:0;background:#000"><img src="${url.replace(/"/g, "%22")}" style="display:block">`);
+}
+await page("Page.navigate", { url: target }, 40000);
 await sleep(2500);
 
 const beforeHref = (
@@ -348,11 +356,13 @@ const shotClip = clipBox
     }
   : { x: 0, y: 0, width: fullWidth, height: fullHeight, scale: 1 };
 
+// The file is what its name says, so a reader that trusts the extension is right.
+const format = /\.png$/i.test(out) ? "png" : /\.webp$/i.test(out) ? "webp" : "jpeg";
 const { data } = await page(
   "Page.captureScreenshot",
   {
-    format: "jpeg",
-    quality: 70,
+    format,
+    ...(format === "png" ? {} : { quality: 70 }),
     captureBeyondViewport: true,
     clip: shotClip,
   },
@@ -369,7 +379,7 @@ if (reviewOut) {
   const reviewHtml = `<!doctype html><meta charset=utf-8>
 <canvas id=c></canvas>
 <script>
-const src = "data:image/jpeg;base64,${data}";
+const src = "data:image/${format};base64,${data}";
 const img = new Image();
 img.onload = () => {
   const colH = 2800;
@@ -411,7 +421,7 @@ img.src = src;
   const { data: reviewData } = await page(
     "Page.captureScreenshot",
     {
-      format: "jpeg",
+      format: /\.png$/i.test(reviewOut) ? "png" : "jpeg",
       quality: 75,
       clip: { x: 0, y: 0, width: sizeResult.value.w, height: sizeResult.value.h, scale: 1 },
       captureBeyondViewport: true,

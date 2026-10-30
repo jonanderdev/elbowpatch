@@ -2,40 +2,48 @@
   "version": 1,
   "skills": {
     "ponytail": {
-      "source": "https://github.com/DietrichGebert/ponytail/tree/main/skills",
+      "source": "https://github.com/DietrichGebert/ponytail",
       "author": "DietrichGebert",
       "agents": [
         "cursor",
         "claude-code"
       ],
-      "installedAt": "2026-10-26T08:53:36.690Z"
+      "installedAt": "2026-10-30T11:50:39.990Z",
+      "kit": "ponytail",
+      "hash": "665a575a8987e0bafe6b3e3dbafe03794a013d51ff34bd3d91a924940e2b0767"
     },
     "ponytail-review": {
-      "source": "https://github.com/DietrichGebert/ponytail/tree/main/skills",
+      "source": "https://github.com/DietrichGebert/ponytail",
       "author": "DietrichGebert",
       "agents": [
         "cursor",
         "claude-code"
       ],
-      "installedAt": "2026-10-26T08:53:36.690Z"
+      "installedAt": "2026-10-30T11:50:39.990Z",
+      "kit": "ponytail",
+      "hash": "65a1a3fa40b607a6bb9fd00d8d7335ab5ae5386831ea21089d488909ee73d0ad"
     },
     "ponytail-audit": {
-      "source": "https://github.com/DietrichGebert/ponytail/tree/main/skills",
+      "source": "https://github.com/DietrichGebert/ponytail",
       "author": "DietrichGebert",
       "agents": [
         "cursor",
         "claude-code"
       ],
-      "installedAt": "2026-10-26T08:53:36.690Z"
+      "installedAt": "2026-10-30T11:50:39.990Z",
+      "kit": "ponytail",
+      "hash": "1fb0481ea454d15d211c183cc4365a6d2db3212f22203a214cd3a65ec46bb8e7"
     },
     "ponytail-debt": {
-      "source": "https://github.com/DietrichGebert/ponytail/tree/main/skills",
+      "source": "https://github.com/DietrichGebert/ponytail",
       "author": "DietrichGebert",
       "agents": [
         "cursor",
         "claude-code"
       ],
-      "installedAt": "2026-10-26T08:53:36.690Z"
+      "installedAt": "2026-10-30T11:50:39.990Z",
+      "kit": "ponytail",
+      "hash": "6b7cde978bc8ad6d1d46ac7e03f0037853cce79354684475272416768264f6e4"
     },
     "diagnosing-bugs": {
       "source": "https://github.com/mattpocock/skills",
@@ -44,7 +52,9 @@
         "cursor",
         "claude-code"
       ],
-      "installedAt": "2026-10-26T08:53:36.690Z"
+      "installedAt": "2026-10-30T11:50:39.991Z",
+      "kit": "mattpocock-skills",
+      "hash": "84a0764dddd7bc294543465210287b9c8afc84561e9476e29af5aa8bfe32c984"
     },
     "premortem": {
       "source": "https://github.com/joetawil7/first-pass/tree/main/skills",
@@ -53,7 +63,8 @@
         "cursor",
         "claude-code"
       ],
-      "installedAt": "2026-10-26T08:53:36.690Z"
+      "installedAt": "2026-10-30T11:50:39.993Z",
+      "hash": "f48cbdca352a2b7bf89b146798581b99d028f58bf8687d645657cda99d4c1c76"
     },
     "grill-me": {
       "source": "https://github.com/mattpocock/skills",
@@ -62,7 +73,9 @@
         "cursor",
         "claude-code"
       ],
-      "installedAt": "2026-10-26T08:53:36.690Z"
+      "installedAt": "2026-10-30T11:50:39.991Z",
+      "kit": "mattpocock-skills",
+      "hash": "d983fc6945c3ac0b1dfdd957c53c1b5f2063f88b49944d595a5729ab3fc1794c"
     },
     "grilling": {
       "source": "https://github.com/mattpocock/skills",
@@ -71,7 +84,9 @@
         "cursor",
         "claude-code"
       ],
-      "installedAt": "2026-10-26T08:53:36.690Z"
+      "installedAt": "2026-10-30T11:50:39.992Z",
+      "kit": "mattpocock-skills",
+      "hash": "42ea9ca084a4e95c9682bd1fe541dcef6641695cc7ececccf5b94ce71c06e79f"
     },
     "design-reference-hunt": {
       "source": "local",
@@ -80,8 +95,9 @@
         "cursor",
         "claude-code"
       ],
-      "installedAt": "2026-10-26T08:53:36.690Z",
-      "version": "0.6.0"
+      "installedAt": "2026-10-30T11:50:39.993Z",
+      "version": "0.8.0",
+      "hash": "6ad4cd89defb34bb7bfc760b35459cb79b174697887d904125022a083aa5f093"
     },
     "design-taste-frontend": {
       "source": "https://github.com/Leonxlnx/taste-skill",
@@ -90,7 +106,8 @@
         "cursor",
         "claude-code"
       ],
-      "installedAt": "2026-10-26T08:53:36.691Z"
+      "installedAt": "2026-10-30T11:50:39.993Z",
+      "hash": "7adee7a3bbbfda3c5844442d116096a1d6f0a487a370bdcaa196ba62d78b7f00"
     },
     "animate": {
       "source": "https://github.com/emilkowalski/skills/tree/main/skills/animate",
@@ -99,7 +116,8 @@
         "cursor",
         "claude-code"
       ],
-      "installedAt": "2026-10-26T08:53:36.691Z"
+      "installedAt": "2026-10-30T11:50:40.001Z",
+      "hash": "3c453959b87069ca6670f0cb3e2ca585c419f72432107707220332a54cf60353"
     },
     "figma-design-to-code": {
       "source": "https://github.com/figma/mcp-server-guide/tree/main/skills",
@@ -108,7 +126,8 @@
         "cursor",
         "claude-code"
       ],
-      "installedAt": "2026-10-26T08:53:36.691Z"
+      "installedAt": "2026-10-30T11:50:40.001Z",
+      "hash": "1545f13d994c45792422fc3ac2c04e39dbc35361321c53ddf12fb541d9b4de42"
     },
     "web-design-guidelines": {
       "source": "https://github.com/vercel-labs/agent-skills/tree/main/skills/web-design-guidelines",
@@ -117,7 +136,8 @@
         "cursor",
         "claude-code"
       ],
-      "installedAt": "2026-10-26T08:53:36.691Z"
+      "installedAt": "2026-10-30T11:50:40.002Z",
+      "hash": "d5cb29ea15d5ceeb4ef0802e75c17ef4287c6f60ff8aa05e46c6080f615178bc"
     },
     "jury": {
       "source": "https://github.com/juliobsz/skills/tree/main/jury",
@@ -126,7 +146,8 @@
         "cursor",
         "claude-code"
       ],
-      "installedAt": "2026-10-26T08:53:36.691Z"
+      "installedAt": "2026-10-30T11:50:40.002Z",
+      "hash": "c623292a78a0ce9e6efb34c2c33a42226fabfb6fe64a7cd58c1b025b61bac2f0"
     },
     "handoff": {
       "source": "https://github.com/mattpocock/skills",
@@ -135,7 +156,9 @@
         "cursor",
         "claude-code"
       ],
-      "installedAt": "2026-10-26T08:53:36.691Z"
+      "installedAt": "2026-10-30T11:50:39.992Z",
+      "kit": "mattpocock-skills",
+      "hash": "5565d3a5f7eb90092512634414a81924c77e4f782dbe25484922cdd86c7a3cc4"
     },
     "design-md": {
       "source": "local",
@@ -144,8 +167,284 @@
         "cursor",
         "claude-code"
       ],
-      "installedAt": "2026-10-26T08:53:36.691Z",
-      "version": "0.6.0"
+      "installedAt": "2026-10-30T11:50:40.003Z",
+      "version": "0.8.0",
+      "hash": "a67e68d8abd82e14f865dc94ca596b5b154e3e2ae9c1ac9f1d7ba9e867fd896f"
+    },
+    "ponytail-gain": {
+      "source": "https://github.com/DietrichGebert/ponytail",
+      "author": "DietrichGebert",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-30T11:50:27.793Z",
+      "kit": "ponytail",
+      "hash": "09924370cf37cce19d1be70467e65470c4c0a189d48934153b9d84accd6582fd"
+    },
+    "ponytail-help": {
+      "source": "https://github.com/DietrichGebert/ponytail",
+      "author": "DietrichGebert",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-30T11:50:27.793Z",
+      "kit": "ponytail",
+      "hash": "0598815db6e842b0de85dd4659216cdb5a437449b6d62100e7359067733f7c3e"
+    },
+    "ask-matt": {
+      "source": "https://github.com/mattpocock/skills",
+      "author": "Matt Pocock",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-30T11:50:27.793Z",
+      "kit": "mattpocock-skills",
+      "hash": "85088a104f6e69122a307ba082255116d8073a9974b6fefcfe7b3d2d139098ed"
+    },
+    "grill-with-docs": {
+      "source": "https://github.com/mattpocock/skills",
+      "author": "Matt Pocock",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-30T11:50:27.794Z",
+      "kit": "mattpocock-skills",
+      "hash": "82c1260cc740362f058733c764da971e16b3f0a16562f0d572485ce3f1a6f0c1"
+    },
+    "triage": {
+      "source": "https://github.com/mattpocock/skills",
+      "author": "Matt Pocock",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-30T11:50:27.794Z",
+      "kit": "mattpocock-skills",
+      "hash": "68bd30f66055c5e59bacd364fb65f4409bc1cd5b071b976ececd1d512e5dfd1a"
+    },
+    "improve-codebase-architecture": {
+      "source": "https://github.com/mattpocock/skills",
+      "author": "Matt Pocock",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-30T11:50:27.794Z",
+      "kit": "mattpocock-skills",
+      "hash": "392561550dc4b3f8c6411ed7920b2b53a3e8e315dc26ff438214feee7bf074d2"
+    },
+    "setup-matt-pocock-skills": {
+      "source": "https://github.com/mattpocock/skills",
+      "author": "Matt Pocock",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-30T11:50:27.794Z",
+      "kit": "mattpocock-skills",
+      "hash": "f4d12172503bbb26d33b600b115b8994ad4d039f6901a571e00f887dbeb590dd"
+    },
+    "tdd": {
+      "source": "https://github.com/mattpocock/skills",
+      "author": "Matt Pocock",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-30T11:50:27.794Z",
+      "kit": "mattpocock-skills",
+      "hash": "2d5c6c96411e358348cf99c3fa32038a0d7fba721b6d0ece927cec73846d07d2"
+    },
+    "to-spec": {
+      "source": "https://github.com/mattpocock/skills",
+      "author": "Matt Pocock",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-30T11:50:27.794Z",
+      "kit": "mattpocock-skills",
+      "hash": "93722d95e5260855d8a26d1b6565343180d982df8283e7229ffaceae479308c8"
+    },
+    "to-tickets": {
+      "source": "https://github.com/mattpocock/skills",
+      "author": "Matt Pocock",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-30T11:50:27.795Z",
+      "kit": "mattpocock-skills",
+      "hash": "9f91bd7af3c6b79f6010b4f5baa182822bb365d603c443688169d916cfea46b9"
+    },
+    "wayfinder": {
+      "source": "https://github.com/mattpocock/skills",
+      "author": "Matt Pocock",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-30T11:50:27.795Z",
+      "kit": "mattpocock-skills",
+      "hash": "7ff85b02c0bdecdbd21af2c4c09445ac9655d03cace74890e9a631b4840cf0e9"
+    },
+    "implement": {
+      "source": "https://github.com/mattpocock/skills",
+      "author": "Matt Pocock",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-30T11:50:27.795Z",
+      "kit": "mattpocock-skills",
+      "hash": "cc0cff2d48b275443bef9e8640237a62079ccc4619c879a018bdeb20bcfc3641"
+    },
+    "implement-spec": {
+      "source": "https://github.com/mattpocock/skills",
+      "author": "Matt Pocock",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-30T11:50:27.795Z",
+      "kit": "mattpocock-skills",
+      "hash": "359251e076958cf813388f3a10106406211a0ceac1b32a21110aef4382d1bba0"
+    },
+    "prototype": {
+      "source": "https://github.com/mattpocock/skills",
+      "author": "Matt Pocock",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-30T11:50:27.795Z",
+      "kit": "mattpocock-skills",
+      "hash": "f6dd5e95ac350e2ef013da2b65f1d763a622188963258574d865d5e93973fded"
+    },
+    "research": {
+      "source": "https://github.com/mattpocock/skills",
+      "author": "Matt Pocock",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-30T11:50:27.795Z",
+      "kit": "mattpocock-skills",
+      "hash": "a6249157ec7f47797901f3085c65b08e38afae351e85b2ff3686f8af8de959a5"
+    },
+    "domain-modeling": {
+      "source": "https://github.com/mattpocock/skills",
+      "author": "Matt Pocock",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-30T11:50:27.795Z",
+      "kit": "mattpocock-skills",
+      "hash": "18fd9c1b225ea276fc3f6de8b13f4bfc89c1703ea2e9e7c6c04d0c8c7c05c960"
+    },
+    "codebase-design": {
+      "source": "https://github.com/mattpocock/skills",
+      "author": "Matt Pocock",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-30T11:50:27.795Z",
+      "kit": "mattpocock-skills",
+      "hash": "13ddcabd31e518eaaadfe631a1cd9f6d31c548e15812ac64632d7dc8d54f96a0"
+    },
+    "code-review": {
+      "source": "https://github.com/mattpocock/skills",
+      "author": "Matt Pocock",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-30T11:50:27.796Z",
+      "kit": "mattpocock-skills",
+      "hash": "790b942e5eb7fa1df411b39d287322008deaa3d54a245f035792755cf294fa96"
+    },
+    "pr": {
+      "source": "https://github.com/mattpocock/skills",
+      "author": "Matt Pocock",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-30T11:50:27.796Z",
+      "kit": "mattpocock-skills",
+      "hash": "ab61022b2d39a7affde6abf8966733b052dd5b849aa510b828be85385d2c0d2d"
+    },
+    "retro": {
+      "source": "https://github.com/mattpocock/skills",
+      "author": "Matt Pocock",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-30T11:50:27.796Z",
+      "kit": "mattpocock-skills",
+      "hash": "0d0966a22fd9f9711c5d0530e6172797968128d3dc8e3f983197b62c575cff1e"
+    },
+    "wizard": {
+      "source": "https://github.com/mattpocock/skills",
+      "author": "Matt Pocock",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-30T11:50:27.796Z",
+      "kit": "mattpocock-skills",
+      "hash": "75d0d434934b46ed6eb4fb0ed7e79fd03c61f9e997958414c7ba7609dd4ee81a"
+    },
+    "teach": {
+      "source": "https://github.com/mattpocock/skills",
+      "author": "Matt Pocock",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-30T11:50:27.796Z",
+      "kit": "mattpocock-skills",
+      "hash": "f0f45197cb258b0da01abd61cc8503efe0fc7e1621a82f5c47354dc771f85625"
+    },
+    "to-questionnaire": {
+      "source": "https://github.com/mattpocock/skills",
+      "author": "Matt Pocock",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-30T11:50:27.797Z",
+      "kit": "mattpocock-skills",
+      "hash": "71ae0b959d6bf01aba9c43e7cbcc83c9a1d9ecc4429e51faeb3f7ac1174e3d8f"
+    },
+    "wait-what": {
+      "source": "https://github.com/mattpocock/skills",
+      "author": "Matt Pocock",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-30T11:50:27.797Z",
+      "kit": "mattpocock-skills",
+      "hash": "50a2018bf591ce07822a3d99c57394f9767a83779d6094d504e50d1e130d91ef"
+    },
+    "writing-for-agents": {
+      "source": "https://github.com/mattpocock/skills",
+      "author": "Matt Pocock",
+      "agents": [
+        "cursor",
+        "claude-code"
+      ],
+      "installedAt": "2026-10-30T11:50:27.797Z",
+      "kit": "mattpocock-skills",
+      "hash": "8533adac15616f526cc34926643c5d6cd5198d4c8bab57ebdd9c69f3bfe5003c"
     }
   }
 }
