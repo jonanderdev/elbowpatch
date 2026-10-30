@@ -949,6 +949,12 @@ button {
   .shelf .piece-menu {
     left: 0;
   }
+  /* Five to a row: the last two open their menu leftwards, so it never runs past a narrow window. */
+  .shelf .piece:nth-child(5n) .piece-menu,
+  .shelf .piece:nth-child(5n - 1) .piece-menu {
+    left: auto;
+    right: 0;
+  }
 }
 
 .empty-library {
