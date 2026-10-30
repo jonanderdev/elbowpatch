@@ -3,8 +3,8 @@ import type { Kind } from '../../domain/model'
 import { geometry, Pager } from '../../page/pager'
 import type { Settings } from '../stores/settings'
 
-/** The narrowest side margin, on a phone. */
-const MIN_SIDE = 24
+/** The tallest the screen has been at this width: on a touch screen the keyboard shortens the window, never the page. */
+let tallest = { width: 0, height: 0 }
 
 export interface PagerState {
   pager: Pager | null
@@ -87,14 +87,21 @@ export function usePager({ screen, viewport, flow, kind, settings, onRelayout }:
   return { pager, page, count, announcement }
 }
 
-/** Lays the pages out for the screen's width and the text settings. */
+/** Lays the pages out: the page fitted to the screen, at the text settings. */
 function layOut(pager: Pager, screen: HTMLElement, kind: Kind): void {
-  const root = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
-  const max = (document.documentElement.dataset.measure === 'wide' ? 40 : 34) * root
-  // The journal's margin rule sits 24px in on a phone, with the text at 44px (DESIGN.md, The journal).
-  // The screen's own width: in a window smaller than the app's least size, the screen keeps that size.
-  const g = geometry(screen.clientWidth, max, MIN_SIDE, kind === 'journal' ? 44 : MIN_SIDE)
-  screen.style.setProperty('--side', `${g.side}px`)
-  screen.style.setProperty('--measure-px', `${g.measure}px`)
+  const width = screen.clientWidth
+  let height = screen.clientHeight
+  if (matchMedia('(pointer: coarse)').matches) {
+    if (width !== tallest.width) tallest = { width, height }
+    height = tallest.height = Math.max(tallest.height, height)
+  }
+  const g = geometry(width, height, document.documentElement.dataset.measure === 'wide', kind === 'journal')
+  const set = (name: string, px: number): void => screen.style.setProperty(name, `${px}px`)
+  screen.style.setProperty('--k', `${g.k}`)
+  set('--side', g.side)
+  set('--measure-px', g.measure)
+  set('--top', g.top)
+  set('--bottom', g.bottom)
+  set('--text-height', g.height)
   pager.layout(g)
 }

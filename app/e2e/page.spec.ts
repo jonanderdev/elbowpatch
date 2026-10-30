@@ -384,8 +384,13 @@ test('a piece left while writing opens with the caret where it was, ready to typ
   test.skip(page.viewportSize()!.width < 700, 'on a phone the caret waits for a tap')
   await newEssay(page)
   await fill(page, 3)
-  // Into the middle of the second paragraph, and a word there.
-  await page.locator('.body p').nth(1).click()
+  // Into the second paragraph's first line, on page 1 (it may run on to the next page), and a word there.
+  for (let i = 0; i < 3; i++) await page.keyboard.press('PageUp')
+  const first = await page
+    .locator('.body p')
+    .nth(1)
+    .evaluate((p) => p.getClientRects()[0]!.toJSON())
+  await page.mouse.click(first.left + 60, first.top + 10)
   await page.keyboard.type('HERE')
   await saved(page, 'HERE')
   await page.locator('.head .word-button').click()
@@ -463,7 +468,8 @@ test('a book opens on its title page; chapter 1 begins on the next', async ({ pa
   await expect(page.locator('.running-head')).toHaveCount(0)
   await saved(page, 'The boats came in.')
   await page.locator('.head .word-button').click()
-  await expect(page.locator('.row', { hasText: 'The Long Winter' })).toContainText('1 chapter')
+  // The title page and chapter 1's: the pages as laid out on this kind of screen.
+  await expect(page.locator('.row', { hasText: 'The Long Winter' })).toContainText('1 chapter · 2 pages')
   await page.reload()
   await page.goto('./#/')
   await page.locator('.row', { hasText: 'The Long Winter' }).click()
@@ -607,7 +613,9 @@ test('a click in the margin turns the page, but not beside the text', async ({ p
 test('a piece opens straight at the place it was left, with no frame of page 1 first', async ({ page }) => {
   await newEssay(page, 'Long one')
   await fill(page, 12)
-  await saved(page, PARAGRAPH.slice(0, 20))
+  // A last line with words: an empty one is not kept, and could be a page of its own.
+  await page.keyboard.type('The end.')
+  await saved(page, 'The end.')
   const left = await page.locator('.page-button').textContent()
   expect(Number(left)).toBeGreaterThan(1)
   await page.locator('.head .word-button').click()
@@ -656,17 +664,38 @@ test('in a window smaller than the smallest phone the page keeps its size, and t
         }
       }),
     )
-    .toEqual({ screen: [320, 360], column: 272, scrolls: true })
+    .toEqual({ screen: [320, 658], column: 256, scrolls: true })
   // And the wheel scrolls it.
   await page.mouse.move(100, 150)
   await page.mouse.wheel(0, 200)
   await expect.poll(() => page.evaluate(() => document.scrollingElement!.scrollTop)).toBeGreaterThan(0)
 })
 
-test('a desktop window less than 600 tall keeps the page 600 tall, and scrolls', async ({ page }) => {
+test('a desktop window less than 765 tall keeps the page at its least scale, and scrolls', async ({ page }) => {
   await newEssay(page)
   await page.setViewportSize({ width: 1200, height: 500 })
-  await expect.poll(() => page.evaluate(() => Math.round(document.querySelector('.page-screen')!.getBoundingClientRect().height))).toBe(600)
+  await expect.poll(() => page.evaluate(() => Math.round(document.querySelector('.page-screen')!.getBoundingClientRect().height))).toBe(765)
+})
+
+test('the page holds the same words at any window size of its kind: only its scale changes', async ({ page }) => {
+  await newEssay(page)
+  await fill(page, 8)
+  await page.keyboard.type('The end.')
+  const count = () => page.locator('.page-button').getAttribute('aria-label')
+  const first = await count()
+  const phone = page.viewportSize()!.width < 700
+  for (const size of phone
+    ? [
+        { width: 375, height: 667 },
+        { width: 430, height: 932 },
+      ]
+    : [
+        { width: 1920, height: 1080 },
+        { width: 1280, height: 700 },
+      ]) {
+    await page.setViewportSize(size)
+    await expect.poll(count).toBe(first)
+  }
 })
 
 test('at a normal size nothing scrolls the window, and the library covers the page whole', async ({ page }) => {

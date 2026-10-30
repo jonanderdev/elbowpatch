@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { memoryStore } from '../adapters/memory-store'
 import { exportAll, FORMAT_VERSION, guessKind, importArchive, importMarkdown, readDay } from './archive'
-import { newPiece, openPiece, putAway, rename, takeMoment, withDay, write } from './pieces'
+import { newPiece, openPiece, putAway, rename, savePages, takeMoment, withDay, write } from './pieces'
 import type { Store } from './ports'
 
 function setup(start = Date.UTC(2026, 9, 1)) {
@@ -92,6 +92,19 @@ describe('export and import', () => {
     expect((await openPiece(a, essay.id))?.sections[0]?.content).toBe('Changed since the export.')
     const titles = (await a.store.transaction((tx) => tx.pieces())).map((p) => p.title).filter((t) => t === 'The second draft')
     expect(titles).toHaveLength(2)
+  })
+
+  it("a copy keeps its chapters' page counts under its own ids", async () => {
+    const a = setup()
+    const book = newPiece(a, 'book', 'en')
+    const chapter = book.sections[0]!.sectionId
+    await write(a, book, chapter, 'Text.')
+    await savePages(a, book.id, 'desktop', chapter, 7)
+    const files = await exportAll(a)
+    await write(a, book, chapter, 'Changed since the export.')
+    await importArchive(a, files)
+    const copy = (await a.store.transaction((tx) => tx.pieces())).find((p) => p.copyOf)!
+    expect(copy.pages).toEqual({ desktop: { [copy.sections[0]!.sectionId]: 7 } })
   })
 
   it('the same export imported twice adds one copy, not two', async () => {

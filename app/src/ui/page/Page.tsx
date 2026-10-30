@@ -2,9 +2,10 @@ import { TextSelection } from 'prosemirror-state'
 import { type ReactElement, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { countWords } from '../../domain/markdown'
 import type { Piece } from '../../domain/model'
-import type { Deps } from '../../domain/pieces'
+import { type Deps, savePages } from '../../domain/pieces'
 import { showCaret } from '../../page/caret'
 import { type Editor, selectionBox } from '../../page/editor'
+import { screenOf } from '../../page/pager'
 import { placeOf } from '../../page/place'
 import { ExportSheet } from '../components/ExportSheet'
 import { WordButton } from '../components/WordButton'
@@ -119,10 +120,18 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
       moved.current = false
       return place
     },
+    pages: () => (pager && screen.current ? { screen: screenOf(screen.current.clientWidth), count: pager.count } : null),
     onStored: onChange,
     flushRef,
     closingRef,
   })
+
+  // The count is kept with the piece whenever it changes (a turn of the text settings, a first reading
+  // on this kind of screen), so the library shows a book's pages without laying it out (DESIGN.md).
+  useEffect(() => {
+    if (readOnly || !pager || !screen.current) return
+    void savePages(deps, piece.id, screenOf(screen.current.clientWidth), sectionId, count).catch(() => {})
+  }, [deps, piece.id, sectionId, count, pager, readOnly])
 
   const caretKeys = useCaretKeys(pager, flow)
   const editor = useEditor(mount, content, piece.lang, {
