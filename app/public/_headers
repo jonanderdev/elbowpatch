@@ -1,0 +1,4 @@
+# Keep the site out of search engines while it is unfinished.
+# Delete this file to allow indexing.
+/*
+  X-Robots-Tag: noindex, nofollow
