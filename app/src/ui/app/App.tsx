@@ -9,7 +9,7 @@ import { download } from '../files/download'
 import { downloadEverything } from '../files/everything'
 import { Library } from '../library/Library'
 import { type Opened, Page } from '../page/Page'
-import { Settings } from '../settings/Settings'
+import { type Area, Settings } from '../settings/Settings'
 import { readLast, writeLast } from '../stores/last'
 import { askToPersist } from './persist'
 import { replayJournal } from './replay'
@@ -20,6 +20,13 @@ import { useWriterLock } from './useWriterLock'
 let reads = 0
 /** The least time the launch screen shows, from the page's start, in ms. */
 const MIN_LAUNCH = 1000
+
+const AREAS: Record<string, Area> = {
+  '/settings/export': 'export',
+  '/settings/put-away': 'put-away',
+  '/settings/help': 'help',
+  '/settings/about': 'about',
+}
 
 export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElement | null {
   const [route, go] = useRoute()
@@ -168,7 +175,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
       {inSettings && (
         <Settings
           deps={deps}
-          area={route === '/settings/export' ? 'export' : route === '/settings/put-away' ? 'put-away' : 'list'}
+          area={AREAS[route] ?? 'list'}
           pieces={everything}
           go={go}
           beforeExport={async () => {

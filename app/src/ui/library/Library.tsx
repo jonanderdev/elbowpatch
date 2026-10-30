@@ -4,6 +4,7 @@ import { screenOf } from '../../page/pager'
 import { ExportSheet } from '../components/ExportSheet'
 import { IconButton } from '../components/Icon'
 import { update, useSettings } from '../stores/settings'
+import { Colophon } from './Colophon'
 import { Empty, KINDS, NewPiece } from './NewPiece'
 import { ExportReminder, SafariNote, UnsavedLine, UpdateLine } from './Notes'
 import { PieceRow } from './PieceRow'
@@ -172,6 +173,7 @@ export function Library({
             })}
             {!settings.firstRunDone && <SafariNote atFoot />}
             <ExportReminder pieces={pieces} onExport={onExportEverything} onDone={setLine} />
+            <Colophon />
           </>
         )}
       </div>

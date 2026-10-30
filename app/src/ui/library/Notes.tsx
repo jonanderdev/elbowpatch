@@ -47,8 +47,12 @@ export function SafariNote({ atFoot }: { atFoot?: boolean }): ReactElement | nul
   if (!safariOutsideHomeScreen()) return null
   return (
     <div className={atFoot ? 'first-run at-foot' : 'first-run'}>
-      <p>Safari clears this after 7 days away. Add Elbowpatch to your Home Screen.</p>
+      <p>Safari may clear your writing if you don't open Elbowpatch for a week. Keep it on your Home Screen and it stays.</p>
       <div className="links">
+        <a className="text-link" href="#/settings/help">
+          Show me how
+        </a>
+        <span aria-hidden="true">·</span>
         <button type="button" className="text-link" onClick={() => update({ firstRunDone: true })}>
           Not now
         </button>

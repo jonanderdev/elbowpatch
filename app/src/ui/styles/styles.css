@@ -259,6 +259,7 @@ button {
   line-height: 1.4;
   color: var(--secondary);
   padding: 4px 0;
+  text-decoration: none;
 }
 .text-link:hover {
   color: var(--title);
@@ -1428,6 +1429,49 @@ button {
 }
 .export-reminder .text-link {
   padding: 0;
+}
+
+/* The colophon: the library ends with its mark, small, and the plain links under it (DESIGN.md, The colophon). */
+.colophon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 48px;
+}
+.colophon-mark {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 300;
+  line-height: 22px;
+  color: var(--secondary);
+}
+.colophon-links {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--secondary);
+  /* Each link is 44px tall to tap; the row still sits 6px under the mark. */
+  margin: -7px 0 -13px;
+}
+.colophon-links .text-link {
+  padding: 13px 0;
+}
+/* In the empty library: on the +'s row, centred, under the + bar when it opens. */
+.colophon-links.at-foot {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--foot);
+  margin: 0;
+  justify-content: center;
+}
+@media (min-width: 700px) {
+  .colophon-links.at-foot {
+    bottom: calc(var(--edge) - (var(--foot) - 44px) / 2);
+  }
 }
 
 /* The journal: a hairline down the left margin, top to bottom; on a phone 24px
