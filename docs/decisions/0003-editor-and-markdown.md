@@ -20,7 +20,7 @@ The page is paged, not scrolled (DESIGN.md, Behaviour).
 - A chapter or a day starts on a fresh page with `break-before: column`.
 - The current page and its neighbours are shown. Typing past the end of a page turns to the next one.
 - A turn changes the column container's scroll position, never a `transform`, so the browser's and the editor's own "keep the caret visible" work with it, not against it. ProseMirror's `handleScrollToSelection` is where the editor asks for a turn: typing past the end, an undo far back and a jump to a found word all turn the page through it, with the same slide.
-- Page counts of the other sections are measured off screen when the app is idle, and cached by section version, text settings and screen size. The tools bar shows the total once it is known; the page button never waits for it.
+- Page counts of the other sections are measured off screen when the app is idle, and cached by section version, text settings and screen size. The tools show the total once it is known; the folio (the page number at the foot) never waits for it.
 - *Added 2026-10-30:* each section's page count, as last laid out, is kept with the piece, once for the phone's page and once for the desktop's (`Piece.pages`), so the library shows a book's pages without laying it out. It is not a change to the piece: it keeps its date and makes no moment.
 - **The limit:** typing stays smooth on a mid-range Android phone in a 10,000-word chapter. If it does not, the editor holds only a window of three pages, and this decision is amended.
 
