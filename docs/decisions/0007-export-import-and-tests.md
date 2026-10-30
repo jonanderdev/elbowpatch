@@ -20,7 +20,9 @@ Date: 2026-10-27 · Status: accepted
 ## Tests
 *Updated 2026-10-27:* real layout is tested in Playwright, not jsdom, which cannot lay out text.
 - **Vitest** on `domain/` and the pure logic in `page/`: making versions, rebuilding a piece at any moment from outline and sections, thinning never removing a protected version, bring back, keep a copy, put away and restore, the working copy surviving a crash, database migrations, export → import gives identical data, Markdown → tree → Markdown gives identical text (unsupported Markdown included), and where page breaks fall given measured lines.
-- **Playwright** in WebKit and Chromium, at phone and desktop sizes:
+- **Playwright** in WebKit, Chromium and Firefox, at phone and desktop sizes:
   - layout of a few fixed texts: page breaks, a chapter starting on a fresh page, the caret across a page edge
   - flows: type, reload, the text is there; bring back an old version; export and import again.
+- **Where the caret is painted**, checked by hand with `app/scripts/painted-caret.mjs`: a browser can paint the caret away from where it reports it (Firefox did, at page breaks and line ends), and the automated tests read only where it is reported. It compares the two step by step in all three engines; for Firefox it captures the window from the screen.
 - No unit tests for UI components. Daily use covers the rest.
+*Updated 2026-10-28:* Firefox joined the automated runs, and the painted-caret check was added.

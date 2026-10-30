@@ -13,6 +13,7 @@ A journal is one piece with a page per day, and a book is one piece made of chap
 - A piece also has immutable **outline** versions: the ordered list of its sections and their titles. A new outline version is written when a section is added, split (typing `#` mid-chapter), removed or renamed.
 - The piece at any moment = the outline at that moment + each section's latest version at or before it.
 - *Updated 2026-10-27:* a section's newest version is found by following `parentId` from its first version, not by time. `createdAt` is never earlier than the previous version's (now, or the previous plus 1 ms, whichever is later). Device clocks jump; timestamps label moments, they do not order them.
+- *Updated 2026-10-28:* each version and outline also carries `seq`, its parent's plus one. Thinning removes versions from the middle of a chain, which leaves a `parentId` pointing at nothing; `seq` keeps the order without asking the clock.
 
 ### Titles
 *Updated 2026-10-27.*

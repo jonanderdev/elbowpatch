@@ -1,0 +1,30 @@
+import { registerSW } from 'virtual:pwa-register'
+import { useSyncExternalStore } from 'react'
+
+// A new version waits for the next launch. While it waits, the library says
+// so quietly; the page never does (0010).
+let waiting = false
+let restart: (() => Promise<void>) | undefined
+const listeners = new Set<() => void>()
+
+export function watchForUpdates(): void {
+  if (!('serviceWorker' in navigator) || import.meta.env.DEV) return
+  restart = registerSW({
+    onNeedRefresh() {
+      waiting = true
+      for (const l of listeners) l()
+    },
+  })
+}
+
+export function useUpdateWaiting(): (() => void) | undefined {
+  const ready = useSyncExternalStore(
+    (l) => {
+      listeners.add(l)
+      return () => listeners.delete(l)
+    },
+    () => waiting,
+  )
+  const now = restart
+  return ready && now ? () => void now() : undefined
+}
