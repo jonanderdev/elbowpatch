@@ -177,6 +177,38 @@ test('a selection grown back across pages shows where it now ends', async ({ pag
   await expect(page.locator('.page-button')).toHaveText('1')
 })
 
+test('a highlight from the selection menu, in an ink, kept as Markdown', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'phones use the writing bar')
+  await newEssay(page)
+  await page.keyboard.type('Mark this word and keep it.')
+  await page
+    .locator('.body p')
+    .first()
+    .dblclick({ position: { x: 60, y: 10 } })
+  const menu = page.getByRole('toolbar', { name: 'Formatting' })
+  // One press marks the word in amber and shows the inks.
+  await menu.getByRole('button', { name: 'Highlight' }).click()
+  await expect(page.locator('.body mark[data-ink="amber"]')).toHaveCount(1)
+  await expect(menu.getByRole('button', { name: 'Amber highlight' })).toHaveAttribute('aria-pressed', 'true')
+  await menu.getByRole('button', { name: 'Iris highlight' }).click()
+  await expect(page.locator('.body mark[data-ink="iris"]')).toHaveCount(1)
+  expect(await page.evaluate(() => getSelection()!.toString().length)).toBeGreaterThan(0)
+  // While choosing, the selected words show the ink untinted, as the swatch.
+  await expect(page.locator('.body')).toHaveAttribute('data-choosing-ink', '')
+  await saved(page, '=={.iris}')
+  await page.reload()
+  await expect(page.locator('.body mark[data-ink="iris"]')).toHaveCount(1)
+
+  // Pressing the chosen ink takes the highlight off.
+  await page.locator('.body mark').dblclick()
+  await menu.getByRole('button', { name: 'Highlight' }).click()
+  await menu.getByRole('button', { name: 'Iris highlight' }).click()
+  await expect(page.locator('.body mark')).toHaveCount(0)
+  await menu.getByRole('button', { name: 'Close highlight inks' }).click()
+  await expect(menu.getByRole('button', { name: 'Bold' })).toBeVisible()
+  await expect(page.locator('.body')).not.toHaveAttribute('data-choosing-ink')
+})
+
 test('the caret and the pages move together', async ({ page }) => {
   await newEssay(page)
   await fill(page, 8)

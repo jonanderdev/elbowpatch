@@ -13,6 +13,14 @@
   --word-line: #c9c9c4;
   --pressed: #e9e9e5;
   --selection: #d6d6d0;
+  /* Highlight inks: the writer's only colour (DESIGN.md, Colour). Text on each ≥ 10:1. */
+  --amber: #f2d98c;
+  --citron: #e3e88a;
+  --sage: #cddcc0;
+  --coral: #f3c0ae;
+  --iris: #d3d2f4;
+  --sky: #c4e0ef;
+  --ink-selection: #00000024;
   --lift: 0 1px 2px #0000000a, 0 8px 28px #00000014;
   --segment-lift: 0 1px 2px #00000014;
   color-scheme: light;
@@ -29,6 +37,14 @@
   --word-line: #3a3a38;
   --pressed: #242424;
   --selection: #3a3a38;
+  /* Body on each ≥ 5.1:1, titles ≥ 8.4:1. */
+  --amber: #4a3e08;
+  --citron: #3b4014;
+  --sage: #2c3a28;
+  --coral: #4a2a22;
+  --iris: #302e52;
+  --sky: #1f3a4c;
+  --ink-selection: #ffffff1f;
   --lift: 0 1px 2px #00000066, 0 10px 32px #00000080;
   --segment-lift: 0 1px 2px #00000066;
   color-scheme: dark;
@@ -467,9 +483,59 @@ button {
   white-space: pre-wrap;
 }
 
-/* Night focus: earlier paragraphs dim; paper never does. */
+/* A highlight: a square band through the words, 1.05em tall, 2px past them on each line (DESIGN.md, Colour). */
+.body mark {
+  color: inherit;
+  background: linear-gradient(var(--ink), var(--ink)) 0 var(--band-top) / 100% 1.05em no-repeat;
+  padding: 0 0.11em;
+  margin: 0 -0.11em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  print-color-adjust: exact;
+  --band-top: 0.2em;
+}
+/* Selected, a highlight keeps its ink under a tint, so the ink just chosen shows. Text on it ≥ 7.1:1 paper, titles ≥ 5.9:1 night. */
+.body mark::selection,
+.body mark *::selection {
+  background: var(--ink-selection);
+}
+[data-theme='night'] .body mark::selection,
+[data-theme='night'] .body mark *::selection {
+  color: var(--title);
+}
+/* While the inks are open, the words show the ink exactly as the swatch pressed; the open menu says what is selected. */
+.body[data-choosing-ink] mark::selection,
+.body[data-choosing-ink] mark *::selection {
+  background: transparent;
+}
+[data-ink='amber'] {
+  --ink: var(--amber);
+}
+[data-ink='citron'] {
+  --ink: var(--citron);
+}
+[data-ink='sage'] {
+  --ink: var(--sage);
+}
+[data-ink='coral'] {
+  --ink: var(--coral);
+}
+[data-ink='iris'] {
+  --ink: var(--iris);
+}
+[data-ink='sky'] {
+  --ink: var(--sky);
+}
+
+/* Night focus: earlier paragraphs dim; paper never does. Highlighted words never dim: dimmed on an ink they fall below 4.5:1. */
 [data-theme='night'] .body .earlier {
   color: var(--dimmed);
+}
+[data-theme='night'] .body .earlier mark {
+  color: var(--text);
+}
+[data-theme='night'] .body .earlier.pull mark {
+  color: var(--title);
 }
 @media (prefers-reduced-motion: no-preference) {
   .body p,
@@ -1185,6 +1251,44 @@ button {
 .selection-menu {
   position: fixed;
   z-index: 4;
+  /* Its own width wherever it was last placed, so it is measured whole when its buttons change. */
+  width: max-content;
+}
+
+/* An ink: always its paper tone, so it reads on the night bar too (10:1 or more). On the white
+   paper bar the tones are only 1.3–1.6:1, so there they take the word-button outline as an edge.
+   Chosen: a ring in the title colour. */
+.ink-swatch::before {
+  content: '';
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--ink-edge);
+}
+.ink-swatch {
+  --ink-edge: var(--word-line);
+}
+[data-theme='night'] .ink-swatch {
+  --ink-edge: transparent;
+}
+.ink-swatch {
+  --amber: #f2d98c;
+  --citron: #e3e88a;
+  --sage: #cddcc0;
+  --coral: #f3c0ae;
+  --iris: #d3d2f4;
+  --sky: #c4e0ef;
+}
+.ink-swatch[aria-pressed='true'] {
+  background: none;
+}
+.ink-swatch[aria-pressed='true']::before {
+  box-shadow:
+    inset 0 0 0 1px var(--ink-edge),
+    0 0 0 2.5px var(--surface),
+    0 0 0 4px var(--title);
 }
 
 .writing-bar {

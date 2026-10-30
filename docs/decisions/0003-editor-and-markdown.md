@@ -26,10 +26,14 @@ The page is paged, not scrolled (DESIGN.md, Behaviour).
 
 ### Markdown
 - **Only Markdown is stored, snapshotted and exported.** HTML exists on screen only. `domain/markdown.ts` reads and writes a small tree of blocks and marks (0009); `page/` maps that tree to and from ProseMirror.
-- v1 marks, matching DESIGN.md: paragraphs, `*italic*`, `**bold**`, `> ` a pull quote. Chapter titles are fields, not Markdown (0005).
+- v1 marks, matching DESIGN.md: paragraphs, `*italic*`, `**bold**`, `==highlight==`, `> ` a pull quote. Chapter titles are fields, not Markdown (0005).
 - Writers never need Markdown. The selection menu and the writing bar are the way to format; typing `*`, `**` or `> ` converts as you type, as a shortcut. In a book, `# ` at the start of a line starts a new chapter and moves that line into its title. In a journal or an essay a `#` typed at the start of a line is ordinary text, stored escaped (`\#`).
 - **Markdown outside the v1 marks is kept exactly as written**, shown as plain text with its symbols visible. It is never dropped, rewritten or escaped, so an imported file loses nothing. Escaping applies only to what is typed in the editor.
 - **Pasting** keeps bold and italic; everything else, headings included, becomes plain paragraphs. Pasted plain text is read as Markdown with the same rules as typing.
+- *Updated 2026-10-30:* **highlights** join the marks. `==words==` is a highlight in amber, the default ink, the way Markdown extensions already write one, so other apps show it. Another ink follows the closing marker by name: `==words=={.iris}`. Inks are stored by name, never as a colour. Amber goes unnamed, except right before another highlight, where `====` would be ambiguous: `==a=={.amber}==b=={.iris}`.
+  - A `==` opens a highlight only before a letter, and only with a closing `==` after a letter later in the block. Any other `==` is text, so `a == b` and `x==y` written before highlights read back exactly as they were. Text written before this that does pair up, such as `==word==`, now shows as a highlight.
+  - `=` and `{` are escaped (`\=`, `\{`) only where, left bare, they would read back as a highlight or its ink. Spaces at a highlight's edges are left out of it. A highlight is written outside bold and italic where they run across it: `==**bold**==`, `*a ==b== c*`. Any other order keeps its block as written. An unknown ink is text: `==a=={.teal}` reads as an amber highlight followed by `{.teal}`, and writes back unchanged.
+  - Pasted HTML keeps only the app's own highlights (`mark[data-ink]`).
 - Lists, links, images, tables and code come later.
 - *Updated 2026-10-28:* what Markdown cannot hold is not offered. A line break (Shift + Return) is refused at the start of a paragraph and straight after another; an empty paragraph left as spacing is only space, and is gone on the next open. Words are never touched by either.
 

@@ -5,7 +5,7 @@ import { keymap } from 'prosemirror-keymap'
 import { Fragment, type MarkType, Slice } from 'prosemirror-model'
 import { type Command, EditorState, Plugin, TextSelection, type Transaction } from 'prosemirror-state'
 import { Decoration, DecorationSet, EditorView } from 'prosemirror-view'
-import { type Block, parse, serialize } from '../domain/markdown'
+import { type Block, type Ink, parse, serialize } from '../domain/markdown'
 import { schema, toBlocks, toDoc } from './schema'
 
 export interface EditorOptions {
@@ -25,16 +25,21 @@ export interface EditorOptions {
 
 export interface Editor {
   view: EditorView
-  /** Which formatting the selection carries, for the pressed state of B, I and the quote. */
-  active(): { bold: boolean; italic: boolean; quote: boolean }
+  /** Which formatting the selection carries, for the pressed state of B, I and the quote, and its highlight's ink. */
+  active(): { bold: boolean; italic: boolean; quote: boolean; ink: Ink | null }
   markdown(): string
   focus(): void
   /** Formatting from the selection menu or the writing bar. */
   run(command: 'bold' | 'italic' | 'quote' | 'undo' | 'redo'): void
+  /** Highlight the selection in an ink, or take its highlight off (null). */
+  highlight(ink: Ink | null): void
+  /** The ink last chosen, which the highlight button puts on next; amber until one is. */
+  lastInk(): Ink
   destroy(): void
 }
 
 export function createEditor(mount: HTMLElement, options: EditorOptions): Editor {
+  let lastInk: Ink = 'amber'
   const state = EditorState.create({
     doc: toDoc(parse(options.content)),
     plugins: [
@@ -89,6 +94,7 @@ export function createEditor(mount: HTMLElement, options: EditorOptions): Editor
       bold: markActive(view.state, schema.marks.strong),
       italic: markActive(view.state, schema.marks.em),
       quote: view.state.selection.$from.parent.type === schema.nodes.quote,
+      ink: inkOf(view.state),
     }),
     focus: () => view.focus(),
     run(command) {
@@ -102,7 +108,36 @@ export function createEditor(mount: HTMLElement, options: EditorOptions): Editor
       commands[command](view.state, view.dispatch, view)
       view.focus()
     },
+    highlight(ink) {
+      if (ink) lastInk = ink
+      setHighlight(ink)(view.state, view.dispatch, view)
+      view.focus()
+    },
+    lastInk: () => lastInk,
     destroy: () => view.destroy(),
+  }
+}
+
+/** The ink of the first highlight in the selection, or the one typing would carry at a caret. */
+function inkOf(state: EditorState): Ink | null {
+  const { from, to, empty, $from } = state.selection
+  const type = schema.marks.highlight
+  if (empty) return (type.isInSet(state.storedMarks ?? $from.marks())?.attrs.ink as Ink | undefined) ?? null
+  let ink: Ink | null = null
+  state.doc.nodesBetween(from, to, (node) => {
+    ink ??= (type.isInSet(node.marks)?.attrs.ink as Ink | undefined) ?? null
+  })
+  return ink
+}
+
+/** One ink over the whole selection, replacing any other; at a caret, for what is typed next. */
+function setHighlight(ink: Ink | null): Command {
+  return (state, dispatch) => {
+    const { from, to, empty } = state.selection
+    const type = schema.marks.highlight
+    if (empty) dispatch?.(ink ? state.tr.addStoredMark(type.create({ ink })) : state.tr.removeStoredMark(type))
+    else dispatch?.((ink ? state.tr.addMark(from, to, type.create({ ink })) : state.tr.removeMark(from, to, type)).scrollIntoView())
+    return true
   }
 }
 
@@ -151,6 +186,7 @@ const leaveQuote: Command = (state, dispatch) => {
 function markdownRules(): InputRule[] {
   return [
     markRule(/\*\*([^*\s](?:[^*]*[^*\s])?)\*\*$/, schema.marks.strong),
+    markRule(/(?<![=\\])==([^=\s](?:[^=]*[^=\s])?)==$/, schema.marks.highlight),
     markRule(/(?<![*\\])\*([^*\s](?:[^*]*[^*\s])?)\*$/, schema.marks.em),
     textblockTypeInputRule(/^>\s$/, schema.nodes.quote),
   ]
@@ -162,8 +198,10 @@ function markRule(pattern: RegExp, type: MarkType): InputRule {
     // Markdown kept as written stays as written.
     if (state.doc.resolve(start).parent.type === schema.nodes.raw) return null
     const inner = match[1]!
-    const tr = state.tr.replaceWith(start, end, schema.text(inner, [...state.doc.resolve(start).marks(), type.create()]))
-    return tr.removeStoredMark(type)
+    // The markers go and the words stay, so marks already inside them (a highlight in italic) are kept.
+    const marker = (match[0].length - inner.length) / 2
+    const tr = state.tr.delete(end - marker + 1, end).delete(start, start + marker)
+    return tr.addMark(start, start + inner.length, type.create()).removeStoredMark(type)
   })
 }
 

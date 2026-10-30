@@ -1,9 +1,9 @@
 import { type Node, Schema } from 'prosemirror-model'
-import { type Block, BREAK, type Mark, type Span } from '../domain/markdown'
+import { type Block, BREAK, INKS, type Ink, type Mark, type Span } from '../domain/markdown'
 
 // The page's editor schema: the v1 marks of docs/decisions/0003. A `raw` block
 // holds Markdown outside them, shown with its symbols and written back as is.
-export const schema: Schema<'doc' | 'paragraph' | 'quote' | 'raw' | 'text' | 'hard_break', 'em' | 'strong'> = new Schema({
+export const schema: Schema<'doc' | 'paragraph' | 'quote' | 'raw' | 'text' | 'hard_break', 'highlight' | 'em' | 'strong'> = new Schema({
   nodes: {
     doc: { content: 'block+' },
     paragraph: {
@@ -35,6 +35,23 @@ export const schema: Schema<'doc' | 'paragraph' | 'quote' | 'raw' | 'text' | 'ha
     },
   },
   marks: {
+    // First, so it wraps italic and bold and its band is sized by the body text, not the larger italic.
+    highlight: {
+      attrs: { ink: { default: 'amber' } },
+      // Typing on at its end does not carry the highlight on.
+      inclusive: false,
+      // Only the app's own highlights are pasted in (0003).
+      parseDOM: [
+        {
+          tag: 'mark[data-ink]',
+          getAttrs: (el) => {
+            const ink = (el as HTMLElement).dataset.ink as Ink
+            return INKS.includes(ink) && { ink }
+          },
+        },
+      ],
+      toDOM: (mark) => ['mark', { 'data-ink': mark.attrs.ink }, 0],
+    },
     em: {
       parseDOM: [{ tag: 'i' }, { tag: 'em' }, { style: 'font-style=italic' }],
       toDOM: () => ['em', 0],
@@ -63,6 +80,7 @@ function inlines(spans: Span[]): Node[] {
   const out: Node[] = []
   for (const span of spans) {
     const marks = span.marks.map((m) => schema.marks[m]!.create())
+    if (span.ink) marks.unshift(schema.marks.highlight.create({ ink: span.ink }))
     span.text.split(BREAK).forEach((part, i) => {
       if (i > 0) out.push(schema.nodes.hard_break.create())
       if (part) out.push(schema.text(part, marks))
@@ -80,12 +98,18 @@ export function toBlocks(doc: Node): Block[] {
     }
     const spans: Span[] = []
     node.forEach((child) => {
-      if (child.type.name === 'hard_break') spans.push({ text: BREAK, marks: spans.at(-1)?.marks ?? [] })
-      else spans.push({ text: child.text ?? '', marks: child.marks.map((m) => m.type.name as Mark) })
+      if (child.type.name === 'hard_break') spans.push({ ...spans.at(-1), text: BREAK, marks: spans.at(-1)?.marks ?? [] })
+      else spans.push(spanOf(child))
     })
     // An empty paragraph is only space between paragraphs: Markdown cannot hold it.
     if (spans.length === 0) return
     blocks.push({ type: node.type.name as 'paragraph' | 'quote', spans })
   })
   return blocks
+}
+
+function spanOf(node: Node): Span {
+  const ink = schema.marks.highlight.isInSet(node.marks)?.attrs.ink as Ink | undefined
+  const marks = node.marks.filter((m) => m.type !== schema.marks.highlight).map((m) => m.type.name as Mark)
+  return { text: node.text ?? '', marks, ...(ink && { ink }) }
 }
