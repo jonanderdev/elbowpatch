@@ -1851,8 +1851,8 @@ button {
     flex-direction: column;
     padding: 13px 20px 24px;
     background: var(--page);
-    /* A hairline you can barely see: the pressed tint at 70% (DESIGN.md, Layout). Decorative only. */
-    border-right: 1px solid color-mix(in srgb, var(--pressed) 70%, var(--page));
+    /* A hairline, the journal's line: the surface line (DESIGN.md, Layout). Decorative only. */
+    border-right: 1px solid var(--surface-line);
   }
   /* The head's line: under it the places start 76px from the top, as the right column does. */
   .rail-top {
@@ -1865,7 +1865,7 @@ button {
   .rail-mark {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     margin: 0;
     font-size: 15px;
     color: var(--text);
