@@ -70,14 +70,14 @@ user-owned data + runs everywhere**. Beauty and feel are the product. Code is th
 - **Paged, not scrolled:** a page is what fits the screen; when it fills, the next page begins and you
   turn to it (docs/decisions/0003).
 - Markdown-based, but gentle: render nicely while typing, never intimidating. Only Markdown is stored.
-- Zero chrome while writing. Controls appear on a small gesture (move mouse to edge, a key chord, or a
-  tap) and fade away.
+- Zero chrome while writing. On a phone, controls appear on a tap and leave when dismissed; on desktop,
+  a quiet rail and head stay while you read and fade while you type (DESIGN.md).
 
 ### 4.2 Pieces
 The unit of writing is a **piece** (a document). A **journal** is one piece where each day starts on a
 fresh page; a writer can keep more than one journal. An essay is one piece. A **book** (a novel, a memoir) is one piece made of **chapters**: each chapter
-starts on a fresh page, its title is the running head of the pages after it, and a Contents sheet lists
-the chapters with the page each starts on. Reordering chapters by drag and a binder view are later.
+starts on a fresh page, its title is the running head of the pages after it, and Contents lists the
+chapters with the page each starts on (a sheet on a phone, the rail on desktop). Reordering chapters by drag and a binder view are later.
 
 ### 4.3 The Time Machine (the differentiator)
 - The app automatically takes **snapshots** while the user writes (debounced, plus on pause, on blur, and
