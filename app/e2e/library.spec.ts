@@ -44,3 +44,33 @@ test('rename and export from the piece menu', async ({ page }) => {
   await page.goto('./#/')
   await expect(page.locator('.row', { hasText: 'A better name' })).toBeVisible()
 })
+
+test('the shelf: switched to, remembered, and the piece menu works on it', async ({ page }) => {
+  await page.goto('./#/')
+  // An empty library has no view switch, only settings.
+  await expect(page.getByRole('button', { name: 'Show as a shelf' })).toHaveCount(0)
+  await essay(page, 'First draft', 'One.')
+  await essay(page, 'Second draft', 'Two.')
+
+  await page.getByRole('button', { name: 'Show as a shelf' }).click()
+  const object = page.locator('.shelf-object', { hasText: 'First draft' })
+  await expect(object).toContainText('1 word')
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Show as a list' })).toBeVisible()
+  await expect(page.locator('.shelf-object')).toHaveCount(2)
+
+  await object.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Rename' }).click()
+  await expect(page.getByRole('textbox', { name: 'Title' })).toBeFocused()
+  await page.keyboard.press('ControlOrMeta+a')
+  await page.keyboard.type('Shelved')
+  await page.keyboard.press('Enter')
+  const renamed = page.locator('.shelf-object', { hasText: 'Shelved' })
+  await expect(renamed).toBeFocused()
+  await page.keyboard.press('Shift+F10')
+  await expect(page.getByRole('menu')).toBeVisible()
+  await page.keyboard.press('Escape')
+
+  await page.getByRole('button', { name: 'Show as a list' }).click()
+  await expect(page.locator('.row', { hasText: 'Shelved' })).toBeVisible()
+})

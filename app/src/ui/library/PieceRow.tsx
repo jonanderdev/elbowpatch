@@ -1,14 +1,17 @@
 import { type ReactElement, type ReactNode, useEffect, useRef, useState } from 'react'
 import type { Piece } from '../../domain/model'
 import { IconButton } from '../components/Icon'
+import { ShelfOutline } from './ShelfOutline'
 
 /**
- * One piece in the list, or the Continue card. Press and hold, right-click, or
+ * One piece: a list row, an object on the shelf, or the Continue card. Press and hold, right-click, or
  * the menu key / Shift + F10 opens the piece menu over it (DESIGN.md, The library).
  */
 export function PieceRow(props: {
   /** The Continue card's body; a list row when absent. */
   card?: ReactNode
+  /** On the shelf: the piece as its kind's outlined object (Figma, Shelf object). */
+  onShelf?: boolean
   piece: Piece
   meta: string
   menuOpen: boolean
@@ -18,10 +21,11 @@ export function PieceRow(props: {
   onExport(): void
   onPutAway(): void
 }): ReactElement {
-  const { piece, menuOpen, onMenu, card } = props
+  const { piece, menuOpen, onMenu, card, onShelf } = props
   const [renaming, setRenaming] = useState(false)
   const Wrap = card ? 'div' : 'li'
-  const look = card ? 'continue surface' : 'row'
+  const look = card ? 'continue surface' : onShelf ? `shelf-object ${piece.kind}` : 'row'
+  const outline = onShelf && <ShelfOutline kind={piece.kind} />
   const row = useRef<HTMLButtonElement>(null)
   const menu = useRef<HTMLDivElement>(null)
   const input = useRef<HTMLInputElement>(null)
@@ -70,6 +74,7 @@ export function PieceRow(props: {
     <Wrap className={card ? 'piece continue-piece' : 'piece'}>
       {renaming ? (
         <div className={`${look} pressed renaming`}>
+          {outline}
           <input
             ref={input}
             className="row-title rename"
@@ -115,6 +120,7 @@ export function PieceRow(props: {
           onPointerCancel={() => clearTimeout(hold.current)}
           onPointerMove={() => clearTimeout(hold.current)}
         >
+          {outline}
           {card ?? (
             <>
               <span className="row-title">{piece.title.trim() || 'Untitled'}</span>

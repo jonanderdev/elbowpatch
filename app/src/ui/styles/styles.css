@@ -851,6 +851,112 @@ button {
   color: var(--secondary);
 }
 
+/* The shelf (Figma, Library as a shelf): each kind's pieces as outlined objects. On a phone
+   one row scrolls sideways to the screen's right edge, where the next piece shows cut off. */
+.shelf {
+  display: flex;
+  gap: 12px;
+  margin: 0 -12px 0 0;
+  padding: 12px 12px 4px;
+  list-style: none;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.shelf::-webkit-scrollbar {
+  display: none;
+}
+.shelf-row {
+  position: relative;
+}
+/* The piece menu floats above the row, outside the scroller that would clip it. */
+.shelf .piece {
+  position: static;
+  flex: none;
+}
+.shelf .piece-menu {
+  left: 12px;
+  width: max-content;
+}
+/* 28px under the shelf in Figma, less the 4px the row keeps for focus rings. */
+.group:has(.shelf) + .group .group-heading {
+  padding-top: 24px;
+}
+.shelf-object {
+  position: relative;
+  isolation: isolate;
+  width: 100px;
+  height: 140px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 14px 14px 12px 12px;
+  border-radius: 6px;
+  text-align: left;
+}
+.shelf-object.book {
+  padding: 14px 12px 12px 20px;
+}
+.shelf-object.journal {
+  padding-right: 26px;
+  border-radius: 9px;
+}
+.shelf-outline {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: visible;
+  fill: var(--page);
+  stroke: var(--secondary);
+  stroke-width: 1;
+  transition: fill 160ms;
+}
+.shelf-object:hover .shelf-outline,
+.shelf-object:active .shelf-outline,
+.shelf-object.pressed .shelf-outline {
+  fill: var(--pressed);
+}
+.shelf-object .row-title {
+  font-size: 15px;
+  line-height: 19px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+.shelf-object .row-meta {
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-line;
+}
+.shelf-object .rename {
+  font-size: 15px;
+  line-height: 19px;
+}
+@media (min-width: 700px) {
+  /* On desktop the rows wrap inside the column: sideways scrolling is awkward with a wheel. */
+  .shelf {
+    flex-wrap: wrap;
+    row-gap: 16px;
+    margin-right: 0;
+    padding-right: 0;
+    overflow-x: visible;
+  }
+  .shelf .piece {
+    position: relative;
+  }
+  .shelf .piece-menu {
+    left: 0;
+  }
+  /* Five to a row: the last two open their menu leftwards, so it never runs past a narrow window. */
+  .shelf .piece:nth-child(5n) .piece-menu,
+  .shelf .piece:nth-child(5n - 1) .piece-menu {
+    left: auto;
+    right: 0;
+  }
+}
+
 .empty-library {
   flex: 1;
   display: flex;

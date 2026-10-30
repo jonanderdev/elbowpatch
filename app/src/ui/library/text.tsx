@@ -30,3 +30,12 @@ export function meta(piece: Piece, today: string, now: number): string {
   const todayWords = todays ? (piece.words?.[todays.sectionId] ?? 0) : 0
   return `${number(days)} ${days === 1 ? 'day' : 'days'} · ${todayWords ? `${words(todayWords)} today` : 'nothing yet today'}`
 }
+
+/** The foot of a shelf object: counts only, one per line; dates are left to the list. */
+export function shelfMeta(piece: Piece): string {
+  if (piece.kind === 'essay') return words(totalWords(piece))
+  const n = piece.sections.length
+  // shortcut: a book's page count ("21 pages") waits until pieces keep one; pages follow the screen.
+  if (piece.kind === 'book') return `${n} ${n === 1 ? 'chapter' : 'chapters'}`
+  return `${number(n)} ${n === 1 ? 'day' : 'days'}`
+}

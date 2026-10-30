@@ -15,6 +15,8 @@ export interface Settings {
   firstRunDone: boolean
   /** The tools have been opened once on this device: the way in is not shown again. */
   toolsSeen: boolean
+  /** The library as rows or as outlined objects on a shelf (DESIGN.md, The library). */
+  libraryView: 'list' | 'shelf'
 }
 
 const KEY = 'elbowpatch.settings'
@@ -27,6 +29,7 @@ const defaults: Settings = {
   indent: false,
   firstRunDone: false,
   toolsSeen: false,
+  libraryView: 'list',
 }
 
 let current: Settings = load()
