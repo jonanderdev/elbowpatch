@@ -38,7 +38,6 @@
 :root {
   --body: 18px;
   --leading: 1.55;
-  --measure: 34rem;
   --top: 64px;
   --bottom: 92px;
   --edge: 16px;
@@ -55,8 +54,32 @@
 [data-leading='loose'] {
   --leading: 1.72;
 }
-[data-measure='wide'] {
-  --measure: 40rem;
+
+/* The page's type, in the page's own px: the same on every device. The screen scale --k
+   (set by the pager) multiplies it, with every other size on the page (DESIGN.md, Layout).
+   The head and the foot are not the page's: they keep their size at the screen's top and bottom. */
+:root {
+  --type: 16px;
+  --head: 64px;
+  --foot: 92px;
+}
+[data-size='s'] {
+  --type: 14px;
+}
+[data-size='l'] {
+  --type: 18px;
+}
+/* The phone's page has its own type, larger for a narrow page held close (PHONE_BELOW in the pager). */
+@media (max-width: 699px) {
+  :root {
+    --type: 18px;
+  }
+  [data-size='s'] {
+    --type: 16px;
+  }
+  [data-size='l'] {
+    --type: 20px;
+  }
 }
 
 /* The frame: on desktop the controls sit in the corners of the screen, 20px in, but within
@@ -101,20 +124,21 @@ body {
   /* A sideways swipe past the edge is not the browser's Back here. */
   overscroll-behavior: none;
 }
-/* The smallest screen the app lays out for (the smallest phones). In a window smaller than this
-   the screens keep this size and the window scrolls, rather than squeezing the page to nothing.
-   The full-screen layers below fill the body, not the window, so they keep it too. */
+/* The smallest screen the app lays out for: the page at its least scale, its text between the head and
+   the foot (PAGES in the pager). The phone's page at 0.75: 64 + 670 × 0.75 + 92 = 658 tall; the desktop's
+   at 0.9: 64 + 686 × 0.9 + 84 = 765. In a window smaller than this the screens keep this size and the window
+   scrolls, rather than shrinking the type past reading size. The full-screen layers below fill the body,
+   not the window, so they keep it too. */
 body {
   position: relative;
   min-width: 320px;
-  min-height: 360px;
+  min-height: 658px;
   /* Only the document scrolls (and only in a window smaller than this). */
   overflow: visible;
 }
-/* On desktop a page needs more height to be a page: below this, the window scrolls. */
 @media (min-width: 700px) {
   body {
-    min-height: 600px;
+    min-height: 765px;
   }
 }
 
@@ -253,6 +277,7 @@ button {
   /* Each screen is its own layer, so what is raised inside it (the head) never shows over the next. */
   isolation: isolate;
   background: var(--page);
+  --body: calc(var(--type) * var(--k, 1));
 }
 /* In the side margins, the pointer is the way the page turns, drawn as our icons are (1.5 strokes,
    round ends), in the title colour with a page-coloured edge, so it reads over text too. Only where there is a page to go to. */
@@ -278,11 +303,12 @@ button {
 }
 
 .head {
-  position: absolute;
+  /* Fixed, as the foot: in a window smaller than the page, they stay at the window's edges while it scrolls. */
+  position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  height: var(--top);
+  height: var(--head);
   display: flex;
   align-items: center;
   /* On a phone, Library's outline sits on the text's left edge; on desktop, in the frame's
@@ -346,7 +372,7 @@ button {
 .pager {
   position: absolute;
   top: var(--top);
-  bottom: var(--bottom);
+  height: var(--text-height);
   left: var(--side);
   width: var(--measure-px);
   overflow: hidden;
@@ -482,11 +508,11 @@ button {
 }
 
 .foot {
-  position: absolute;
+  position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
-  height: var(--bottom);
+  height: var(--foot);
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -528,9 +554,9 @@ button {
 }
 
 .line {
-  position: absolute;
+  position: fixed;
   left: calc(var(--frame) + var(--edge));
-  bottom: calc((var(--bottom) - 44px) / 2);
+  bottom: calc((var(--foot) - 44px) / 2);
   max-width: calc(100% - 2 * var(--edge) - 56px);
   min-height: 44px;
   display: flex;
@@ -557,8 +583,8 @@ button {
   left: 12px;
   right: 12px;
   /* Above the tools bar, which stays in view beneath it (Figma, Text settings). */
-  bottom: calc((var(--bottom) - 44px) / 2 + 44px + 12px);
-  max-height: calc(100dvh - var(--bottom) - 24px);
+  bottom: calc((var(--foot) - 44px) / 2 + 44px + 12px);
+  max-height: calc(100dvh - var(--foot) - 24px);
   overflow-y: auto;
   z-index: 5;
   display: flex;
@@ -572,6 +598,7 @@ button {
   .sheet {
     left: auto;
     right: calc(var(--frame) + var(--edge));
+    bottom: calc(var(--edge) + 44px + 18px);
     width: 300px;
   }
   .sheet[aria-label='Export'] {
@@ -1410,15 +1437,10 @@ button {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: calc(var(--side) - 20px);
+  left: calc(var(--side) - 20px * var(--k, 1));
   width: 1px;
   background: var(--surface-line);
   pointer-events: none;
-}
-@media (min-width: 700px) {
-  .page-screen.journal::before {
-    left: calc(var(--side) - 44px);
-  }
 }
 .day-words {
   position: absolute;
@@ -1499,11 +1521,11 @@ button {
      from the top and left, the page button (44px) from the bottom and right. The head and the
      foot move as a whole, so what sits level with them stays level. */
   .head {
-    top: calc(var(--edge) - (var(--top) - 30px) / 2);
+    top: calc(var(--edge) - (var(--head) - 30px) / 2);
     padding: 0 calc(var(--frame) + var(--edge));
   }
   .foot {
-    bottom: calc(var(--edge) - (var(--bottom) - 44px) / 2);
+    bottom: calc(var(--edge) - (var(--foot) - 44px) / 2);
   }
   .line,
   .library-lines {

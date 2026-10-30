@@ -5,8 +5,8 @@
 
 import { debounced, moments, type Scheduled } from '../../adapters/schedule'
 import { pieceAsMarkdown } from '../../domain/export'
-import type { Piece, Place } from '../../domain/model'
-import { type Deps, openPiece, rename, renameSection, savePlace, setSubtitle, takeMoment, write } from '../../domain/pieces'
+import type { Piece, Place, Screen } from '../../domain/model'
+import { type Deps, openPiece, rename, renameSection, savePages, savePlace, setSubtitle, takeMoment, write } from '../../domain/pieces'
 import { type Unsaved, unsaved } from '../stores/unsaved'
 
 /** What the page holds now. A title is null when the page has no such field. */
@@ -35,6 +35,8 @@ export interface SavingOptions {
   readOnly(): boolean
   /** The writer's place, when they moved since the last moment. */
   place(): Place | undefined
+  /** The section's page count as laid out now, and on which screen's page; null before it is laid out. */
+  pages(): { screen: Screen; count: number } | null
   onStored(piece: Piece): void
   onFailed(failed: boolean): void
 }
@@ -82,6 +84,7 @@ export function createSaving(o: SavingOptions): Saving {
     // Read everything before the first await: the page may close while this runs.
     const since = Date.now()
     const held = o.read()
+    const pages = o.pages()
     if (o.readOnly()) {
       // Another window writes this piece now: what was not saved here waits, with Save a copy.
       if (changed(held)) unsaved.keep(entry(held), since)
@@ -90,6 +93,8 @@ export function createSaving(o: SavingOptions): Saving {
     try {
       await write(deps, piece, sectionId, held.markdown)
       stored.markdown = held.markdown
+      // A new piece is stored by its first words: its pages are kept from then on.
+      if (pages) await savePages(deps, piece.id, pages.screen, sectionId, pages.count)
       // A journal day's title is its date, never written here (its title is null).
       if (held.title !== null && held.title !== stored.title) {
         if (piece.kind === 'essay') await rename(deps, piece, held.title)

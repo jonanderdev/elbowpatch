@@ -1,6 +1,22 @@
 import { describe, expect, it } from 'vitest'
 import { memoryStore } from '../adapters/memory-store'
-import { history, library, newPiece, openPiece, putAway, recover, rename, restore, setSubtitle, takeMoment, totalWords, withDay, write } from './pieces'
+import {
+  bookPages,
+  history,
+  library,
+  newPiece,
+  openPiece,
+  putAway,
+  recover,
+  rename,
+  restore,
+  savePages,
+  setSubtitle,
+  takeMoment,
+  totalWords,
+  withDay,
+  write,
+} from './pieces'
 
 function setup(start = 1_000_000) {
   let t = start
@@ -12,6 +28,25 @@ function setup(start = 1_000_000) {
 }
 
 describe('pieces', () => {
+  it("keeps each chapter's pages per screen, without dating the piece; a book counts only when every chapter has", async () => {
+    const { deps, clock } = setup()
+    const piece = newPiece(deps, 'book', 'en')
+    const one = piece.sections[0]!.sectionId
+    await write(deps, piece, one, 'Chapter one.')
+    clock.set(2_000_000)
+    await savePages(deps, piece.id, 'desktop', one, 12)
+    await savePages(deps, piece.id, 'desktop', one, 12)
+    let stored = (await openPiece(deps, piece.id))!.piece
+    expect(stored.updatedAt).toBe(1_000_000)
+    expect(bookPages(stored, 'desktop')).toBe(12)
+    expect(bookPages(stored, 'phone')).toBeUndefined()
+    const withTwo = { ...stored, sections: [...stored.sections, { sectionId: 'two', title: '' }] }
+    expect(bookPages(withTwo, 'desktop')).toBeUndefined()
+    await savePages(deps, piece.id, 'phone', one, 19)
+    stored = (await openPiece(deps, piece.id))!.piece
+    expect(stored.pages).toEqual({ desktop: { [one]: 12 }, phone: { [one]: 19 } })
+  })
+
   it('does not keep a new piece until something is written', async () => {
     const { deps } = setup()
     newPiece(deps, 'essay', 'en')

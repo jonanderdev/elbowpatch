@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { Piece, Place } from '../../domain/model'
+import type { Piece, Place, Screen } from '../../domain/model'
 import type { Deps } from '../../domain/pieces'
 import type { Editor } from '../../page/editor'
 import { keptFor, type Opened, type TitleRefs, titleOf } from './fields'
@@ -14,6 +14,8 @@ interface Options {
   readOnly: boolean
   /** The writer's place, when they moved since the last moment. */
   place(): Place | undefined
+  /** The section's page count as laid out now, and on which screen's page. */
+  pages(): { screen: Screen; count: number } | null
   onStored(piece: Piece): void
   /** Lets the app ask the page to save now, before another window takes the piece. */
   flushRef: { current: (() => Promise<void>) | null }
@@ -26,15 +28,15 @@ interface Options {
  * hiding or closing the window, the words not stored yet go to the journal first. Declare it
  * before useEditor: its last save, as the page closes, reads the editor's text.
  */
-export function useSaving({ deps, opened, editor, titles, readOnly, place, onStored, flushRef, closingRef }: Options): {
+export function useSaving({ deps, opened, editor, titles, readOnly, place, pages, onStored, flushRef, closingRef }: Options): {
   saving: Saving | null
   failed: boolean
 } {
   const [saving, setSaving] = useState<Saving | null>(null)
   const [failed, setFailed] = useState(false)
   // Read when a save runs, long after this render.
-  const now = useRef({ editor, titles, readOnly, place, onStored })
-  now.current = { editor, titles, readOnly, place, onStored }
+  const now = useRef({ editor, titles, readOnly, place, pages, onStored })
+  now.current = { editor, titles, readOnly, place, pages, onStored }
   const first = useRef({ deps, opened, flushRef, closingRef })
 
   useLayoutEffect(() => {
@@ -58,6 +60,7 @@ export function useSaving({ deps, opened, editor, titles, readOnly, place, onSto
       read,
       readOnly: () => now.current.readOnly,
       place: () => now.current.place(),
+      pages: () => now.current.pages(),
       onStored: (p) => now.current.onStored(p),
       onFailed: setFailed,
     })

@@ -2,6 +2,9 @@
 
 export type Kind = 'journal' | 'essay' | 'book'
 
+/** The two pages a piece is laid out on: a phone's and a larger screen's (DESIGN.md, Layout). */
+export type Screen = 'phone' | 'desktop'
+
 export interface OutlineSection {
   sectionId: string
   title: string
@@ -25,6 +28,8 @@ export interface Piece {
   place?: Place
   /** Each section's word count as last written, so the library never opens the text. */
   words?: Record<string, number>
+  /** Each section's page count as last laid out, on each screen's page, so the library never lays the text out. */
+  pages?: Partial<Record<Screen, Record<string, number>>>
   /** Imported beside a different piece with the same id: which export copy it was (archive). */
   copyOf?: string
 }
@@ -36,7 +41,7 @@ export interface Place {
   offset: number
   /** The paragraph's opening words: finds the place again after edits, and is the library's excerpt. */
   snippet: string
-  /** The page it was on: for orientation only, it follows the screen. */
+  /** The page it was on: for orientation only, it differs between a phone's page and a desktop's. */
   page: number
   /** True when the caret was there; otherwise it is the first line on screen. */
   caret: boolean

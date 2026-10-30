@@ -136,6 +136,11 @@ export async function importArchive(deps: Deps, files: ArchiveFile[]): Promise<I
         sections: incoming.sections.map((s) => ({ ...s, sectionId: ids(s.sectionId) })),
         place: incoming.place && { ...incoming.place, sectionId: ids(incoming.place.sectionId) },
         words: incoming.words && Object.fromEntries(Object.entries(incoming.words).map(([k, n]) => [ids(k), n])),
+        pages:
+          incoming.pages &&
+          Object.fromEntries(
+            Object.entries(incoming.pages).map(([screen, counts]) => [screen, Object.fromEntries(Object.entries(counts).map(([k, n]) => [ids(k), n]))]),
+          ),
         // Put away when it was exported: it waits a fresh 30 days, rather than arriving already due to go.
         ...(incoming.putAwayAt !== undefined ? { putAwayAt: now } : {}),
         ...(here ? { copyOf: print } : {}),

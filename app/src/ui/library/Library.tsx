@@ -1,5 +1,6 @@
 import { type ReactElement, useEffect, useRef, useState } from 'react'
 import type { Kind, Piece } from '../../domain/model'
+import { screenOf } from '../../page/pager'
 import { ExportSheet } from '../components/ExportSheet'
 import { IconButton } from '../components/Icon'
 import { update, useSettings } from '../stores/settings'
@@ -44,6 +45,8 @@ export function Library({
   const empty = pieces.length === 0
   const onShelf = settings.libraryView === 'shelf'
   const now = Date.now()
+  // A book's pages are those of this screen's page: a phone and a desktop count them apart (DESIGN.md, Layout).
+  const screen = screenOf(document.documentElement.clientWidth)
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const [exporting, setExporting] = useState<Piece | null>(null)
   const [line, setLine] = useState<string | null>(null)
@@ -78,7 +81,7 @@ export function Library({
   // One menu at a time, by place: the piece in Continue is also in its group.
   const handlers = (piece: Piece, where: 'continue' | 'row') => ({
     piece,
-    meta: onShelf && where === 'row' ? shelfMeta(piece) : meta(piece, today, now),
+    meta: onShelf && where === 'row' ? shelfMeta(piece, screen) : meta(piece, today, now, screen),
     menuOpen: menuFor === `${where}:${piece.id}`,
     onMenu: (open: boolean) => setMenuFor(open ? `${where}:${piece.id}` : null),
     onOpen: () => onOpen(piece),

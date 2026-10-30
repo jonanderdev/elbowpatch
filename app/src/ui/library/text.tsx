@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
-import type { Piece } from '../../domain/model'
-import { totalWords } from '../../domain/pieces'
+import type { Piece, Screen } from '../../domain/model'
+import { bookPages, totalWords } from '../../domain/pieces'
 import { dayTitle, number, shortDate, words } from '../../domain/words'
 
 export function excerpt(piece: Piece): string {
@@ -18,13 +18,17 @@ export function continueMeta(piece: Piece): ReactNode {
   )
 }
 
-export function meta(piece: Piece, today: string, now: number): string {
+/** A book's chapters, and its pages on this screen's page once every chapter has been laid out there. */
+function bookCounts(piece: Piece, screen: Screen): string[] {
+  const n = piece.sections.length
+  const pages = bookPages(piece, screen)
+  return [`${n} ${n === 1 ? 'chapter' : 'chapters'}`, ...(pages ? [`${number(pages)} ${pages === 1 ? 'page' : 'pages'}`] : [])]
+}
+
+export function meta(piece: Piece, today: string, now: number, screen: Screen): string {
   const date = shortDate(piece.updatedAt, now)
   if (piece.kind === 'essay') return `${words(totalWords(piece))} · ${date}`
-  if (piece.kind === 'book') {
-    const n = piece.sections.length
-    return `${n} ${n === 1 ? 'chapter' : 'chapters'} · ${date}`
-  }
+  if (piece.kind === 'book') return [...bookCounts(piece, screen), date].join(' · ')
   const todays = piece.sections.find((s) => s.title === today)
   const days = piece.sections.length
   const todayWords = todays ? (piece.words?.[todays.sectionId] ?? 0) : 0
@@ -32,10 +36,9 @@ export function meta(piece: Piece, today: string, now: number): string {
 }
 
 /** The foot of a shelf object: counts only, one per line; dates are left to the list. */
-export function shelfMeta(piece: Piece): string {
+export function shelfMeta(piece: Piece, screen: Screen): string {
   if (piece.kind === 'essay') return words(totalWords(piece))
+  if (piece.kind === 'book') return bookCounts(piece, screen).join('\n')
   const n = piece.sections.length
-  // shortcut: a book's page count ("21 pages") waits until pieces keep one; pages follow the screen.
-  if (piece.kind === 'book') return `${n} ${n === 1 ? 'chapter' : 'chapters'}`
   return `${number(n)} ${n === 1 ? 'day' : 'days'}`
 }

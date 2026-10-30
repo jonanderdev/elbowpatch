@@ -4,8 +4,10 @@
 // changes the scroll position and the browser keeps the caret, selection and
 // keyboard as they are.
 
+import type { Screen } from '../domain/model'
+
 export interface Geometry {
-  /** The text column, in whole pixels. */
+  /** The text column's width. */
   measure: number
   /** The margin left of it. */
   side: number
@@ -14,15 +16,58 @@ export interface Geometry {
 }
 
 /**
- * Whole pixels, so page 300 lands where page 1 does. The column is centred,
- * with at least `minSide` either side and `minLeft` on the left (the journal's
- * margin rule wants more room there).
+ * The pages, in their own px (DESIGN.md, Layout): one for phones, tall and narrow, one for larger screens,
+ * a paperback page. Each keeps its size on every screen of its kind; the screen only scales it. Side margins:
+ * normal, with the wide measure, and the journal's left one, which leaves room for its margin rule.
  */
-export function geometry(screenWidth: number, maxMeasure: number, minSide: number, minLeft: number = minSide): Geometry {
-  const width = Math.floor(screenWidth)
-  const measure = Math.floor(Math.min(maxMeasure, width - minSide - minLeft))
-  const side = Math.max(minLeft, Math.floor((width - measure) / 2))
-  return { measure, side, stride: width }
+export const PAGES = {
+  phone: { width: 390, height: 826, top: 64, bottom: 92, side: 24, wide: 12, journal: 44 },
+  desktop: { width: 540, height: 834, top: 64, bottom: 84, side: 36, wide: 18, journal: 56 },
+}
+/** Screens narrower than this take the phone's page. */
+export const PHONE_BELOW = 700
+
+/** Which page a screen this wide takes. */
+export function screenOf(width: number): Screen {
+  return width < PHONE_BELOW ? 'phone' : 'desktop'
+}
+/** The most a screen scales the page up: past it the type outgrows reading size, and a big screen shows more room around the page instead. */
+export const MAX_SCALE = 1.3
+
+/** The page fitted to a screen: the column and the margins around it, in screen px. */
+export interface Fit extends Geometry {
+  /** The screen scale: every size on the page is its page size times this. */
+  k: number
+  /** From the screen's top to the text, and from the text's foot to the screen's bottom. */
+  top: number
+  bottom: number
+  /** The text's height. */
+  height: number
+}
+
+/**
+ * The screen's page at the largest scale that fits it, up to MAX_SCALE. The text fits between the head and
+ * the foot, which keep their size, and sits centred between them. The stride stays whole pixels, so page 300
+ * lands where page 1 does.
+ */
+export function geometry(screenWidth: number, screenHeight: number, wide = false, journal = false): Fit {
+  const stride = Math.floor(screenWidth)
+  const page = PAGES[screenOf(stride)]
+  const right = wide ? page.wide : page.side
+  const left = journal ? page.journal : right
+  const text = page.height - page.top - page.bottom
+  const room = screenHeight - page.top - page.bottom
+  const k = Math.min(MAX_SCALE, stride / page.width, room / text)
+  const top = page.top + (room - text * k) / 2
+  return {
+    measure: (page.width - left - right) * k,
+    side: (stride - page.width * k) / 2 + left * k,
+    stride,
+    k,
+    top,
+    bottom: screenHeight - top - text * k,
+    height: text * k,
+  }
 }
 
 export function pageCount(scrollWidth: number, g: Geometry): number {

@@ -1,5 +1,5 @@
 import { countWords } from './markdown'
-import type { Kind, Outline, Piece, Place, Version, Working } from './model'
+import type { Kind, Outline, Piece, Place, Screen, Version, Working } from './model'
 import type { Clock, Ids, Store, Tx } from './ports'
 
 export interface Deps {
@@ -95,6 +95,30 @@ export function withDay(deps: Pick<Deps, 'ids'>, piece: Piece, isoDay: string): 
 
 export function totalWords(piece: Piece): number {
   return Object.values(piece.words ?? {}).reduce((a, b) => a + b, 0)
+}
+
+/**
+ * A book's pages on a screen's page: the sum of its chapters', or undefined while a chapter has not been
+ * laid out there yet, rather than a count that is short.
+ */
+export function bookPages(piece: Piece, screen: Screen): number | undefined {
+  const counts = piece.pages?.[screen]
+  let total = 0
+  for (const s of piece.sections) {
+    const n = counts?.[s.sectionId]
+    if (n === undefined) return undefined
+    total += n
+  }
+  return total
+}
+
+/** Keeps a section's page count on a screen's page. Not a change to the piece: its date stays. Safe to run twice. */
+export function savePages(deps: Pick<Deps, 'store'>, pieceId: string, screen: Screen, sectionId: string, count: number): Promise<void> {
+  return deps.store.transaction(async (tx) => {
+    const piece = await tx.piece(pieceId)
+    if (!piece || piece.pages?.[screen]?.[sectionId] === count) return
+    await tx.putPiece({ ...piece, pages: { ...piece.pages, [screen]: { ...piece.pages?.[screen], [sectionId]: count } } })
+  })
 }
 
 export function savePlace(deps: Pick<Deps, 'store'>, pieceId: string, place: Place): Promise<void> {

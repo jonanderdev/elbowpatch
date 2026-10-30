@@ -3,7 +3,9 @@
 Date: 2026-10-27 · Status: accepted
 
 ## Context
-The page is paged, not scrolled (DESIGN.md, Behaviour): a page is what fits the screen at the current text settings.
+The page is paged, not scrolled (DESIGN.md, Behaviour).
+
+*Updated 2026-10-30:* a page was what fits the screen at the current text settings, so page breaks moved with every window size, the keyboard and rotation. A page now has a fixed size (DESIGN.md, Layout): one for phones (390 × 826) and one for larger screens (540 × 834, a paperback page). The screen only scales the page, by one CSS size factor that multiplies the type, the margins and the page's size — never a `transform` — so a page holds the same words on every screen of its kind. What sits around the page (the controls, the space to the screen's edges) is not scaled.
 
 *Updated 2026-10-27:* the first version of this decision was our own editor on a bare `contenteditable`, because editor libraries are built around a scrolling viewport. That holds for code editors, not for ProseMirror: it is a `contenteditable` with a strict schema and leaves layout to us. Our own editor would have meant owning undo after our code changes the text, cleaning up pasted HTML, and phone keyboards that compose words before we can see them.
 
@@ -19,6 +21,7 @@ The page is paged, not scrolled (DESIGN.md, Behaviour): a page is what fits the 
 - The current page and its neighbours are shown. Typing past the end of a page turns to the next one.
 - A turn changes the column container's scroll position, never a `transform`, so the browser's and the editor's own "keep the caret visible" work with it, not against it. ProseMirror's `handleScrollToSelection` is where the editor asks for a turn: typing past the end, an undo far back and a jump to a found word all turn the page through it, with the same slide.
 - Page counts of the other sections are measured off screen when the app is idle, and cached by section version, text settings and screen size. The tools bar shows the total once it is known; the page button never waits for it.
+- *Added 2026-10-30:* each section's page count, as last laid out, is kept with the piece, once for the phone's page and once for the desktop's (`Piece.pages`), so the library shows a book's pages without laying it out. It is not a change to the piece: it keeps its date and makes no moment.
 - **The limit:** typing stays smooth on a mid-range Android phone in a 10,000-word chapter. If it does not, the editor holds only a window of three pages, and this decision is amended.
 
 ### Markdown
