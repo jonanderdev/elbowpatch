@@ -6,7 +6,8 @@
 
 ***
 
-Elbowpatch is a writing app for journals, essays and books. It opens on one page and nothing else, like a book you are writing in.  
+Elbowpatch is a writing app for journals, essays and books.  
+It opens on one page and nothing else, like a book you are writing in.  
 Behind that page it quietly remembers every moment of your writing, so you can walk back through it and bring back anything you lost, with no save button and no version control to learn.
 
 It runs in the browser, installs on phone, tablet or desktop, and works offline.  
