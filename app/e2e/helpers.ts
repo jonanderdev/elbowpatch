@@ -45,3 +45,17 @@ export async function saved(page: Page, words: string): Promise<void> {
     )
     .toBe(true)
 }
+
+/** Starts a new piece of this kind from Write: a bar on a phone, a menu from the rail on desktop. */
+export async function write(page: Page, kind: 'Book' | 'Journal' | 'Essay'): Promise<void> {
+  await page.getByRole('button', { name: 'Write' }).click()
+  await page
+    .getByRole('button', { name: kind, exact: true })
+    .or(page.getByRole('menuitem', { name: kind, exact: true }))
+    .click()
+}
+
+/** Opens the tools: the page button on a phone; on desktop they are already in the head. */
+export async function openTools(page: Page): Promise<void> {
+  if (await page.locator('.page-button').isVisible()) await page.locator('.page-button').click()
+}

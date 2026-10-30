@@ -1,5 +1,5 @@
 import { TextSelection } from 'prosemirror-state'
-import { type ReactElement, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { type CSSProperties, type ReactElement, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { countWords } from '../../domain/markdown'
 import type { Piece } from '../../domain/model'
 import { type Deps, savePages } from '../../domain/pieces'
@@ -8,14 +8,15 @@ import { type Editor, selectionBox } from '../../page/editor'
 import { screenOf } from '../../page/pager'
 import { placeOf } from '../../page/place'
 import { ExportSheet } from '../components/ExportSheet'
-import { WordButton } from '../components/WordButton'
+import { Path } from '../components/Path'
+import { useScrolled } from '../components/useScrolled'
 import { download } from '../files/download'
 import { markdownFile } from '../files/markdownFile'
-import { update, useSettings } from '../stores/settings'
+import { useSettings } from '../stores/settings'
 import { fillTitleFields, keptFor, type Opened, type TitleRefs } from './fields'
 import { PageFoot, StatusLine } from './PageFoot'
 import { SectionTitle, TitlePage } from './Titles'
-import { TextSettings } from './Tools'
+import { HeadTools, TextSettings } from './Tools'
 import { useCaretFollowing, useCaretKeys } from './useCaret'
 import { useEditor } from './useEditor'
 import { useFocusOnOpen } from './useFocusOnOpen'
@@ -70,15 +71,23 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
   const [line, setLine] = useState<string | null>(null)
   const [words, setWords] = useState(() => countWords(content))
   const [heading, setHeading] = useState('')
+  // A book's or a journal's name, as on its title page: the desktop path shows it while it is written.
+  const [name, setName] = useState(piece.title)
   const [writing, setWriting] = useState(false)
   const [selection, setSelection] = useState<SelectionState | null>(null)
   const [kept, setKept] = useState('')
+  // Where a sheet opened from the desktop head drops: under its control, right-aligned to it.
+  const [anchor, setAnchor] = useState<CSSProperties | undefined>(undefined)
+  // Only a window smaller than the page scrolls: the head then stands on its strip (DESIGN.md, One head).
+  const scrolled = useScrolled()
 
   const screen = useRef<HTMLDivElement>(null)
   const viewport = useRef<HTMLDivElement>(null)
   const flow = useRef<HTMLDivElement>(null)
   const mount = useRef<HTMLDivElement>(null)
   const pageButton = useRef<HTMLButtonElement>(null)
+  /** The head's control that opened the sheet: the focus goes back to it when the sheet closes. */
+  const opener = useRef<HTMLElement | null>(null)
   const titles: TitleRefs = {
     title: useRef<HTMLHeadingElement>(null),
     bookTitle: useRef<HTMLHeadingElement>(null),
@@ -93,6 +102,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
   const [openedFirst] = useState(opened)
   useLayoutEffect(() => {
     setHeading(fillTitleFields(openedFirst, { title: titles.title.current, bookTitle: titles.bookTitle.current, subtitle: titles.subtitle.current }))
+    if (titles.bookTitle.current) setName(titles.bookTitle.current.textContent ?? '')
   }, [openedFirst, titles.title, titles.bookTitle, titles.subtitle])
 
   const { pager, page, count, announcement } = usePager({
@@ -190,6 +200,24 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     requestAnimationFrame(() => pageButton.current?.focus())
   }, [])
 
+  // A sheet from the phone's tools bar sits above it; one from the desktop head drops under the control
+  // that opened it, and closing it gives that control the focus back.
+  function openSheet(which: 'text' | 'export', from?: HTMLElement): void {
+    if (from && sheet === which) {
+      closeSheet()
+      return
+    }
+    opener.current = from ?? null
+    setAnchor(from ? below(from) : undefined)
+    setSheet(which)
+  }
+  const closeSheet = useCallback((): void => {
+    setSheet(null)
+    const back = opener.current
+    opener.current = null
+    if (back) requestAnimationFrame(() => back.focus())
+  }, [])
+
   // Escape closes what is open, innermost first: a sheet, then the tools. One listener reads what
   // is open now from a ref: re-attached on each change, an Escape pressed right after one (Done,
   // then Escape) would reach the listener from before it.
@@ -199,14 +227,14 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     if (covered) return
     const onKey = (e: KeyboardEvent): void => {
       if (e.key !== 'Escape') return
-      if (open.current.sheet) setSheet(null)
+      if (open.current.sheet) closeSheet()
       else if (open.current.tools) closeTools()
       else return
       e.preventDefault()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [covered, closeTools])
+  }, [covered, closeTools, closeSheet])
 
   // A calm line at the foot for a few seconds.
   useEffect(() => {
@@ -236,17 +264,26 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
 
   return (
     <div ref={screen} className={piece.kind === 'journal' ? 'page-screen journal' : 'page-screen'} inert={covered} aria-hidden={covered}>
-      <div className="head">
-        {/* Pressed, it leaves the caret where it is, so the place kept is the caret's. */}
-        <WordButton
-          word="Library"
+      <div className="head" data-scrolled={scrolled || undefined}>
+        {/* Pressed, § leaves the caret where it is, so the place kept is the caret's. On desktop the
+            piece's name follows it; a phone shows § alone. */}
+        <Path
+          crumbs={[{ word: (piece.kind === 'essay' ? heading : name).trim() || 'Untitled' }]}
           keepFocus
-          onClick={() => {
+          onHome={() => {
             focus.leaving()
             onLibrary()
           }}
         />
         {page > (titlePage ? 1 : 0) ? <div className="running-head">{heading}</div> : null}
+        <HeadTools
+          page={page + 1}
+          count={count}
+          words={words}
+          sheet={anchor ? sheet : null}
+          onTextSettings={(from) => openSheet('text', from)}
+          onExport={(from) => openSheet('export', from)}
+        />
       </div>
 
       <div ref={viewport} className="pager">
@@ -258,7 +295,10 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
               kind={piece.kind === 'book' ? 'book' : 'journal'}
               readOnly={readOnly}
               onFocus={() => pager?.turnTo(0)}
-              onInput={() => saving?.touch()}
+              onInput={() => {
+                setName(titles.bookTitle.current?.textContent ?? '')
+                saving?.touch()
+              }}
               onDone={() => (titleEditable ? titles.title.current?.focus() : editor?.focus())}
             />
           ) : null}
@@ -289,29 +329,27 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
         count={count}
         words={words}
         journal={piece.kind === 'journal'}
+        titlePage={titlePage && page === 0}
         tools={tools}
-        showWayIn={!settings.toolsSeen && keyboard === 0 && !failed && !line && writer !== 'elsewhere'}
         keyboard={keyboard}
         pageButtonRef={pageButton}
-        onOpenTools={() => {
-          setTools(true)
-          if (!settings.toolsSeen) update({ toolsSeen: true })
-        }}
+        onOpenTools={() => setTools(true)}
         onCloseTools={closeTools}
-        onTextSettings={() => setSheet('text')}
-        onExport={() => setSheet('export')}
+        onTextSettings={() => openSheet('text')}
+        onExport={() => openSheet('export')}
       />
 
-      {sheet === 'text' ? <TextSettings onDone={() => setSheet(null)} /> : null}
+      {sheet === 'text' ? <TextSettings onDone={closeSheet} style={anchor} /> : null}
       {sheet === 'export' ? (
         <ExportSheet
           title={heading || (piece.kind === 'journal' ? piece.title : 'Untitled')}
+          style={anchor}
           onMarkdown={async () => {
             const name = await exportMarkdown()
-            setSheet(null)
+            closeSheet()
             if (name) setLine(`Saved as ${name}.`)
           }}
-          onDone={() => setSheet(null)}
+          onDone={closeSheet}
         />
       ) : null}
 
@@ -323,4 +361,16 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
       </div>
     </div>
   )
+}
+
+/** A sheet's place under the head control that opened it, right-aligned to it. */
+function below(control: HTMLElement): CSSProperties {
+  const box = control.getBoundingClientRect()
+  return {
+    top: box.bottom + 8,
+    right: document.documentElement.clientWidth - box.right,
+    bottom: 'auto',
+    left: 'auto',
+    maxHeight: `calc(100dvh - ${box.bottom + 24}px)`,
+  }
 }

@@ -50,7 +50,7 @@ export function usePageTurns({ screen, viewport, bookTitle, editor, pager, cover
       if (pager.page === from || now.current.readOnly) return
       const view = editor.view
       const writing = view.hasFocus()
-      if (!writing && (!matchMedia('(pointer: fine)').matches || document.activeElement?.closest('.sheet, .foot'))) return
+      if (!writing && (!matchMedia('(pointer: fine)').matches || document.activeElement?.closest('.sheet, .foot, .head'))) return
       // Placed before the text takes focus, so the browser never scrolls to the old caret first.
       if (caretToEnd(view, viewportEl)) {
         if (!writing) view.focus()
@@ -87,12 +87,12 @@ export function usePageTurns({ screen, viewport, bookTitle, editor, pager, cover
       turn(dx < 0 ? 1 : -1)
     }
 
-    // A click in the side margins turns the page, but not near the text, where a click is likely
+    // A click in the side margins turns the page, but not on the head (the path, the tools), not near the text, where a click is likely
     // aimed at a word, and never after a drag, which is selecting. A click there never reaches the
     // text, even with no page to turn to.
     const side = (e: MouseEvent): 1 | -1 | 0 => {
       const g = pager.g
-      if (g.side < 120 || (e.target as HTMLElement).closest('button, .pager, .sheet, [contenteditable]')) return 0
+      if (g.side < 120 || (e.target as HTMLElement).closest('button, .head, .pager, .sheet, [contenteditable]')) return 0
       if (e.clientX < g.side - MARGIN_CLEAR) return -1
       if (e.clientX > g.side + g.measure + MARGIN_CLEAR) return 1
       return 0

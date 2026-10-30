@@ -1,17 +1,17 @@
 import { expect, type Page, test } from '@playwright/test'
+import { write } from './helpers'
 
 async function essay(page: Page, title: string, text: string) {
   await page.goto('./#/')
   if (await page.locator('.start.essay').count()) await page.locator('.start.essay').click()
   else {
-    await page.getByRole('button', { name: 'New piece' }).click()
-    await page.getByRole('toolbar', { name: 'New piece' }).getByRole('button', { name: 'Essay' }).click()
+    await write(page, 'Essay')
   }
   await expect(page.locator('.title')).toBeFocused()
   await page.keyboard.type(title)
   await page.keyboard.press('Enter')
   await page.keyboard.type(text)
-  await page.locator('.head .word-button').click()
+  await page.locator('.head .home').click()
   await expect(page.locator('.continue')).toContainText(text)
 }
 

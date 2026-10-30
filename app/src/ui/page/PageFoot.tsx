@@ -1,5 +1,6 @@
 import type { ReactElement, RefObject } from 'react'
 import { words as wordsLine } from '../../domain/words'
+import { Icon } from '../components/Icon'
 import { ToolsBar } from './Tools'
 
 interface PageFootProps {
@@ -7,9 +8,9 @@ interface PageFootProps {
   count: number
   words: number
   journal: boolean
+  /** A book's or a journal's title page, which carries no folio. */
+  titlePage: boolean
   tools: boolean
-  /** "Your tools are here", until the tools are first opened on this device (DESIGN.md, Control). */
-  showWayIn: boolean
   /** The phone keyboard's height: the foot rides above it. */
   keyboard: number
   pageButtonRef: RefObject<HTMLButtonElement | null>
@@ -19,14 +20,17 @@ interface PageFootProps {
   onExport(): void
 }
 
-/** The foot of the page: the page button, which opens into the tools bar. */
+/**
+ * The foot of the page: the folio, and on a phone the page button, which opens into the tools bar
+ * (DESIGN.md, Control). The folio stands aside while the tools bar or the keyboard says the page.
+ */
 export function PageFoot({
   page,
   count,
   words,
   journal,
+  titlePage,
   tools,
-  showWayIn,
   keyboard,
   pageButtonRef,
   onOpenTools,
@@ -34,19 +38,20 @@ export function PageFoot({
   onTextSettings,
   onExport,
 }: PageFootProps): ReactElement {
+  const folio = !journal && !titlePage && !tools && keyboard === 0
   return (
-    <div className={keyboard > 0 ? 'foot raised' : 'foot'} style={keyboard > 0 ? { bottom: keyboard } : undefined}>
-      {/* The day's words, at the text's left edge, level with the page button. */}
-      {journal && !tools && <span className="day-words">{wordsLine(words)}</span>}
-      {tools ? (
-        <ToolsBar page={page + 1} count={count} words={words} onClose={onCloseTools} onTextSettings={onTextSettings} onExport={onExport} />
-      ) : (
-        <>
-          {showWayIn && (
-            <span className="way-in" aria-hidden="true">
-              Your tools are here
-            </span>
-          )}
+    <>
+      {folio && (
+        <div className="folio" aria-hidden="true">
+          {page + 1}
+        </div>
+      )}
+      <div className={keyboard > 0 ? 'foot raised' : 'foot'} style={keyboard > 0 ? { bottom: keyboard } : undefined}>
+        {/* The day's words, at the text's left edge, level with the page button. */}
+        {journal && !tools && <span className="day-words">{wordsLine(words)}</span>}
+        {tools ? (
+          <ToolsBar page={page + 1} count={count} words={words} onClose={onCloseTools} onTextSettings={onTextSettings} onExport={onExport} />
+        ) : (
           <button
             ref={pageButtonRef}
             type="button"
@@ -54,11 +59,11 @@ export function PageFoot({
             aria-label={`Page ${page + 1} of ${count}. Open tools`}
             onClick={onOpenTools}
           >
-            {page + 1}
+            <Icon name="asterisk" />
           </button>
-        </>
-      )}
-    </div>
+        )}
+      </div>
+    </>
   )
 }
 

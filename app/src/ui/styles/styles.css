@@ -8,9 +8,8 @@
   --text: #1f1f1f;
   --secondary: #676767;
   --dimmed: #1f1f1f; /* paper does not dim */
-  --surface: #ffffff;
+  --surface: #fafaf8;
   --surface-line: #e2e2de;
-  --word-line: #c9c9c4;
   --pressed: #e9e9e5;
   --selection: #d6d6d0;
   --lift: 0 1px 2px #0000000a, 0 8px 28px #00000014;
@@ -24,10 +23,9 @@
   --text: #b5b5b2;
   --secondary: #8c8c8a;
   --dimmed: #8c8c8a;
-  --surface: #1a1a1a;
+  --surface: #1e1e1e;
   --surface-line: #2a2a2a;
-  --word-line: #3a3a38;
-  --pressed: #242424;
+  --pressed: #252525;
   --selection: #3a3a38;
   --lift: 0 1px 2px #00000066, 0 10px 32px #00000080;
   --segment-lift: 0 1px 2px #00000066;
@@ -124,22 +122,11 @@ body {
   /* A sideways swipe past the edge is not the browser's Back here. */
   overscroll-behavior: none;
 }
-/* The smallest screen the app lays out for: the page at its least scale, its text between the head and
-   the foot (PAGES in the pager). The phone's page at 0.75: 64 + 670 × 0.75 + 92 = 658 tall; the desktop's
-   at 0.9: 64 + 686 × 0.9 + 84 = 765. In a window smaller than this the screens keep this size and the window
-   scrolls, rather than shrinking the type past reading size. The full-screen layers below fill the body,
-   not the window, so they keep it too. */
 body {
   position: relative;
   min-width: 320px;
-  min-height: 658px;
-  /* Only the document scrolls (and only in a window smaller than this). */
+  /* Only the document scrolls (and only in a window smaller than the page, below). */
   overflow: visible;
-}
-@media (min-width: 700px) {
-  body {
-    min-height: 765px;
-  }
 }
 
 #app {
@@ -220,11 +207,17 @@ button {
 .icon-button.quiet {
   color: var(--secondary);
 }
+/* Icons that stay on screen rest in secondary grey and take the title colour on hover, when pressed,
+   and while the sheet they opened is open, so the text keeps the attention (DESIGN.md, Icons). */
+.icon-button.quiet:hover,
+.icon-button.quiet:active,
+.icon-button.quiet[aria-pressed='true'] {
+  color: var(--title);
+}
 
 .aa {
   font-size: 16px;
   line-height: 1;
-  color: var(--title);
 }
 
 .bar {
@@ -270,15 +263,31 @@ button {
 
 /* ——— The page ——— */
 
+/* The smallest screen the page lays out for: the page at its least scale, its text between the head and
+   the foot (PAGES in the pager). The phone's page at 0.75: 64 + 670 × 0.75 + 92 = 658 tall; the desktop's
+   at 0.9: 64 + 686 × 0.9 + 84 = 765. In a window smaller than this the page keeps this size and the window
+   scrolls, rather than shrinking the type past reading size. Only the page: the library and settings fill
+   the window and scroll themselves, so a short window never shows two scrollbars. */
 .page-screen {
   position: absolute;
   inset: 0;
+  min-height: 658px;
   /* What sits at its edges (the foot, 20px from the bottom on desktop) never makes the window scroll. */
   overflow: clip;
   /* Each screen is its own layer, so what is raised inside it (the head) never shows over the next. */
   isolation: isolate;
   background: var(--page);
   --body: calc(var(--type) * var(--k, 1));
+}
+@media (min-width: 700px) {
+  .page-screen {
+    min-height: 765px;
+  }
+}
+/* Covered by the library or settings, the page keeps its size, laid out as it was, but fixed: it no
+   longer makes the window scroll under them. */
+.page-screen[inert] {
+  position: fixed;
 }
 /* In the side margins, the pointer is the way the page turns, drawn as our icons are (1.5 strokes,
    round ends), in the title colour with a page-coloured edge, so it reads over text too. Only where there is a page to go to. */
@@ -312,10 +321,64 @@ button {
   height: var(--head);
   display: flex;
   align-items: center;
-  /* On a phone, Library's outline sits on the text's left edge; on desktop, in the frame's
-     top-left corner, as the page button sits in its bottom-right (DESIGN.md, Layout). */
-  padding: 0 var(--side);
+  justify-content: space-between;
+  /* On a phone § is 24px in on every screen, the journal's too (DESIGN.md, One head). */
+  padding: 0 24px;
   z-index: 2;
+}
+
+/* The path: § home, then a slash and the places you came from (DESIGN.md, Control). */
+.path {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+}
+.path .home {
+  display: inline-flex;
+  align-items: center;
+  height: 44px;
+  /* A 44px tap area round the glyph, which still stands on the text's left edge. */
+  min-width: 44px;
+  padding: 0 14px;
+  margin-left: -14px;
+  font-size: 22px;
+  font-weight: 300;
+  line-height: 1;
+  color: var(--title);
+}
+/* § sits low in its box: raised so its ink centres on the line beside it. */
+.path .home span {
+  position: relative;
+  top: -1px;
+}
+.path .crumbs {
+  /* A long path wraps rather than cutting, and never leaves the rail. */
+  max-width: 224px;
+  padding-top: 12px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--text);
+}
+.path .slash {
+  color: var(--secondary);
+}
+.path .crumb-word {
+  color: var(--text);
+}
+.path button.crumb-word:hover {
+  color: var(--title);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+/* On a phone's page, § stands alone. */
+.page-screen .path .crumbs {
+  display: none;
+}
+
+/* The tools in the desktop head; on a phone they are in the tools bar. */
+.head-tools {
+  display: none;
 }
 
 .word-button {
@@ -330,18 +393,17 @@ button {
   align-items: center;
   height: 30px;
   padding: 0 12px;
-  border: 1px solid var(--word-line);
+  border: 1px solid var(--title);
   border-radius: 15px;
   font-size: 13px;
   line-height: 1;
-  color: var(--secondary);
-  transition:
-    color 160ms,
-    background-color 160ms;
+  /* The title colour: Write is the library's primary action (DESIGN.md, The word button). */
+  color: var(--title);
+  transition: background-color 160ms;
 }
 .word-button:hover .word,
-.word-button:active .word {
-  color: var(--title);
+.word-button:active .word,
+.word-button[aria-expanded='true'] .word {
   background: var(--pressed);
 }
 /* The focus ring goes round the pill, not the tap area. */
@@ -354,12 +416,12 @@ button {
 }
 
 .running-head {
-  /* Centred over the text column, with the same room either side: as wide as Library
-     and its gap, so it is balanced, never pushed by Library (DESIGN.md, Type). */
+  /* Centred over the text column, whatever sits left and right of it; on a phone clear of §
+     (DESIGN.md, Type). */
   position: absolute;
   left: var(--side);
   width: var(--measure-px);
-  padding: 0 64px;
+  padding: 0 48px;
   text-align: center;
   font-size: 13px;
   font-style: italic;
@@ -525,18 +587,33 @@ button {
 }
 
 .page-button {
-  /* A circle: 44 across with its border. Past page 99 the number widens it into a pill. */
-  min-width: 44px;
+  /* A circle, 44 across with its border, showing the asterisk (DESIGN.md, Control). */
+  width: 44px;
   height: 44px;
-  padding: 0 11px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 22px;
-  font-size: 15px;
-  line-height: 1;
   color: var(--title);
+}
+
+/* The folio: the page number, centred under the text column; on a phone level with the page button,
+   on desktop in the page's foot margin (DESIGN.md, Type). */
+.folio {
+  /* Part of the page: in a window smaller than the page it scrolls with it, never over the text. */
+  position: absolute;
+  left: var(--side);
+  width: var(--measure-px);
+  bottom: 0;
+  height: var(--foot);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--secondary);
   font-variant-numeric: lining-nums tabular-nums;
+  pointer-events: none;
 }
 
 .count {
@@ -736,17 +813,12 @@ button {
   display: flex;
   flex-direction: column;
 }
-@media (min-width: 700px) {
-  .library {
-    padding-top: 88px;
-  }
-}
 
 .library-head {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  padding: 0 2px 29px 12px;
+  padding: 0 2px 14px 12px;
 }
 .library-head h1 {
   margin: 0;
@@ -760,7 +832,6 @@ button {
 .library-actions {
   display: flex;
   gap: 4px;
-  padding-top: 6px;
 }
 
 .group-heading {
@@ -1001,6 +1072,9 @@ button {
   font-weight: 300;
   color: var(--secondary);
 }
+.empty-kind .empty-mark .mark {
+  font-size: inherit;
+}
 .empty-line {
   font-size: 18px;
   line-height: 1.55;
@@ -1081,7 +1155,8 @@ button {
   padding: 0;
 }
 
-.new-piece-bar .menu-item {
+.new-piece-bar .menu-item,
+.write-menu .menu-item {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1092,13 +1167,22 @@ button {
   line-height: 1.4;
   color: var(--title);
 }
-.new-piece-bar .menu-item:hover {
+.new-piece-bar .menu-item:hover,
+.write-menu .menu-item:hover,
+.write-menu .menu-item:focus-visible {
   background: var(--pressed);
 }
-.new-piece-bar .mark {
+.new-piece-bar .mark,
+.write-menu .mark {
   min-width: 20px;
   text-align: center;
   font-size: 19px;
+}
+/* In the Write menu the marks share one column, as wide as the widest (the journal's date), each centred
+   in it, so the words line up. */
+.write-menu .mark {
+  flex: none;
+  width: 32px;
 }
 
 /* ——— Launch ——— */
@@ -1244,12 +1328,16 @@ button {
   padding: 0 12px 96px;
 }
 .settings-head {
+  /* The head never scrolls away (DESIGN.md, One head). */
+  position: sticky;
+  top: 0;
+  z-index: 2;
   height: var(--top);
   display: flex;
   align-items: center;
   max-width: 568px;
   margin: 0 auto;
-  /* The outline on the text's left edge, as on the page. */
+  /* § on the text's left edge, as on the page. */
   padding-left: 12px;
 }
 .settings-inner {
@@ -1458,20 +1546,14 @@ button {
 .colophon-links .text-link {
   padding: 13px 0;
 }
-/* In the empty library: on the +'s row, centred, under the + bar when it opens. */
+/* In the empty library on a phone: on Write's row, left-aligned on the text's left edge, so the foot
+   reads as one line — help at the left, the action at the right. */
 .colophon-links.at-foot {
   position: fixed;
-  left: 0;
-  right: 0;
+  left: calc(var(--frame) + 24px);
   bottom: 0;
   height: var(--foot);
   margin: 0;
-  justify-content: center;
-}
-@media (min-width: 700px) {
-  .colophon-links.at-foot {
-    bottom: calc(var(--edge) - (var(--foot) - 44px) / 2);
-  }
 }
 
 /* The journal: a hairline down the left margin, top to bottom; on a phone 24px
@@ -1479,7 +1561,8 @@ button {
 .page-screen.journal::before {
   content: '';
   position: absolute;
-  top: 0;
+  /* On a phone it starts under the head, so § sits at its top end (DESIGN.md, The journal). */
+  top: 54px;
   bottom: 0;
   left: calc(var(--side) - 20px * var(--k, 1));
   width: 1px;
@@ -1550,23 +1633,46 @@ button {
   break-before: column;
 }
 
-/* "Your tools are here": on the page, no surface, level with the page button and ending 10px from it. */
-.way-in {
-  margin-right: 10px;
-  font-size: 13px;
-  font-style: italic;
-  line-height: 1;
-  color: var(--secondary);
-  pointer-events: none;
-}
-
 @media (min-width: 700px) {
-  /* In the corners, the same 20px from both edges: Library's outline (30px, in a 44px tap area)
-     from the top and left, the page button (44px) from the bottom and right. The head and the
-     foot move as a whole, so what sits level with them stays level. */
+  /* A quiet head (DESIGN.md, Layout): one line centred 35px from the top, the path at the left and the
+     tools at the right, each 20px in, within the frame. There is no page button: the tools are here. */
   .head {
-    top: calc(var(--edge) - (var(--head) - 30px) / 2);
-    padding: 0 calc(var(--frame) + var(--edge));
+    height: 70px;
+    padding: 0 calc(var(--frame) + 10px) 0 calc(var(--frame) + var(--edge));
+  }
+  :root {
+    --strip: 56px;
+  }
+  .head .path {
+    align-items: flex-start;
+  }
+  .head .path .home {
+    height: 36px;
+    min-width: 0;
+    padding: 0 10px;
+    margin-left: -10px;
+    font-size: 20px;
+  }
+  .head .path .crumbs {
+    display: block;
+    padding-top: 8px;
+    font-size: 15px;
+  }
+  /* Still centred over the column, but clear of the path and the tools (about 330px from each edge),
+     cut with "…" where a narrow window brings them close. */
+  .running-head {
+    padding: 0 max(0px, calc(330px - var(--side)));
+  }
+  .head-tools {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+  .page-button {
+    display: none;
+  }
+  .folio {
+    height: var(--bottom);
   }
   .foot {
     bottom: calc(var(--edge) - (var(--foot) - 44px) / 2);
@@ -1577,6 +1683,243 @@ button {
   }
   .settings-head {
     max-width: none;
-    padding-left: calc(var(--frame) + var(--edge) - 12px);
+    height: 70px;
+    padding-left: calc(var(--frame) + var(--edge));
+  }
+  .settings-head .path .home {
+    height: 36px;
+    min-width: 0;
+    padding: 0 10px;
+    margin-left: -10px;
+    font-size: 20px;
+  }
+  .settings-head .path .crumbs {
+    padding-top: 8px;
+    font-size: 15px;
+  }
+}
+
+/* Write, on a phone: a raised word in the page button's place (DESIGN.md, The library). */
+.write {
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 22px;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--title);
+}
+
+/* One head on every screen (DESIGN.md, Layout): the library's head line, fixed, its actions at the right.
+   On a phone it is the line from 10 to 54px, with "§ Library" at the left once the title has gone. */
+.library-top {
+  position: fixed;
+  top: 0;
+  left: var(--frame);
+  right: var(--frame);
+  z-index: 3;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px 0 24px;
+  pointer-events: none;
+}
+.library-top > * {
+  pointer-events: auto;
+}
+.library-actions {
+  margin-left: auto;
+}
+.library-path {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  color: var(--text);
+}
+.library-path[hidden] {
+  display: none;
+}
+.library-path .home {
+  font-size: 22px;
+  font-weight: 300;
+  color: var(--title);
+}
+
+/* When what is under it scrolls, the head stands on a strip of page colour with a fade under it,
+   so the text thins out before it meets the head (DESIGN.md, One head). */
+:root {
+  --strip: 54px;
+}
+.head[data-scrolled]::before,
+.library-top[data-scrolled]::before,
+.settings-head[data-scrolled]::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: calc(var(--strip) + 58px);
+  background: linear-gradient(var(--page) var(--strip), color-mix(in srgb, var(--page) 0%, transparent));
+  pointer-events: none;
+  z-index: -1;
+}
+/* The settings head is the column's width; its strip is the window's. */
+.settings-head[data-scrolled]::before {
+  left: calc(50% - 50vw);
+  right: calc(50% - 50vw);
+}
+
+/* The rail is desktop only (DESIGN.md, Layout). */
+.rail {
+  display: none;
+}
+
+@media (min-width: 700px) {
+  /* The library column, centred in the width right of the rail. */
+  .library {
+    padding: 61px 12px 33px calc(var(--frame) + 336px + 12px);
+  }
+  .library-foot {
+    display: none;
+  }
+  /* There is no big title: the rail says where you are. The heading stays for screen readers. */
+  .library-head {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  /* On desktop the head line is right of the rail: the view switch and paper / night where the tools
+     sit on a page. The rail carries the name, and Settings is at its foot. */
+  .library-top {
+    left: calc(var(--frame) + 336px);
+    height: 70px;
+    padding: 0 10px 0 20px;
+  }
+  .library-top[data-scrolled]::before,
+  .library-path,
+  .phone-only {
+    display: none;
+  }
+  /* A short list sits in the middle of the height above the colophon; a long one reaches the top and scrolls. */
+  .library-list {
+    margin-block: auto;
+  }
+  /* The rail already carries the wordmark: the colophon is the links alone, at the window's foot. */
+  .colophon-mark {
+    display: none;
+  }
+  .colophon {
+    padding-top: 48px;
+  }
+  .empty-library {
+    /* Lifted 60px above the true centre, so it looks centred over the links at the foot. */
+    padding-bottom: 120px;
+  }
+  .colophon-links.at-foot {
+    left: calc(var(--frame) + 336px);
+    right: 0;
+    bottom: calc(42px - var(--foot) / 2);
+    justify-content: center;
+  }
+  .library-lines {
+    left: calc(var(--frame) + 336px + var(--edge));
+  }
+
+  .rail {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: var(--frame);
+    width: 336px;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    padding: 13px 20px 24px;
+    background: var(--page);
+    /* A hairline you can barely see: the pressed tint at 70% (DESIGN.md, Layout). Decorative only. */
+    border-right: 1px solid color-mix(in srgb, var(--pressed) 70%, var(--page));
+  }
+  /* The head's line: under it the places start 76px from the top, as the right column does. */
+  .rail-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 44px;
+    margin-bottom: 19px;
+  }
+  .rail-mark {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    font-size: 15px;
+    color: var(--text);
+  }
+  .rail-mark .home {
+    position: relative;
+    top: -1px;
+    font-size: 20px;
+    font-weight: 300;
+    color: var(--title);
+  }
+  /* 4px between rows, so two tints (the open place and one hovered) never touch. */
+  .rail-places {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .rail-foot {
+    margin-top: auto;
+  }
+  .rail-place {
+    width: 100%;
+    height: 36px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 12px;
+    border-radius: 18px;
+    font-size: 15px;
+    color: var(--text);
+    transition: background-color 160ms;
+  }
+  .rail-place:hover,
+  .rail-place[aria-current='page'] {
+    background: var(--pressed);
+    color: var(--title);
+  }
+  .rail-place.none {
+    color: var(--secondary);
+  }
+  .rail-count {
+    font-size: 13px;
+    color: var(--secondary);
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+  /* Write's menu drops under it, right-aligned to it, never over it. */
+  .write-menu-anchor {
+    position: relative;
+  }
+  .write-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    padding: 6px;
+    border-radius: 18px;
+  }
+}
+@media (min-width: 700px) {
+  .page-screen.journal::before {
+    top: 0;
   }
 }

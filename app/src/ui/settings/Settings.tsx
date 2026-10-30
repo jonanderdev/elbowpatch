@@ -2,7 +2,8 @@ import { type ReactElement, useEffect, useRef } from 'react'
 import type { Piece } from '../../domain/model'
 import type { Deps } from '../../domain/pieces'
 import { longDate, number } from '../../domain/words'
-import { WordButton } from '../components/WordButton'
+import { Path } from '../components/Path'
+import { useScrolled } from '../components/useScrolled'
 import { lastExport } from '../files/everything'
 import { ExportImport } from './ExportImport'
 import { goesIn, PutAway, waiting } from './PutAway'
@@ -30,14 +31,17 @@ interface Props {
 
 export function Settings(props: Props): ReactElement {
   const heading = useRef<HTMLHeadingElement>(null)
+  const scroller = useRef<HTMLElement>(null)
+  const scrolled = useScrolled(scroller)
   // Each area opens with the focus on its heading, for screen readers and the keyboard.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the area is the trigger, not read inside.
   useEffect(() => heading.current?.focus(), [props.area])
   const toLibrary = props.area === 'list' || props.area === 'help' || props.area === 'about'
   return (
-    <main className="settings">
-      <div className="settings-head">
-        <WordButton word={toLibrary ? 'Library' : 'Settings'} onClick={() => props.go(toLibrary ? '/' : '/settings')} />
+    <main ref={scroller} className="settings">
+      <div className="settings-head" data-scrolled={scrolled || undefined}>
+        {/* § goes home; an area inside Settings adds the way back to it (DESIGN.md, The path). */}
+        <Path onHome={() => props.go('/')} crumbs={toLibrary ? [] : [{ word: 'Settings', onClick: () => props.go('/settings') }]} />
       </div>
       <div className="settings-inner">
         <h1 ref={heading} tabIndex={-1} className="settings-title">
