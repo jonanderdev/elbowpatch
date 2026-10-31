@@ -183,9 +183,24 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
   editorNow.current = editor
 
   useCaretFollowing(editor, pager, flow, mount, caretKeys.memory)
-  // With the keyboard down the page no longer scrolls: it stands at its top again.
+  // The keyboard coming up folds the tools bar back into the page button, with any sheet from it.
+  // The focus stays in the text.
+  useEffect(() => {
+    if (!keyboard) return
+    setTools(false)
+    setSheet(null)
+  }, [keyboard])
+  // With the keyboard down the page no longer scrolls: it stands at its top again. A selection made
+  // while writing goes with the keyboard; the next tap places the caret anew.
+  const keyboardWasUp = useRef(false)
   useEffect(() => {
     if (!keyboard && scroller.current) scroller.current.scrollTop = 0
+    const view = editorNow.current?.view
+    if (!keyboard && keyboardWasUp.current && view && !view.state.selection.empty) {
+      view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, view.state.selection.head)))
+      window.getSelection()?.removeAllRanges()
+    }
+    keyboardWasUp.current = keyboard
   }, [keyboard])
   // As the keyboard comes up, the browser shows the caret just above it, under the writing bar: once
   // the bar has moved with it, the caret is scrolled clear. Only on a resize, so a scroll by the writer stays.
@@ -268,6 +283,17 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [covered, closeTools, closeSheet])
+
+  // On a phone, a tap outside a sheet closes it; the tools bar beneath it is not outside. One opened
+  // from the desktop head stays, so the page can be seen beside it.
+  useEffect(() => {
+    if (!sheet || covered || opener.current) return
+    const onDown = (e: PointerEvent): void => {
+      if (!(e.target as Element).closest?.('.sheet, .tools')) closeSheet()
+    }
+    window.addEventListener('pointerdown', onDown)
+    return () => window.removeEventListener('pointerdown', onDown)
+  }, [sheet, covered, closeSheet])
 
   // A calm line at the foot for a few seconds.
   useEffect(() => {
