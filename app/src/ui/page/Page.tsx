@@ -385,6 +385,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
           </div>
         </div>
       </div>
+      <div className="scroll-mark" aria-hidden="true" />
 
       {editor && !readOnly && writing && keyboard && selection ? <WritingBar editor={editor} active={selection.active} barRef={writingBar} /> : null}
       {editor && !readOnly && !keyboard && selection?.rect ? (

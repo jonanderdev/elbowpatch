@@ -321,6 +321,50 @@ button {
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+/* With the keyboard up, a short track at the right edge says the page goes on behind the keyboard or above
+   the head, and where you are in it (Figma, Scroll indicator). A sign, never a control. The thumb follows
+   the scroll by CSS alone; where it cannot, the browser's own indicator stays. */
+.scroll-mark {
+  display: none;
+}
+@supports (animation-timeline: --a) and (timeline-scope: --a) {
+  .page-screen[data-keyboard] {
+    timeline-scope: --page-scroll;
+  }
+  .page-screen[data-keyboard] .page-scroll {
+    scroll-timeline: --page-scroll block;
+    scrollbar-width: none;
+  }
+  .page-screen[data-keyboard] .page-scroll::-webkit-scrollbar {
+    display: none;
+  }
+  .page-screen[data-keyboard] .scroll-mark {
+    display: block;
+    position: absolute;
+    top: 50%;
+    right: 14px;
+    width: 3px;
+    height: 70px;
+    margin-top: -35px;
+    border-radius: 1.5px;
+    background: var(--surface-line);
+    pointer-events: none;
+  }
+  .scroll-mark::before {
+    content: '';
+    display: block;
+    height: 35px;
+    border-radius: inherit;
+    background: var(--secondary);
+    animation: scroll-mark linear both;
+    animation-timeline: --page-scroll;
+  }
+}
+@keyframes scroll-mark {
+  to {
+    transform: translateY(35px);
+  }
+}
 /* Covered by the library or settings, the page keeps its size, laid out as it was, but fixed: it no
    longer makes the window scroll under them. */
 .page-screen[inert] {
