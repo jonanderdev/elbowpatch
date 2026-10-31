@@ -199,20 +199,30 @@ button {
   color: var(--title);
   transition: background-color 160ms;
 }
-.icon-button:hover,
+/* Hover only where there is a pointer that hovers: a tap leaves :hover on the button, and B or I
+   would look pressed after turning off. */
 .icon-button:active,
 .icon-button[aria-pressed='true'] {
   background: var(--pressed);
+}
+@media (hover: hover) {
+  .icon-button:hover {
+    background: var(--pressed);
+  }
 }
 .icon-button.quiet {
   color: var(--secondary);
 }
 /* Icons that stay on screen rest in secondary grey and take the title colour on hover, when pressed,
    and while the sheet they opened is open, so the text keeps the attention (DESIGN.md, Icons). */
-.icon-button.quiet:hover,
 .icon-button.quiet:active,
 .icon-button.quiet[aria-pressed='true'] {
   color: var(--title);
+}
+@media (hover: hover) {
+  .icon-button.quiet:hover {
+    color: var(--title);
+  }
 }
 
 .aa {
