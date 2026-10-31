@@ -24,7 +24,7 @@ import { useOpenAtPlace } from './useOpenAtPlace'
 import { usePager } from './usePager'
 import { usePageTurns } from './usePageTurns'
 import { useSaving } from './useSaving'
-import { SelectionMenu, useKeyboard, WritingBar } from './Writing'
+import { SelectionMenu, useHeadInView, useKeyboard, WritingBar } from './Writing'
 
 export type { Opened } from './fields'
 
@@ -176,6 +176,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
   editorNow.current = editor
 
   useCaretFollowing(editor, pager, flow, mount, caretKeys.memory)
+  useHeadInView(head)
   // As the keyboard comes up, the browser shows the caret just above it, under the writing bar: once
   // the bar has moved with it, the caret is scrolled clear. Only on a resize, so a scroll by the writer stays.
   useEffect(() => {

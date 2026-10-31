@@ -144,3 +144,28 @@ export function useKeyboard(): number | null {
   }, [])
   return covered
 }
+
+/**
+ * Where the keyboard does not shorten the window (iPhone, installed), iOS slides the whole view up to show
+ * the caret, and the head would go with it: the head follows the visible area instead, on its strip
+ * (DESIGN.md, One head). Written straight to the head, as it changes on every frame of a scroll.
+ */
+export function useHeadInView(head: RefObject<HTMLElement | null>): void {
+  useEffect(() => {
+    const vv = window.visualViewport
+    const el = head.current
+    if (!vv || !el) return
+    const on = (): void => {
+      const top = Math.max(0, vv.offsetTop)
+      el.style.transform = top ? `translateY(${top}px)` : ''
+      el.toggleAttribute('data-lifted', top > 0)
+    }
+    on()
+    vv.addEventListener('resize', on)
+    vv.addEventListener('scroll', on)
+    return () => {
+      vv.removeEventListener('resize', on)
+      vv.removeEventListener('scroll', on)
+    }
+  }, [head])
+}
