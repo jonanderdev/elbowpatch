@@ -60,6 +60,9 @@
   --type: 16px;
   --head: 64px;
   --foot: 92px;
+  /* Installed on a phone, the app draws to the screen's foot. What sits at the foot (the page's end, the
+     tools bar, the sheet above it) rises by half the home bar's inset: clear of it, without floating. */
+  --lift: calc(env(safe-area-inset-bottom, 0px) / 2);
 }
 [data-size='s'] {
   --type: 14px;
@@ -287,9 +290,8 @@ button {
 .page-screen {
   position: absolute;
   inset: 0;
-  /* Installed on a phone, the app draws to the screen's foot: the page ends above the home bar and the
-     rounded corners, as the foot does. */
-  bottom: env(safe-area-inset-bottom, 0px);
+  /* Installed on a phone, the page ends --lift above the screen's foot, as the foot does. */
+  bottom: var(--lift);
   /* On a touch screen, the height it was laid out at (--page-height, from the pager). */
   min-height: var(--page-height, 658px);
   /* What sits at its edges (the foot, 20px from the bottom on desktop) never makes the window scroll. */
@@ -698,7 +700,7 @@ button {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: env(safe-area-inset-bottom, 0px);
+  bottom: var(--lift);
   height: var(--foot);
   display: flex;
   align-items: center;
@@ -758,7 +760,7 @@ button {
 .line {
   position: fixed;
   left: calc(var(--frame) + var(--edge));
-  bottom: calc((var(--foot) - 44px) / 2);
+  bottom: calc(var(--lift) + (var(--foot) - 44px) / 2);
   max-width: calc(100% - 2 * var(--edge) - 56px);
   min-height: 44px;
   display: flex;
@@ -785,8 +787,8 @@ button {
   left: 12px;
   right: 12px;
   /* Above the tools bar, which stays in view beneath it (Figma, Text settings). */
-  bottom: calc((var(--foot) - 44px) / 2 + 44px + 12px);
-  max-height: calc(100dvh - var(--foot) - 24px);
+  bottom: calc(var(--lift) + (var(--foot) - 44px) / 2 + 44px + 12px);
+  max-height: calc(100dvh - var(--lift) - var(--foot) - 24px);
   overflow-y: auto;
   z-index: 5;
   display: flex;
@@ -1698,7 +1700,7 @@ button {
 .colophon-links.at-foot {
   position: fixed;
   left: calc(var(--frame) + 24px);
-  bottom: 0;
+  bottom: var(--lift);
   height: var(--foot);
   margin: 0;
 }
