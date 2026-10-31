@@ -24,7 +24,7 @@ import { useOpenAtPlace } from './useOpenAtPlace'
 import { usePager } from './usePager'
 import { usePageTurns } from './usePageTurns'
 import { useSaving } from './useSaving'
-import { SelectionMenu, useKeyboard, WritingBar } from './Writing'
+import { SelectionMenu, useCaretInView, useKeyboard, WritingBar } from './Writing'
 
 export type { Opened } from './fields'
 
@@ -86,6 +86,8 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
   const flow = useRef<HTMLDivElement>(null)
   const mount = useRef<HTMLDivElement>(null)
   const pageButton = useRef<HTMLButtonElement>(null)
+  const head = useRef<HTMLDivElement>(null)
+  const writingBar = useRef<HTMLDivElement>(null)
   /** The head's control that opened the sheet: the focus goes back to it when the sheet closes. */
   const opener = useRef<HTMLElement | null>(null)
   const titles: TitleRefs = {
@@ -173,6 +175,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
   editorNow.current = editor
 
   useCaretFollowing(editor, pager, flow, mount, caretKeys.memory)
+  const lifted = useCaretInView(editor, writing, keyboard, viewport, head, writingBar)
   useOpenAtPlace(editor, pager, opened)
   usePageTurns({
     screen,
@@ -265,7 +268,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
 
   return (
     <div ref={screen} className={piece.kind === 'journal' ? 'page-screen journal' : 'page-screen'} inert={covered} aria-hidden={covered}>
-      <div className="head" data-scrolled={scrolled || undefined}>
+      <div ref={head} className="head" data-scrolled={scrolled || lifted || undefined}>
         {/* Pressed, § leaves the caret where it is, so the place kept is the caret's. On desktop the
             piece's name follows it; a phone shows § alone. */}
         <Path
@@ -320,7 +323,9 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
         </div>
       </div>
 
-      {editor && !readOnly && writing && keyboard !== null && selection ? <WritingBar editor={editor} active={selection.active} keyboard={keyboard} /> : null}
+      {editor && !readOnly && writing && keyboard !== null && selection ? (
+        <WritingBar editor={editor} active={selection.active} keyboard={keyboard} barRef={writingBar} />
+      ) : null}
       {editor && !readOnly && keyboard === null && selection?.rect ? (
         <SelectionMenu editor={editor} rect={selection.rect} active={selection.active} onKeep={() => void keepMoment()} />
       ) : null}
