@@ -136,11 +136,6 @@ body {
 ::selection {
   background: var(--selection);
 }
-/* The caret is the title colour in every field, not only the page; on iPhone it also tints the
-   selection and its handles, which would otherwise be the system blue (DESIGN.md, Colour). */
-:root {
-  caret-color: var(--title);
-}
 
 button {
   font: inherit;
