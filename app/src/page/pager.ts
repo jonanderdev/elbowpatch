@@ -2,7 +2,9 @@
 // page. The pager is exactly one column wide and sits at the side margin; a
 // gap of two margins puts page k at scrollLeft = k × stride, so a turn only
 // changes the scroll position and the browser keeps the caret, selection and
-// keyboard as they are.
+// keyboard as they are. The text itself is the column box, as wide as all its
+// pages: iOS places and draws the caret only within the editable element's
+// own box, and a box split across columns is only page 1's.
 
 import type { Screen } from '../domain/model'
 
@@ -74,10 +76,6 @@ export function geometry(screenWidth: number, screenHeight: number, wide = false
   }
 }
 
-export function pageCount(scrollWidth: number, g: Geometry): number {
-  return Math.max(1, Math.round((scrollWidth - g.measure) / g.stride) + 1)
-}
-
 /** The page holding a point, given its distance from the start of the flow. */
 export function pageAt(offset: number, g: Geometry): number {
   return Math.max(0, Math.floor((offset + (g.stride - g.measure) / 2) / g.stride))
@@ -127,9 +125,14 @@ export class Pager {
   /** Called when the browser scrolled on its own: the page shows the caret's page again. */
   onDrift?: () => void
 
+  /** The section title's height, as the text's room for it was last set. */
+  private titleHeight = -1
+
   constructor(
     readonly viewport: HTMLElement,
     readonly flow: HTMLElement,
+    /** The text, in columns: one box across every page. */
+    readonly columns: HTMLElement,
     readonly onChange: (page: number, count: number) => void,
   ) {
     // The browser may scroll the viewport itself to show the caret; settle it on the caret's page.
@@ -142,20 +145,39 @@ export class Pager {
 
   layout(g: Geometry): void {
     this.g = g
-    this.flow.style.columnWidth = `${g.measure}px`
-    this.flow.style.columnGap = `${g.stride - g.measure}px`
+    this.columns.style.columnGap = `${g.stride - g.measure}px`
+    this.size(this.count)
     this.measure()
   }
 
-  /** Recount pages after the text or the layout changed. */
+  /**
+   * Recount pages after the text or the layout changed. The titles sit over the text, which keeps
+   * room for them; their height is read first, since it moves every page break after it.
+   */
   measure(): void {
-    const count = pageCount(this.viewport.scrollWidth, this.g)
+    const title = this.flow.querySelector<HTMLElement>('.title')
+    const height = title?.offsetHeight ?? 0
+    if (height !== this.titleHeight) {
+      this.titleHeight = height
+      this.flow.style.setProperty('--title-height', `${height}px`)
+    }
+    // Text past the columns the box has flows on into more to its right: the last line says how many.
+    const lines = this.columns.lastElementChild?.getClientRects()
+    const last = lines?.[lines.length - 1]
+    const count = last ? pageAt(last.left - this.columns.getBoundingClientRect().left, this.g) + 1 : 1
     const page = Math.min(this.page, count - 1)
     const changed = count !== this.count || page !== this.page
+    if (count !== this.count) this.size(count)
     this.count = count
     this.page = page
     this.viewport.scrollLeft = page * this.g.stride
     if (changed) this.onChange(this.page, this.count)
+  }
+
+  /** The text's box, as wide as `count` pages: their columns, and the gaps between them. */
+  private size(count: number): void {
+    this.columns.style.columnCount = String(count)
+    this.columns.style.width = `${count * this.g.stride - (this.g.stride - this.g.measure)}px`
   }
 
   turnTo(page: number): void {

@@ -453,8 +453,8 @@ button {
 }
 
 .flow {
+  position: relative;
   height: 100%;
-  column-fill: auto;
   font-size: var(--body);
   line-height: var(--leading);
   font-weight: 360;
@@ -468,8 +468,14 @@ button {
   hyphens: auto;
 }
 
+/* The titles sit over the text, which keeps room for them (src/page/pager.ts): the section title at
+   the top of its first page, the one after a title page if there is one. */
 .title {
-  margin: 0 0 var(--body);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  margin: 0;
   padding: 0.149em 0 0.263em;
   font-size: calc(var(--body) * 2.05);
   font-weight: 300;
@@ -483,12 +489,18 @@ button {
   break-after: avoid;
   white-space: pre-wrap;
 }
+[data-title-page] .title {
+  left: var(--stride);
+}
 .title[data-empty]::before {
   content: attr(data-placeholder);
   color: var(--secondary);
 }
 
 .body {
+  /* The column box (src/page/pager.ts): as tall as the page, as wide as all its pages. */
+  height: 100%;
+  column-fill: auto;
   outline: none;
   white-space: pre-wrap;
   word-wrap: break-word;
@@ -502,6 +514,16 @@ button {
 }
 .body > :last-child {
   margin-bottom: 0;
+}
+/* The room the titles take (they sit over it): the section title and the space under it, after a
+   title page's whole page if there is one. Not a node, so no caret or selection can land in it. */
+.body::before {
+  content: '';
+  display: block;
+  height: calc(var(--title-height, 0px) + var(--body));
+}
+[data-title-page] .body::before {
+  height: calc(var(--text-height) + var(--title-height, 0px) + var(--body));
 }
 .body p.empty::before {
   content: attr(data-placeholder);
@@ -1616,9 +1638,9 @@ button {
    in the upper third (the optical centre); chapter 1 opens on the next page. The title page is
    one page tall, so this holds where column breaks are not supported (Firefox). */
 .title-page {
-  height: 100%;
+  position: absolute;
+  inset: 0;
   overflow: hidden;
-  break-after: column;
   padding-top: 22%;
   text-align: center;
 }
@@ -1660,9 +1682,6 @@ button {
 .book-title:focus-visible,
 .subtitle:focus-visible {
   outline: none;
-}
-.title.chapter-opening {
-  break-before: column;
 }
 
 @media (min-width: 700px) {

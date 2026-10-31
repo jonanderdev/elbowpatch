@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { geometry, linesOf, MAX_SCALE, pageAt, pageCount } from './pager'
+import { geometry, linesOf, MAX_SCALE, pageAt } from './pager'
 
 describe('paging maths', () => {
   it('a 390px phone shows the phone page as it is', () => {
@@ -31,13 +31,6 @@ describe('paging maths', () => {
 
   it('keeps the stride in whole pixels on an odd width', () => {
     expect(geometry(391.5, 800).stride).toBe(391)
-  })
-
-  it('counts pages from the width the columns take', () => {
-    const g = geometry(540, 900)
-    expect(pageCount(g.measure, g)).toBe(1)
-    expect(pageCount(g.measure + g.stride, g)).toBe(2)
-    expect(pageCount(g.measure + 299 * g.stride, g)).toBe(300)
   })
 
   it('finds the page holding a point', () => {
