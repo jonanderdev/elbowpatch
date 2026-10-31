@@ -3,7 +3,7 @@ import { type CSSProperties, type ReactElement, useCallback, useEffect, useLayou
 import { countWords } from '../../domain/markdown'
 import type { Piece } from '../../domain/model'
 import { type Deps, savePages } from '../../domain/pieces'
-import { showCaret } from '../../page/caret'
+import { caretRect, showCaret } from '../../page/caret'
 import { type Editor, selectionBox } from '../../page/editor'
 import { screenOf } from '../../page/pager'
 import { placeOf } from '../../page/place'
@@ -24,7 +24,7 @@ import { useOpenAtPlace } from './useOpenAtPlace'
 import { usePager } from './usePager'
 import { usePageTurns } from './usePageTurns'
 import { useSaving } from './useSaving'
-import { SelectionMenu, useCaretInView, useKeyboard, WritingBar } from './Writing'
+import { SelectionMenu, useKeyboard, WritingBar } from './Writing'
 
 export type { Opened } from './fields'
 
@@ -157,6 +157,12 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     },
     onCaret(view) {
       if (pager) showCaret(view, pager)
+      // The window scrolls the line being written out from under the head and the writing bar.
+      const caret = caretRect(view)
+      const top = (head.current?.getBoundingClientRect().bottom ?? 0) + 16
+      const bottom = (writingBar.current?.getBoundingClientRect().top ?? window.innerHeight) - 16
+      if (caret && caret.bottom > bottom) window.scrollBy(0, caret.bottom - bottom)
+      else if (caret && caret.top < top) window.scrollBy(0, caret.top - top)
     },
     onFocusChange(focused) {
       if (focused) moved.current = true
@@ -175,7 +181,6 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
   editorNow.current = editor
 
   useCaretFollowing(editor, pager, flow, mount, caretKeys.memory)
-  const lifted = useCaretInView(editor, writing, keyboard, viewport, head, writingBar)
   useOpenAtPlace(editor, pager, opened)
   usePageTurns({
     screen,
@@ -268,7 +273,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
 
   return (
     <div ref={screen} className={piece.kind === 'journal' ? 'page-screen journal' : 'page-screen'} inert={covered} aria-hidden={covered}>
-      <div ref={head} className="head" data-scrolled={scrolled || lifted || undefined}>
+      <div ref={head} className="head" data-scrolled={scrolled || undefined}>
         {/* Pressed, § leaves the caret where it is, so the place kept is the caret's. On desktop the
             piece's name follows it; a phone shows § alone. */}
         <Path

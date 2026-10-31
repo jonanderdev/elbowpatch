@@ -1,5 +1,4 @@
 import { type ReactElement, type RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { caretRect, liftFor } from '../../page/caret'
 import type { Editor } from '../../page/editor'
 import { Icon, IconButton } from '../components/Icon'
 
@@ -144,41 +143,4 @@ export function useKeyboard(): number | null {
     }
   }, [])
   return covered
-}
-
-/**
- * While writing with the phone keyboard up, the text is lifted so the caret stays in view, between the
- * head and the writing bar: the page keeps its height, so the keyboard covers its foot. Runs on every
- * render, as the page renders on each caret move. True while the text is lifted, so the head stands on
- * its strip.
- */
-export function useCaretInView(
-  editor: Editor | null,
-  writing: boolean,
-  keyboard: number | null,
-  text: RefObject<HTMLElement | null>,
-  head: RefObject<HTMLElement | null>,
-  bar: RefObject<HTMLElement | null>,
-): boolean {
-  const lift = useRef(0)
-  const [lifted, setLifted] = useState(false)
-  useLayoutEffect(() => {
-    const el = text.current
-    const vv = window.visualViewport
-    if (!el) return
-    let next = 0
-    const caret = editor && writing && keyboard !== null && vv ? caretRect(editor.view) : null
-    if (caret && vv) {
-      const margin = 16
-      const top = Math.max(head.current?.getBoundingClientRect().bottom ?? 0, vv.offsetTop) + margin
-      const bottom = Math.min(bar.current?.getBoundingClientRect().top ?? Infinity, vv.offsetTop + vv.height) - margin
-      next = liftFor(caret, lift.current, { top, bottom })
-    }
-    if (next !== lift.current) {
-      lift.current = next
-      el.style.transform = next ? `translateY(${-next}px)` : ''
-    }
-    setLifted(next > 0)
-  })
-  return lifted
 }
