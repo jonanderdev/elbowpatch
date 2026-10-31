@@ -3,7 +3,7 @@ import { type CSSProperties, type ReactElement, useCallback, useEffect, useLayou
 import { countWords } from '../../domain/markdown'
 import type { Piece } from '../../domain/model'
 import { type Deps, savePages } from '../../domain/pieces'
-import { caretRect, showCaret } from '../../page/caret'
+import { scrollToCaret, showCaret } from '../../page/caret'
 import { type Editor, selectionBox } from '../../page/editor'
 import { screenOf } from '../../page/pager'
 import { placeOf } from '../../page/place'
@@ -157,12 +157,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     },
     onCaret(view) {
       if (pager) showCaret(view, pager)
-      // The window scrolls the line being written out from under the head and the writing bar.
-      const caret = caretRect(view)
-      const top = (head.current?.getBoundingClientRect().bottom ?? 0) + 16
-      const bottom = (writingBar.current?.getBoundingClientRect().top ?? window.innerHeight) - 16
-      if (caret && caret.bottom > bottom) window.scrollBy(0, caret.bottom - bottom)
-      else if (caret && caret.top < top) window.scrollBy(0, caret.top - top)
+      scrollToCaret(view, head.current, writingBar.current)
     },
     onFocusChange(focused) {
       if (focused) moved.current = true
@@ -181,6 +176,24 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
   editorNow.current = editor
 
   useCaretFollowing(editor, pager, flow, mount, caretKeys.memory)
+  // As the keyboard comes up, the browser shows the caret just above it, under the writing bar: once
+  // the bar has moved with it, the caret is scrolled clear. Only on a resize, so a scroll by the writer stays.
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv || !editor) return
+    let frame = 0
+    const on = (): void => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        if (editor.view.hasFocus()) scrollToCaret(editor.view, head.current, writingBar.current)
+      })
+    }
+    vv.addEventListener('resize', on)
+    return () => {
+      vv.removeEventListener('resize', on)
+      cancelAnimationFrame(frame)
+    }
+  }, [editor])
   useOpenAtPlace(editor, pager, opened)
   usePageTurns({
     screen,

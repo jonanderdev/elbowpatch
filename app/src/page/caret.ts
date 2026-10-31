@@ -47,6 +47,19 @@ export function showCaret(view: EditorView, pager: Pager, force: boolean = false
   if (rect) pager.show(rect.left)
 }
 
+/**
+ * Scrolls the window so the caret stands clear of the head above and, with the phone keyboard up, the
+ * writing bar below it. Only the window scrolls, so the writer can scroll it back.
+ */
+export function scrollToCaret(view: EditorView, head: HTMLElement | null, bar: HTMLElement | null): void {
+  const caret = caretRect(view)
+  if (!caret) return
+  const top = (head?.getBoundingClientRect().bottom ?? 0) + 16
+  const bottom = (bar?.getBoundingClientRect().top ?? window.innerHeight) - 16
+  if (caret.bottom > bottom) window.scrollBy(0, caret.bottom - bottom)
+  else if (caret.top < top) window.scrollBy(0, caret.top - top)
+}
+
 /** Where a caret at `pos` would be drawn, without moving the caret there. */
 export function drawnAt(view: EditorView, pos: number): DOMRect | null {
   try {
