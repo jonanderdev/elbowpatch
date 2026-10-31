@@ -47,6 +47,17 @@ export function showCaret(view: EditorView, pager: Pager, force: boolean = false
   if (rect) pager.show(rect.left)
 }
 
+/**
+ * How far the text is lifted so the caret stands in the band left between the head and what covers the
+ * foot (the phone keyboard and the writing bar). `caret` is drawn with `lift` applied; the lift moves
+ * only when the caret leaves the band, and never below 0.
+ */
+export function liftFor(caret: { top: number; bottom: number }, lift: number, band: { top: number; bottom: number }): number {
+  if (caret.bottom > band.bottom) return Math.max(0, lift + caret.bottom - band.bottom)
+  if (caret.top < band.top) return Math.max(0, lift + caret.top - band.top)
+  return lift
+}
+
 /** Where a caret at `pos` would be drawn, without moving the caret there. */
 export function drawnAt(view: EditorView, pos: number): DOMRect | null {
   try {
