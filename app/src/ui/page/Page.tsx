@@ -24,7 +24,7 @@ import { useOpenAtPlace } from './useOpenAtPlace'
 import { usePager } from './usePager'
 import { usePageTurns } from './usePageTurns'
 import { useSaving } from './useSaving'
-import { SelectionMenu, useHeadInView, useKeyboard, WritingBar } from './Writing'
+import { SelectionMenu, useKeyboard, WritingBar } from './Writing'
 
 export type { Opened } from './fields'
 
@@ -78,16 +78,22 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
   const [kept, setKept] = useState('')
   // Where a sheet opened from the desktop head drops: under its control, right-aligned to it.
   const [anchor, setAnchor] = useState<CSSProperties | undefined>(undefined)
-  // Only a window smaller than the page scrolls: the head then stands on its strip (DESIGN.md, One head).
-  const scrolled = useScrolled()
 
   const screen = useRef<HTMLDivElement>(null)
+  /** The page's scroller: it scrolls while the phone keyboard is up (DESIGN.md, Control). */
+  const scroller = useRef<HTMLDivElement>(null)
   const viewport = useRef<HTMLDivElement>(null)
   const flow = useRef<HTMLDivElement>(null)
   const mount = useRef<HTMLDivElement>(null)
   const pageButton = useRef<HTMLButtonElement>(null)
   const head = useRef<HTMLDivElement>(null)
   const writingBar = useRef<HTMLDivElement>(null)
+  // A window smaller than the page scrolls, and the page in its scroller with the keyboard up: either
+  // way the head then stands on its strip (DESIGN.md, One head). With the keyboard down the scroller no
+  // longer scrolls, and may say nothing as its scroll goes.
+  const windowScrolled = useScrolled()
+  const pageScrolled = useScrolled(scroller)
+  const scrolled = windowScrolled || (keyboard && pageScrolled)
   /** The head's control that opened the sheet: the focus goes back to it when the sheet closes. */
   const opener = useRef<HTMLElement | null>(null)
   const titles: TitleRefs = {
@@ -114,6 +120,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     columns: mount,
     kind: piece.kind,
     settings,
+    keyboard,
     onRelayout: (p) => {
       if (editorNow.current) showCaret(editorNow.current.view, p)
     },
@@ -157,7 +164,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     },
     onCaret(view) {
       if (pager) showCaret(view, pager)
-      scrollToCaret(view, head.current, writingBar.current)
+      scrollToCaret(view, scroller.current, head.current, writingBar.current)
     },
     onFocusChange(focused) {
       if (focused) moved.current = true
@@ -176,7 +183,10 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
   editorNow.current = editor
 
   useCaretFollowing(editor, pager, flow, mount, caretKeys.memory)
-  useHeadInView(head)
+  // With the keyboard down the page no longer scrolls: it stands at its top again.
+  useEffect(() => {
+    if (!keyboard && scroller.current) scroller.current.scrollTop = 0
+  }, [keyboard])
   // As the keyboard comes up, the browser shows the caret just above it, under the writing bar: once
   // the bar has moved with it, the caret is scrolled clear. Only on a resize, so a scroll by the writer stays.
   useEffect(() => {
@@ -186,7 +196,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     const on = (): void => {
       cancelAnimationFrame(frame)
       frame = requestAnimationFrame(() => {
-        if (editor.view.hasFocus()) scrollToCaret(editor.view, head.current, writingBar.current)
+        if (editor.view.hasFocus()) scrollToCaret(editor.view, scroller.current, head.current, writingBar.current)
       })
     }
     vv.addEventListener('resize', on)
@@ -286,7 +296,13 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
   }
 
   return (
-    <div ref={screen} className={piece.kind === 'journal' ? 'page-screen journal' : 'page-screen'} inert={covered} aria-hidden={covered}>
+    <div
+      ref={screen}
+      className={piece.kind === 'journal' ? 'page-screen journal' : 'page-screen'}
+      data-keyboard={keyboard || undefined}
+      inert={covered}
+      aria-hidden={covered}
+    >
       <div ref={head} className="head" data-scrolled={scrolled || undefined}>
         {/* Pressed, § leaves the caret where it is, so the place kept is the caret's. On desktop the
             piece's name follows it; a phone shows § alone. */}
@@ -309,43 +325,43 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
         />
       </div>
 
-      <div ref={viewport} className="pager">
-        <div ref={flow} className="flow" lang={piece.lang} data-title-page={titlePage || undefined}>
-          {titlePage ? (
-            <TitlePage
-              nameRef={titles.bookTitle}
-              subtitleRef={titles.subtitle}
-              kind={piece.kind === 'book' ? 'book' : 'journal'}
-              readOnly={readOnly}
-              onFocus={() => pager?.turnTo(0)}
-              onInput={() => {
-                setName(titles.bookTitle.current?.textContent ?? '')
+      <div ref={scroller} className="page-scroll">
+        <div ref={viewport} className="pager">
+          <div ref={flow} className="flow" lang={piece.lang} data-title-page={titlePage || undefined}>
+            {titlePage ? (
+              <TitlePage
+                nameRef={titles.bookTitle}
+                subtitleRef={titles.subtitle}
+                kind={piece.kind === 'book' ? 'book' : 'journal'}
+                readOnly={readOnly}
+                onFocus={() => pager?.turnTo(0)}
+                onInput={() => {
+                  setName(titles.bookTitle.current?.textContent ?? '')
+                  saving?.touch()
+                }}
+                onDone={() => (titleEditable ? titles.title.current?.focus() : editor?.focus())}
+              />
+            ) : null}
+            <SectionTitle
+              titleRef={titles.title}
+              editable={titleEditable}
+              placeholder={piece.kind === 'book' ? 'Chapter title' : 'Untitled'}
+              afterTitlePage={titlePage}
+              onFocus={(el) => pager?.show(el.getBoundingClientRect().left)}
+              onInput={(text) => {
+                setHeading(text)
                 saving?.touch()
+                requestAnimationFrame(() => pager?.measure())
               }}
-              onDone={() => (titleEditable ? titles.title.current?.focus() : editor?.focus())}
+              onDone={toText}
             />
-          ) : null}
-          <SectionTitle
-            titleRef={titles.title}
-            editable={titleEditable}
-            placeholder={piece.kind === 'book' ? 'Chapter title' : 'Untitled'}
-            afterTitlePage={titlePage}
-            onFocus={(el) => pager?.show(el.getBoundingClientRect().left)}
-            onInput={(text) => {
-              setHeading(text)
-              saving?.touch()
-              requestAnimationFrame(() => pager?.measure())
-            }}
-            onDone={toText}
-          />
-          <div ref={mount} />
+            <div ref={mount} />
+          </div>
         </div>
       </div>
 
-      {editor && !readOnly && writing && keyboard !== null && selection ? (
-        <WritingBar editor={editor} active={selection.active} keyboard={keyboard} barRef={writingBar} />
-      ) : null}
-      {editor && !readOnly && keyboard === null && selection?.rect ? (
+      {editor && !readOnly && writing && keyboard && selection ? <WritingBar editor={editor} active={selection.active} barRef={writingBar} /> : null}
+      {editor && !readOnly && !keyboard && selection?.rect ? (
         <SelectionMenu editor={editor} rect={selection.rect} active={selection.active} onKeep={() => void keepMoment()} />
       ) : null}
 
