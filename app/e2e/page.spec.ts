@@ -866,3 +866,35 @@ test('a tap below the text puts the caret at its end, ready to type', async ({ p
   await page.keyboard.type(' More.')
   await expect(page.locator('.body')).toHaveText('A short page. More.')
 })
+
+// iOS places and draws the caret only within the text's own box: split across pages, its box is
+// page 1's, and on a later page a tap moved no caret and the caret was not drawn.
+test('on every page the text is one box that covers the page shown', async ({ page }) => {
+  await newEssay(page)
+  await fill(page, 8)
+  const total = Number((await pageLabel(page))?.match(/of (\d+)/)?.[1])
+  expect(total).toBeGreaterThan(1)
+  for (let i = 1; i < total; i++) await page.keyboard.press('PageUp')
+  for (let n = 1; n <= total; n++) {
+    if (n > 1) await page.keyboard.press('PageDown')
+    await onPage(page, n)
+    const box = await page.evaluate(() => {
+      const body = document.querySelector('.body')!
+      const r = body.getBoundingClientRect()
+      const p = document.querySelector('.pager')!.getBoundingClientRect()
+      return { boxes: body.getClientRects().length, covers: r.left <= p.left + 1 && r.right >= p.right - 1 }
+    })
+    expect(box).toEqual({ boxes: 1, covers: true })
+  }
+})
+
+test('the drop cap is the first letter of the text, not of the room kept for the title', async ({ page }) => {
+  await newEssay(page)
+  await page.keyboard.type('Once upon a time.')
+  const weight = () =>
+    page.evaluate(() => {
+      document.documentElement.dataset.dropcap = 'true'
+      return getComputedStyle(document.querySelector('.body p')!, '::first-letter').fontWeight
+    })
+  expect(await weight()).toBe('600')
+})

@@ -56,31 +56,35 @@ export function createEditor(mount: HTMLElement, options: EditorOptions): Editor
     ],
   })
 
-  const view = new EditorView(mount, {
-    state,
-    editable: () => options.editable?.() ?? true,
-    attributes: { class: 'body', lang: options.lang, spellcheck: 'true', 'aria-label': 'Text', 'aria-multiline': 'true', role: 'textbox' },
-    // Pasted plain text is read as Markdown, with the same rules as typing (0003).
-    // Markdown outside the v1 marks, headings included, arrives as plain paragraphs.
-    clipboardTextParser: (text) => new Slice(Fragment.from(toDoc(parse(text).map(plainIfRaw)).content), 0, 0),
-    clipboardTextSerializer: (slice) => serialize(toBlocks(schema.nodes.doc.create(null, slice.content.size ? slice.content : undefined))),
-    // The pager turns to the caret; nothing scrolls by itself.
-    handleKeyDown: (v, e) => options.onKey?.(v, e) ?? false,
-    handleScrollToSelection: (v) => {
-      options.onCaret(v)
-      return true
+  // The mount is the text itself, so the pager can lay it out in columns as one box.
+  const view = new EditorView(
+    { mount },
+    {
+      state,
+      editable: () => options.editable?.() ?? true,
+      attributes: { class: 'body', lang: options.lang, spellcheck: 'true', 'aria-label': 'Text', 'aria-multiline': 'true', role: 'textbox' },
+      // Pasted plain text is read as Markdown, with the same rules as typing (0003).
+      // Markdown outside the v1 marks, headings included, arrives as plain paragraphs.
+      clipboardTextParser: (text) => new Slice(Fragment.from(toDoc(parse(text).map(plainIfRaw)).content), 0, 0),
+      clipboardTextSerializer: (slice) => serialize(toBlocks(schema.nodes.doc.create(null, slice.content.size ? slice.content : undefined))),
+      // The pager turns to the caret; nothing scrolls by itself.
+      handleKeyDown: (v, e) => options.onKey?.(v, e) ?? false,
+      handleScrollToSelection: (v) => {
+        options.onCaret(v)
+        return true
+      },
+      handleDOMEvents: {
+        focus: () => void options.onFocusChange?.(true),
+        blur: () => void options.onFocusChange?.(false),
+      },
+      dispatchTransaction(tr) {
+        const next = view.state.apply(tr)
+        view.updateState(next)
+        if (tr.docChanged) options.onChange(serialize(toBlocks(next.doc)))
+        if (tr.selectionSet || tr.docChanged || tr.storedMarksSet) options.onSelection?.(view, tr)
+      },
     },
-    handleDOMEvents: {
-      focus: () => void options.onFocusChange?.(true),
-      blur: () => void options.onFocusChange?.(false),
-    },
-    dispatchTransaction(tr) {
-      const next = view.state.apply(tr)
-      view.updateState(next)
-      if (tr.docChanged) options.onChange(serialize(toBlocks(next.doc)))
-      if (tr.selectionSet || tr.docChanged || tr.storedMarksSet) options.onSelection?.(view, tr)
-    },
-  })
+  )
 
   return {
     view,

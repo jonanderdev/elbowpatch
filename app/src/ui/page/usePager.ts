@@ -19,6 +19,8 @@ interface Options {
   screen: RefObject<HTMLDivElement | null>
   viewport: RefObject<HTMLDivElement | null>
   flow: RefObject<HTMLDivElement | null>
+  /** The text, laid out in the columns. */
+  columns: RefObject<HTMLDivElement | null>
   kind: Kind
   settings: Settings
   /** After the pages were laid out again: show the caret's page. */
@@ -29,7 +31,7 @@ interface Options {
  * The pager for the page: the text in CSS columns, one per page (docs/decisions/0003). Laid out
  * before the first paint, and again when the window, the fonts or the text settings change.
  */
-export function usePager({ screen, viewport, flow, kind, settings, onRelayout }: Options): PagerState {
+export function usePager({ screen, viewport, flow, columns, kind, settings, onRelayout }: Options): PagerState {
   const [pager, setPager] = useState<Pager | null>(null)
   const [page, setPage] = useState(0)
   const [count, setCount] = useState(1)
@@ -42,9 +44,10 @@ export function usePager({ screen, viewport, flow, kind, settings, onRelayout }:
     const viewportEl = viewport.current
     const flowEl = flow.current
     const screenEl = screen.current
-    if (!viewportEl || !flowEl || !screenEl) return
+    const columnsEl = columns.current
+    if (!viewportEl || !flowEl || !screenEl || !columnsEl) return
     let shown = -1
-    const p = new Pager(viewportEl, flowEl, (next, total) => {
+    const p = new Pager(viewportEl, flowEl, columnsEl, (next, total) => {
       setPage(next)
       setCount(total)
       if (shown !== -1 && next !== shown) setAnnouncement(`Page ${next + 1} of ${total}`)
@@ -69,7 +72,7 @@ export function usePager({ screen, viewport, flow, kind, settings, onRelayout }:
       document.fonts.removeEventListener('loadingdone', remeasure)
       window.removeEventListener('resize', relayout)
     }
-  }, [screen, viewport, flow, kind])
+  }, [screen, viewport, flow, columns, kind])
 
   // Text settings change the page: lay it out again, on the next frame, once they apply.
   const { size, leading, measure, align, dropcap, indent } = settings
@@ -100,6 +103,7 @@ function layOut(pager: Pager, screen: HTMLElement, kind: Kind): void {
   screen.style.setProperty('--k', `${g.k}`)
   set('--side', g.side)
   set('--measure-px', g.measure)
+  set('--stride', g.stride)
   set('--top', g.top)
   set('--bottom', g.bottom)
   set('--text-height', g.height)

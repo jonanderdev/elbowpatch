@@ -109,6 +109,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     screen,
     viewport,
     flow,
+    columns: mount,
     kind: piece.kind,
     settings,
     onRelayout: (p) => {
@@ -287,7 +288,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
       </div>
 
       <div ref={viewport} className="pager">
-        <div ref={flow} className="flow" lang={piece.lang}>
+        <div ref={flow} className="flow" lang={piece.lang} data-title-page={titlePage || undefined}>
           {titlePage ? (
             <TitlePage
               nameRef={titles.bookTitle}
