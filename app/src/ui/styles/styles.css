@@ -272,6 +272,9 @@ button {
 .page-screen {
   position: absolute;
   inset: 0;
+  /* Installed on a phone, the app draws to the screen's foot: the page ends above the home bar and the
+     rounded corners, as the foot does. */
+  bottom: env(safe-area-inset-bottom, 0px);
   min-height: 658px;
   /* What sits at its edges (the foot, 20px from the bottom on desktop) never makes the window scroll. */
   overflow: clip;
@@ -607,7 +610,7 @@ button {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 0;
+  bottom: env(safe-area-inset-bottom, 0px);
   height: var(--foot);
   display: flex;
   align-items: center;
