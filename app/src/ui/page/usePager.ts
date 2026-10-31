@@ -95,8 +95,14 @@ function layOut(pager: Pager, screen: HTMLElement, kind: Kind): void {
   const width = screen.clientWidth
   let height = screen.clientHeight
   if (matchMedia('(pointer: coarse)').matches) {
-    if (width !== tallest.width) tallest = { width, height }
+    if (width !== tallest.width) {
+      screen.style.minHeight = ''
+      height = screen.clientHeight
+      tallest = { width, height }
+    }
     height = tallest.height = Math.max(tallest.height, height)
+    // The page keeps that height, so with the keyboard up the window scrolls to every line.
+    screen.style.minHeight = `${height}px`
   }
   const g = geometry(width, height, document.documentElement.dataset.measure === 'wide', kind === 'journal')
   const set = (name: string, px: number): void => screen.style.setProperty(name, `${px}px`)
