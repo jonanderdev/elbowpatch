@@ -275,7 +275,8 @@ button {
   /* Installed on a phone, the app draws to the screen's foot: the page ends above the home bar and the
      rounded corners, as the foot does. */
   bottom: env(safe-area-inset-bottom, 0px);
-  min-height: 658px;
+  /* On a touch screen, the height it was laid out at (--page-height, from the pager). */
+  min-height: var(--page-height, 658px);
   /* What sits at its edges (the foot, 20px from the bottom on desktop) never makes the window scroll. */
   overflow: clip;
   /* Each screen is its own layer, so what is raised inside it (the head) never shows over the next. */
@@ -285,8 +286,35 @@ button {
 }
 @media (min-width: 700px) {
   .page-screen {
-    min-height: 765px;
+    min-height: var(--page-height, 765px);
   }
+}
+/* The page, in a scroller as big as the screen and as long as the page. Only with the phone keyboard up
+   does it scroll. */
+.page-scroll {
+  position: absolute;
+  inset: 0;
+}
+.page-scroll::after {
+  content: '';
+  display: block;
+  height: var(--page-height, 0px);
+}
+/* With the phone keyboard up (DESIGN.md, Control), the screen is the part of the window above it
+   (--visible-height, from useKeyboard), and holds what is fixed in it: the head stands at its top, the
+   writing bar and the page button on its foot, by CSS alone, and the page scrolls under them. Nothing
+   follows a scroll in script, so nothing lags behind one. */
+.page-screen[data-keyboard] {
+  position: fixed;
+  top: 0;
+  bottom: auto;
+  height: var(--visible-height, 100%);
+  min-height: 0;
+  contain: layout paint;
+}
+.page-screen[data-keyboard] .page-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 /* Covered by the library or settings, the page keeps its size, laid out as it was, but fixed: it no
    longer makes the window scroll under them. */
@@ -1317,6 +1345,7 @@ button {
 .writing-bar {
   position: fixed;
   left: var(--edge);
+  bottom: 12px;
   z-index: 4;
 }
 @media (min-width: 360px) {
@@ -1329,6 +1358,7 @@ button {
   }
 }
 .foot.raised {
+  bottom: 0;
   height: 68px;
 }
 
@@ -1807,7 +1837,6 @@ button {
   --strip: 54px;
 }
 .head[data-scrolled]::before,
-.head[data-lifted]::before,
 .library-top[data-scrolled]::before,
 .settings-head[data-scrolled]::before {
   content: '';

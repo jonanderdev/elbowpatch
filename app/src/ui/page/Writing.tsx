@@ -83,23 +83,14 @@ export function SelectionMenu({
 export function WritingBar({
   editor,
   active,
-  keyboard,
   barRef,
 }: {
   editor: Editor
   active: ReturnType<Editor['active']>
-  keyboard: number
   barRef: RefObject<HTMLDivElement | null>
 }): ReactElement {
   return (
-    <div
-      ref={barRef}
-      className="bar surface writing-bar"
-      role="toolbar"
-      aria-label="Writing"
-      style={{ bottom: keyboard + 12 }}
-      onMouseDown={(e) => e.preventDefault()}
-    >
+    <div ref={barRef} className="bar surface writing-bar" role="toolbar" aria-label="Writing" onMouseDown={(e) => e.preventDefault()}>
       <IconButton icon="undo" label="Undo" onClick={() => editor.run('undo')} />
       <IconButton icon="redo" label="Redo" onClick={() => editor.run('redo')} />
       <span className="bar-separator" />
@@ -113,59 +104,46 @@ export function WritingBar({
 }
 
 /**
- * While the on-screen keyboard is up, how far above the foot of the window fixed controls must sit to
- * stand on it, in px; null when it is down. The keyboard may shrink the window itself (iPhone, and
- * Android with `interactive-widget=resizes-content`), leaving 0 to rise, so it is told by the visible
- * height falling below the tallest it has been at this width.
+ * Whether the on-screen keyboard is up. The keyboard may shrink the window itself (a phone's browser, and
+ * Android with `interactive-widget=resizes-content`) or only the part of it on view (iPhone, installed), so
+ * it is told by the visible height falling below the tallest it has been at this width. While it is up,
+ * `--visible-height` on the root is the height left above it: the page screen takes that height, so the head
+ * and the bars stand at its edges by CSS alone and the page scrolls inside it (DESIGN.md, Control). Written
+ * on a resize, never on a scroll: nothing follows the scroll frame by frame.
  */
-export function useKeyboard(): number | null {
-  const [covered, setCovered] = useState<number | null>(null)
+export function useKeyboard(): boolean {
+  const [up, setUp] = useState(false)
   useEffect(() => {
     const vv = window.visualViewport
     if (!vv) return
+    const root = document.documentElement
     let tallest = { width: 0, height: 0 }
-    const on = () => {
-      const width = document.documentElement.clientWidth
+    const onResize = (): void => {
+      const width = root.clientWidth
       // A pinch zoom shrinks the visible height too: measure at scale 1.
       const height = vv.height * vv.scale
       if (width !== tallest.width) tallest = { width, height }
       tallest.height = Math.max(tallest.height, height)
       // A few px of browser chrome is not a keyboard.
-      const up = tallest.height - height > 80
-      setCovered(up ? Math.max(0, document.documentElement.clientHeight - vv.height - vv.offsetTop) : null)
+      const next = tallest.height - height > 80
+      if (next) root.style.setProperty('--visible-height', `${vv.height}px`)
+      else root.style.removeProperty('--visible-height')
+      setUp(next)
+      onScroll()
     }
-    on()
-    vv.addEventListener('resize', on)
-    vv.addEventListener('scroll', on)
+    // Installed on iPhone, iOS slides the view up to show the caret behind the keyboard; the screen
+    // already ends above it, so it is slid back. A scroll inside the page never moves the view.
+    const onScroll = (): void => {
+      if (vv.offsetTop > 0 && root.style.getPropertyValue('--visible-height')) window.scrollTo(0, 0)
+    }
+    onResize()
+    vv.addEventListener('resize', onResize)
+    vv.addEventListener('scroll', onScroll)
     return () => {
-      vv.removeEventListener('resize', on)
-      vv.removeEventListener('scroll', on)
+      vv.removeEventListener('resize', onResize)
+      vv.removeEventListener('scroll', onScroll)
+      root.style.removeProperty('--visible-height')
     }
   }, [])
-  return covered
-}
-
-/**
- * Where the keyboard does not shorten the window (iPhone, installed), iOS slides the whole view up to show
- * the caret, and the head would go with it: the head follows the visible area instead, on its strip
- * (DESIGN.md, One head). Written straight to the head, as it changes on every frame of a scroll.
- */
-export function useHeadInView(head: RefObject<HTMLElement | null>): void {
-  useEffect(() => {
-    const vv = window.visualViewport
-    const el = head.current
-    if (!vv || !el) return
-    const on = (): void => {
-      const top = Math.max(0, vv.offsetTop)
-      el.style.transform = top ? `translateY(${top}px)` : ''
-      el.toggleAttribute('data-lifted', top > 0)
-    }
-    on()
-    vv.addEventListener('resize', on)
-    vv.addEventListener('scroll', on)
-    return () => {
-      vv.removeEventListener('resize', on)
-      vv.removeEventListener('scroll', on)
-    }
-  }, [head])
+  return up
 }

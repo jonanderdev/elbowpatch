@@ -11,8 +11,8 @@ interface PageFootProps {
   /** A book's or a journal's title page, which carries no folio. */
   titlePage: boolean
   tools: boolean
-  /** While the phone keyboard is up, how far the foot rises to stand on it; null when it is down. */
-  keyboard: number | null
+  /** The phone keyboard is up: the foot stands on it, at the screen's foot (see Page). */
+  keyboard: boolean
   pageButtonRef: RefObject<HTMLButtonElement | null>
   onOpenTools(): void
   onCloseTools(): void
@@ -38,7 +38,7 @@ export function PageFoot({
   onTextSettings,
   onExport,
 }: PageFootProps): ReactElement {
-  const folio = !journal && !titlePage && !tools && keyboard === null
+  const folio = !journal && !titlePage && !tools && !keyboard
   return (
     <>
       {folio && (
@@ -46,10 +46,10 @@ export function PageFoot({
           {page + 1}
         </div>
       )}
-      <div className={keyboard !== null ? 'foot raised' : 'foot'} style={keyboard !== null ? { bottom: keyboard } : undefined}>
+      <div className={keyboard ? 'foot raised' : 'foot'}>
         {/* The day's words, at the text's left edge, level with the page button; down with the folio
             while the keyboard is up, so they never sit over the text. */}
-        {journal && !tools && keyboard === null && <span className="day-words">{wordsLine(words)}</span>}
+        {journal && !tools && !keyboard && <span className="day-words">{wordsLine(words)}</span>}
         {tools ? (
           <ToolsBar page={page + 1} count={count} words={words} onClose={onCloseTools} onTextSettings={onTextSettings} onExport={onExport} />
         ) : (
