@@ -118,6 +118,14 @@ export function useKeyboard(): boolean {
     if (!vv) return
     const root = document.documentElement
     let tallest = { width: 0, height: 0 }
+    let wasUp = false
+    // Installed on iPhone, iOS slides the view up to show the caret behind the keyboard; the screen
+    // already ends above it, so it is slid back. A scroll inside the page never moves the view. Only
+    // while the keyboard is up, and once as it goes down (iOS may leave the view slid): a pinch zoom
+    // moves the view too, and is left where it is.
+    const slideBack = (): void => {
+      if (vv.offsetTop > 0) window.scrollTo(0, 0)
+    }
     const onResize = (): void => {
       const width = root.clientWidth
       // A pinch zoom shrinks the visible height too: measure at scale 1.
@@ -128,13 +136,12 @@ export function useKeyboard(): boolean {
       const next = tallest.height - height > 80
       if (next) root.style.setProperty('--visible-height', `${vv.height}px`)
       else root.style.removeProperty('--visible-height')
+      if (next || wasUp) slideBack()
+      wasUp = next
       setUp(next)
-      onScroll()
     }
-    // Installed on iPhone, iOS slides the view up to show the caret behind the keyboard; the screen
-    // already ends above it, so it is slid back. A scroll inside the page never moves the view.
     const onScroll = (): void => {
-      if (vv.offsetTop > 0 && root.style.getPropertyValue('--visible-height')) window.scrollTo(0, 0)
+      if (wasUp) slideBack()
     }
     onResize()
     vv.addEventListener('resize', onResize)

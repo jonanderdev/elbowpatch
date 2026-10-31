@@ -921,23 +921,30 @@ const keyboardUp = (page: Page) =>
   page.evaluate(() => {
     const box = (s: string) => document.querySelector(s)!.getBoundingClientRect()
     const root = document.scrollingElement!
+    // In an empty paragraph the caret has no box of its own: its paragraph's stands in.
+    const sel = getSelection()!
+    const at = sel.focusNode instanceof Element ? sel.focusNode : sel.focusNode?.parentElement
+    const caret = sel.getRangeAt(0).getClientRects()[0] ?? at?.getBoundingClientRect()
     return {
       screen: Math.round(box('.page-screen').height),
       head: Math.round(box('.head').top),
       bar: Math.round(box('.writing-bar').bottom),
       button: Math.round(box('.page-button').bottom),
       windowScrolls: root.scrollHeight > root.clientHeight,
+      // The line being written stands above the writing bar (DESIGN.md, Control).
+      caretAboveBar: !!caret && caret.bottom <= box('.writing-bar').top,
     }
   })
 
 test('with the phone keyboard up the bars stand on it, and the page scrolls between them', async ({ page }) => {
   test.skip(page.viewportSize()!.width >= 700, 'the keyboard is a phone’s')
   await newEssay(page)
-  await fill(page, 3)
+  // The caret low on the page, where the keyboard comes up.
+  await fill(page, 2)
   // A browser that shortens the window for the keyboard.
   await page.setViewportSize({ width: 390, height: 500 })
   await expect(page.locator('.writing-bar')).toBeVisible()
-  await expect.poll(() => keyboardUp(page)).toEqual({ screen: 500, head: 0, bar: 488, button: 488, windowScrolls: false })
+  await expect.poll(() => keyboardUp(page)).toEqual({ screen: 500, head: 0, bar: 488, button: 488, windowScrolls: false, caretAboveBar: true })
   const scroller = page.locator('.page-scroll')
   await scroller.evaluate((el) => el.scrollTo(0, el.scrollHeight))
   await expect(page.locator('.head')).toHaveAttribute('data-scrolled')
@@ -966,14 +973,14 @@ test('installed on iPhone, the keyboard leaves the window as it is: the bars sta
     }) as typeof window.scrollTo
   })
   await newEssay(page)
-  await fill(page, 3)
+  await fill(page, 2)
   await page.evaluate(() => {
     const { vv } = window as unknown as { vv: EventTarget & { height: number } }
     vv.height = 544
     vv.dispatchEvent(new Event('resize'))
   })
   await expect(page.locator('.writing-bar')).toBeVisible()
-  await expect.poll(() => keyboardUp(page)).toEqual({ screen: 544, head: 0, bar: 532, button: 532, windowScrolls: false })
+  await expect.poll(() => keyboardUp(page)).toEqual({ screen: 544, head: 0, bar: 532, button: 532, windowScrolls: false, caretAboveBar: true })
   // Scrolling the page moves nothing in script: no style is written to the head or the bars.
   const writes = await page.evaluate(async () => {
     let n = 0
@@ -998,5 +1005,17 @@ test('installed on iPhone, the keyboard leaves the window as it is: the bars sta
     vv.offsetTop = 200
     vv.dispatchEvent(new Event('scroll'))
   })
-  expect(await page.evaluate(() => (window as unknown as { slidBack: number }).slidBack)).toBeGreaterThan(0)
+  const slidBack = () => page.evaluate(() => (window as unknown as { slidBack: number }).slidBack)
+  expect(await slidBack()).toBeGreaterThan(0)
+  // Going down with the view left slid, it is slid back once, and the head is at the top.
+  const before = await slidBack()
+  await page.evaluate(() => {
+    const { vv } = window as unknown as { vv: EventTarget & { offsetTop: number; height: number } }
+    vv.offsetTop = 200
+    vv.height = 844
+    vv.dispatchEvent(new Event('resize'))
+  })
+  await expect(page.locator('.page-screen')).not.toHaveAttribute('data-keyboard')
+  expect(await slidBack()).toBe(before + 1)
+  expect(Math.round((await page.locator('.head').boundingBox())!.y)).toBe(0)
 })
