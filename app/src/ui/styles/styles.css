@@ -342,7 +342,8 @@ button {
     display: block;
     position: absolute;
     top: 50%;
-    right: 14px;
+    /* Centred in the right margin, so it never sits on the text, the wide measure's narrower margin too. */
+    right: calc((100% - var(--side) - var(--measure-px) - 3px) / 2);
     width: 3px;
     height: 70px;
     margin-top: -35px;
