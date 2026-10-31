@@ -135,9 +135,34 @@ function plainIfRaw(block: Block): Block {
   return block.type === 'raw' ? { type: 'paragraph', spans: [{ text: block.text, marks: [] }] } : block
 }
 
-const toggleQuote: Command = (state, dispatch) => {
-  const inQuote = state.selection.$from.parent.type === schema.nodes.quote
-  return setBlockType(inQuote ? schema.nodes.paragraph : schema.nodes.quote)(state, dispatch)
+/** Only the selected words become the pull quote: their paragraph splits around them. */
+export const toggleQuote: Command = (state, dispatch) => {
+  const { $from, $to, empty } = state.selection
+  const inQuote = $from.parent.type === schema.nodes.quote
+  if (inQuote || empty) return setBlockType(inQuote ? schema.nodes.paragraph : schema.nodes.quote)(state, dispatch)
+  if (!setBlockType(schema.nodes.quote)(state)) return false
+  if (dispatch) {
+    const tr = state.tr
+    // The end first, so the start's position still holds. The space between the quote and the words
+    // around it goes with the split.
+    if ($to.parent.type === schema.nodes.paragraph) {
+      const rest = $to.parent.textBetween($to.parentOffset, $to.parent.content.size, undefined, '￼')
+      const space = rest.length - rest.trimStart().length
+      tr.delete($to.pos, $to.pos + space)
+      if (space < rest.length) tr.split($to.pos)
+    }
+    if ($from.parent.type === schema.nodes.paragraph) {
+      const lead = $from.parent.textBetween(0, $from.parentOffset, undefined, '￼')
+      const space = lead.length - lead.trimEnd().length
+      tr.delete($from.pos - space, $from.pos)
+      if (space < lead.length) tr.split($from.pos - space)
+    }
+    const from = tr.mapping.map($from.pos, 1)
+    const to = tr.mapping.map($to.pos, -1)
+    tr.setBlockType(from, to, schema.nodes.quote)
+    dispatch(tr.setSelection(TextSelection.create(tr.doc, from, to)).scrollIntoView())
+  }
+  return true
 }
 
 /** Return at the end of a pull quote starts a plain paragraph after it. */
