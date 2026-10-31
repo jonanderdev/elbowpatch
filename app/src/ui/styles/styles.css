@@ -1807,6 +1807,7 @@ button {
   --strip: 54px;
 }
 .head[data-scrolled]::before,
+.head[data-lifted]::before,
 .library-top[data-scrolled]::before,
 .settings-head[data-scrolled]::before {
   content: '';
