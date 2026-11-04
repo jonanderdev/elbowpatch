@@ -201,6 +201,24 @@ test("the library's About opens About & privacy, one step inside Settings", asyn
   await expect(page.getByRole('link', { name: 'About', exact: true })).toBeVisible()
 })
 
+test('About & privacy says what it promises, and only what is true here', async ({ page }) => {
+  await page.goto('./#/settings/about')
+  await expect(page.getByText('A quiet place to write journals, essays and books, for people who want to do the writing themselves.')).toBeVisible()
+  for (const heading of ['Your writing', 'Privacy', 'No warranty', 'The project']) {
+    await expect(page.getByRole('heading', { name: heading, level: 2 })).toBeVisible()
+  }
+  await expect(page.getByText('It stays on this device.', { exact: true })).toBeVisible()
+  await expect(page.getByText('No cookies, no fingerprinting, no tracking in the editor.', { exact: true })).toBeVisible()
+  await expect(page.getByText('Open source under the MIT License. The main copy runs on a best-effort basis, and anyone can host their own.')).toBeVisible()
+  await expect(page.getByText('Set in Literata by TypeTogether and EB Garamond by Georg Duffner, both under the SIL Open Font License.')).toBeVisible()
+  // Neither is true yet: nothing can be connected, and nothing counts visits.
+  await expect(page.getByText('a place you connect')).toHaveCount(0)
+  await expect(page.getByText('Visits to this site are counted')).toHaveCount(0)
+  await expect(page.getByText('Elbowpatch is provided as-is, with no warranty. Keep a copy of what matters:')).toBeVisible()
+  await page.getByRole('link', { name: 'Export & import' }).click()
+  await expect(page.getByRole('heading', { name: 'Export & import', level: 1 })).toBeVisible()
+})
+
 test('in Safari on an iPhone, Show me how lands on the Home Screen steps', async ({ browser }) => {
   const iphone = await browser.newContext({
     userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',

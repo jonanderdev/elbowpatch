@@ -1,5 +1,6 @@
-import type { ReactElement, ReactNode } from 'react'
+import type { ReactElement } from 'react'
 import { safariOutsideHomeScreen } from '../library/Notes'
+import { Part } from './parts'
 
 // Help (DESIGN.md, Settings): short answers, inside the app so it works offline.
 // shortcut: Going back and the Time Machine's keys wait for the Time Machine, so Help never describes what isn't there.
@@ -14,15 +15,6 @@ const KEYS: [string, string][] = [
   ...(TIME_MACHINE ? ([['Time Machine', '⌘/Ctrl + Alt + Z']] as [string, string][]) : []),
   ['Piece menu', 'Menu key, or Shift + F10'],
 ]
-
-function Part({ heading, children }: { heading: string; children: ReactNode }): ReactElement {
-  return (
-    <section className="help-part">
-      <h2>{heading}</h2>
-      {children}
-    </section>
-  )
-}
 
 export function Help(): ReactElement {
   return (

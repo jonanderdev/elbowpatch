@@ -5,6 +5,7 @@ import { longDate, number } from '../../domain/words'
 import { Path } from '../components/Path'
 import { useScrolled } from '../components/useScrolled'
 import { lastExport } from '../files/everything'
+import { About } from './About'
 import { ExportImport } from './ExportImport'
 import { Help, HomeScreen } from './Help'
 import { goesIn, PutAway, waiting } from './PutAway'
@@ -62,6 +63,7 @@ export function Settings(props: Props): ReactElement {
         {props.area === 'put-away' && <PutAway deps={props.deps} pieces={props.pieces} onChanged={props.onChanged} />}
         {props.area === 'help' && <Help />}
         {props.area === 'home-screen' && <HomeScreen />}
+        {props.area === 'about' && <About />}
       </div>
     </main>
   )
