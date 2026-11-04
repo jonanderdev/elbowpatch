@@ -58,6 +58,8 @@ export interface Saving {
    * section's. False, with everything as it was, when the words could not be stored or `reshape` failed.
    */
   split(reshape: (whole: string) => Promise<Piece>): Promise<boolean>
+  /** A split is running or has run: what this page holds and counts is no longer the section's. */
+  sealed(): boolean
 }
 
 /** How long a split waits for the words to be stored before leaving the text as it is. */
@@ -194,6 +196,7 @@ export function createSaving(o: SavingOptions): Saving {
       closed = true
       return last
     },
+    sealed: () => sealed,
     async split(reshape): Promise<boolean> {
       if (closed || sealed || o.readOnly()) return false
       // Text read differently from how it is stored counts as a change too: it is stored first.

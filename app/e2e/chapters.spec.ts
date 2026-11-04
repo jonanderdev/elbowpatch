@@ -261,8 +261,9 @@ test('words typed just before a jump are there after a reload, in their own chap
   await expect(page.locator('.body')).toContainText('Typed at the last moment.')
   await openChapter(page, 'Two')
   await page.reload()
-  // The words are stored before the chapter opens; the place follows a moment after, so a reload this
-  // soon lands on either chapter. Wherever it lands, the words are in their own chapter and nowhere else.
+  // The words are stored, or kept in the unsaved journal, before the chapter opens. The place is saved
+  // after the closing save of the page left, so a reload this soon lands on either chapter; wherever it
+  // lands, the words are in their own chapter and nowhere else.
   await expect(page.locator('.title')).toHaveText(/^(One|Two)$/)
   await openChapter(page, 'One')
   await expect(page.locator('.body')).toHaveText('First chapter. Typed at the last moment.')

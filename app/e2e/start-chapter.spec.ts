@@ -68,6 +68,8 @@ interface Stored {
   place?: string
   versions: string[]
   outlines: string[][]
+  /** Each chapter's page count on this screen's page, where known. */
+  counts: (number | undefined)[]
 }
 
 /** The book as stored, read straight from the database. */
@@ -85,11 +87,17 @@ const stored = (page: Page) =>
           const outlines = tx.objectStore('outlines').getAll()
           tx.oncomplete = () => {
             db.close()
-            const piece = pieces.result[0] as { place?: { sectionId: string }; sections: { sectionId: string; title: string }[] }
+            const piece = pieces.result[0] as {
+              place?: { sectionId: string }
+              sections: { sectionId: string; title: string }[]
+              pages?: Record<string, Record<string, number>>
+            }
+            const kept = piece.pages?.[innerWidth < 700 ? 'phone' : 'desktop']
             const text = (id: string) => (working.result as { sectionId: string; content: string }[]).find((w) => w.sectionId === id)?.content ?? ''
             done({
               chapters: piece.sections.map((s) => ({ title: s.title, text: text(s.sectionId) })),
               place: piece.sections.findIndex((s) => s.sectionId === piece.place?.sectionId).toString(),
+              counts: piece.sections.map((s) => kept?.[s.sectionId]),
               versions: (versions.result as { content: string }[]).map((v) => v.content),
               outlines: (outlines.result as { seq: number; sections: { title: string }[] }[])
                 .sort((a, b) => a.seq - b.seq)
@@ -323,4 +331,27 @@ test('a title typed into a split chapter stays, and Contents lists it where it s
   await expect(page.locator('.title')).toBeFocused()
   await page.keyboard.type('Salt')
   await expect.poll(async () => (await stored(page)).chapters.map((c) => c.title)).toEqual(['One', 'Salt', 'Two'])
+})
+
+const PARAGRAPH = 'The windows of the shop had been salted white by the first storm of November, and Ana scraped a small square clear each morning.'
+const LONG = `# One\n\n${Array.from({ length: 16 }, (_, i) => `Part ${i + 1}. ${PARAGRAPH}`).join('\n\n')}\n\n# Two\n\nThe end.\n`
+
+test('the numbers agree after a split: the long chapter is counted again, and the new one for the first time', async ({ page }) => {
+  await importBook(page, LONG)
+  await expect.poll(async () => (await stored(page)).counts.every((n) => n !== undefined)).toBe(true)
+  const was = (await stored(page)).counts[0]!
+  await press(page, 'Part 9.')
+  await expect(page.locator('.title')).toBeFocused()
+  await expect.poll(async () => (await stored(page)).counts.filter((n) => n !== undefined).length, { timeout: 15000 }).toBe(3)
+  const counts = (await stored(page)).counts as number[]
+  expect(counts[0]).toBeLessThan(was)
+  const pages = counts.reduce((a, b) => a + b, 0)
+  if (onDesktop(page)) await expect(page.locator('.rail-line')).toHaveText(`3 chapters · ${pages} pages`)
+  else {
+    await page.locator('.title').blur()
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.locator('.page-button').click()
+    await page.locator('.tools .count').click()
+    await expect(page.locator('.contents-pages')).toHaveText(`${pages} pages`)
+  }
 })

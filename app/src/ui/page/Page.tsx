@@ -202,9 +202,9 @@ export function Page({
   // The count is kept with the piece whenever it changes (a turn of the text settings, a first reading
   // on this kind of screen), so the library shows a book's pages without laying it out (DESIGN.md).
   useEffect(() => {
-    if (readOnly || !pager || !screen.current) return
+    if (readOnly || !pager || !screen.current || saving?.sealed()) return
     void savePages(deps, piece.id, screenOf(screen.current.clientWidth), sectionId, count).catch(() => {})
-  }, [deps, piece.id, sectionId, count, pager, readOnly])
+  }, [deps, piece.id, sectionId, count, pager, readOnly, saving])
 
   const shown = numbers(page, count)
 
