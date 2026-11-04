@@ -1521,6 +1521,81 @@ button {
   line-height: 1.4;
   color: var(--secondary);
 }
+/* Help: short answers under small italic headings (Figma, Help). */
+.help-part {
+  padding: 0 12px 26px;
+}
+.help-part h2 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-style: italic;
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--secondary);
+}
+.help-part p {
+  margin: 0;
+  font-size: var(--body);
+  line-height: 1.55;
+  color: var(--text);
+}
+.help-part a {
+  color: var(--title);
+  text-decoration: underline;
+  white-space: nowrap;
+}
+.help-part ol {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+  font-size: var(--body);
+  line-height: 1.55;
+  color: var(--text);
+}
+.help-part li {
+  display: flex;
+  gap: 8px;
+  counter-increment: step;
+}
+.help-part li::before {
+  content: counter(step);
+  flex: none;
+  width: 18px;
+  color: var(--secondary);
+}
+/* The keys are for a keyboard: desktop only. */
+.help-keys {
+  display: none;
+}
+@media (min-width: 700px) {
+  .help-keys {
+    display: block;
+  }
+}
+.help-keys dl {
+  margin: 0;
+}
+.help-keys dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 0;
+}
+.help-keys dt {
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--text);
+}
+.help-keys dd {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--secondary);
+}
 .area-rows {
   display: flex;
   flex-direction: column;
