@@ -26,6 +26,7 @@ export function useEditor(mount: RefObject<HTMLDivElement | null>, content: stri
       editable: () => latest.current.editable?.() ?? true,
       onSelection: (view, tr) => latest.current.onSelection?.(view, tr),
       onKey: (view, e) => latest.current.onKey?.(view, e) ?? false,
+      onChapterLine: (at) => latest.current.onChapterLine?.(at),
     })
     setEditor(made)
     return () => made.destroy()

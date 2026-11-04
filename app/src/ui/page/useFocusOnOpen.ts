@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { Editor } from '../../page/editor'
-import type { Opened, TitleRefs } from './fields'
+import { caretToFieldEnd, type Opened, type TitleRefs } from './fields'
 import type { Saving } from './saving'
 
 /**
@@ -87,8 +87,12 @@ export function useFocusOnOpen({ opened, editor, saving, titles, covered, readOn
         name?.focus()
         // A new journal is called "Journal": selected, so typing names it.
         if (name && opened.piece.kind === 'journal') getSelection()?.selectAllChildren(name)
-      } else if (titleEditable) titles.title.current?.focus()
-      else editor.focus()
+      } else if (titleEditable) {
+        const title = titles.title.current
+        title?.focus()
+        // A title from a `# ` line: the caret after its words.
+        if (title?.textContent) caretToFieldEnd(title)
+      } else editor.focus()
       return
     }
     const place = opened.piece.place

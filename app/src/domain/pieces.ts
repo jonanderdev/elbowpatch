@@ -1,4 +1,4 @@
-import { countWords } from './markdown'
+import { countWords, parse } from './markdown'
 import type { Kind, Outline, OutlineSection, Piece, Place, Screen, Version, Working } from './model'
 import type { Clock, Ids, Store, Tx } from './ports'
 
@@ -254,59 +254,125 @@ export function savePlace(deps: Pick<Deps, 'store'>, pieceId: string, place: Pla
  * `kept` ("keep this moment") always writes, and is never thinned.
  */
 export function takeMoment(deps: Deps, pieceId: string, opts: { kept?: boolean } = {}): Promise<number> {
+  return deps.store.transaction((tx) => momentIn(tx, deps, pieceId, opts))
+}
+
+async function momentIn(tx: Tx, deps: Pick<Deps, 'clock' | 'ids'>, pieceId: string, opts: { kept?: boolean } = {}): Promise<number> {
+  const piece = await tx.piece(pieceId)
+  if (!piece) return 0
+
+  const changes: { working: Working; parent: Version | undefined }[] = []
+  for (const working of await tx.workingOf(pieceId)) {
+    const parent = working.baseVersionId ? await tx.version(working.baseVersionId) : undefined
+    const unchanged = parent ? parent.content === working.content : working.content === ''
+    if (!unchanged || (opts.kept && parent)) changes.push({ working, parent })
+  }
+  const outline = piece.outlineId ? await tx.outline(piece.outlineId) : undefined
+  const outlineChanged =
+    !outline || outline.title !== piece.title || (outline.subtitle ?? '') !== (piece.subtitle ?? '') || !sameSections(outline.sections, piece.sections)
+  if (changes.length === 0 && !outlineChanged) return 0
+
+  // One timestamp for the moment, never earlier than anything it follows: clocks jump.
+  let at = deps.clock.now()
+  for (const { parent } of changes) if (parent) at = Math.max(at, parent.createdAt + 1)
+  if (outline) at = Math.max(at, outline.createdAt + 1)
+
+  for (const { working, parent } of changes) {
+    const version: Version = {
+      id: deps.ids.next(),
+      pieceId,
+      sectionId: working.sectionId,
+      parentId: parent?.id ?? null,
+      seq: (parent?.seq ?? 0) + 1,
+      createdAt: at,
+      content: working.content,
+      ...(opts.kept ? { kept: true } : {}),
+    }
+    await tx.putVersion(version)
+    await tx.putWorking({ ...working, baseVersionId: version.id })
+  }
+
+  let outlineId = piece.outlineId
+  if (outlineChanged) {
+    const next: Outline = {
+      id: deps.ids.next(),
+      pieceId,
+      parentId: outline?.id ?? null,
+      seq: (outline?.seq ?? 0) + 1,
+      createdAt: at,
+      title: piece.title,
+      ...(piece.subtitle ? { subtitle: piece.subtitle } : {}),
+      sections: piece.sections.map((s) => ({ ...s })),
+    }
+    await tx.putOutline(next)
+    outlineId = next.id
+  }
+  await tx.putPiece({ ...piece, outlineId })
+  return changes.length + (outlineChanged ? 1 : 0)
+}
+
+/** Where a chapter starts in the text, and what the page held when it did. */
+export interface ChapterStart {
+  sectionId: string
+  /** The section's text as the page holds it: the split runs only if this is what is stored. */
+  whole: string
+  /** The two halves: what stays, and what moves. */
+  before: string
+  after: string
+  /** Empty, or the rest of a `# ` line. */
+  title: string
+  /** Chosen by the caller, which is what makes running it twice safe. */
+  newSectionId: string
+}
+
+/**
+ * Starts a chapter at a point, in one transaction: a moment first, so the undivided chapter stays in
+ * history, then the current section shortened and the new one written after it. The working copies
+ * carry the text until the next moment, so a crash before it is recovered as usual. Safe to run twice.
+ * Refused, with nothing changed, unless `whole` is what is stored. Returns the piece as it now stands.
+ */
+export function startChapterAt(deps: Deps, pieceId: string, start: ChapterStart): Promise<Piece> {
   return deps.store.transaction(async (tx) => {
-    const piece = await tx.piece(pieceId)
-    if (!piece) return 0
+    const { sectionId, whole, before, after, title, newSectionId } = start
+    const found = await tx.piece(pieceId)
+    if (found?.kind !== 'book') throw new Error('Only a book has chapters.')
+    if (found.sections.some((s) => s.sectionId === newSectionId)) return found
+    const at = found.sections.findIndex((s) => s.sectionId === sectionId)
+    if (at < 0 || (await current(tx, sectionId)).content !== whole) throw new Error('The words are not stored yet.')
 
-    const changes: { working: Working; parent: Version | undefined }[] = []
-    for (const working of await tx.workingOf(pieceId)) {
-      const parent = working.baseVersionId ? await tx.version(working.baseVersionId) : undefined
-      const unchanged = parent ? parent.content === working.content : working.content === ''
-      if (!unchanged || (opts.kept && parent)) changes.push({ working, parent })
+    await momentIn(tx, deps, pieceId)
+    const piece = (await tx.piece(pieceId))!
+    const now = deps.clock.now()
+    const working = await tx.working(sectionId)
+    const base = working?.baseVersionId ?? latest(await tx.versionsOf(sectionId))?.id ?? null
+    await tx.putWorking({ sectionId, pieceId, content: before, baseVersionId: base, updatedAt: now })
+    await tx.putWorking({ sectionId: newSectionId, pieceId, content: after, baseVersionId: null, updatedAt: now })
+    const next: Piece = {
+      ...piece,
+      sections: [...piece.sections.slice(0, at + 1), { sectionId: newSectionId, title }, ...piece.sections.slice(at + 1)],
+      words: { ...piece.words, [sectionId]: countWords(before), [newSectionId]: countWords(after) },
+      pages: withoutCount(piece.pages, sectionId),
+      place: { sectionId: newSectionId, paragraph: 0, offset: 0, snippet: openingWords(after), page: 1, caret: true, at: now },
+      updatedAt: now,
     }
-    const outline = piece.outlineId ? await tx.outline(piece.outlineId) : undefined
-    const outlineChanged =
-      !outline || outline.title !== piece.title || (outline.subtitle ?? '') !== (piece.subtitle ?? '') || !sameSections(outline.sections, piece.sections)
-    if (changes.length === 0 && !outlineChanged) return 0
-
-    // One timestamp for the moment, never earlier than anything it follows: clocks jump.
-    let at = deps.clock.now()
-    for (const { parent } of changes) if (parent) at = Math.max(at, parent.createdAt + 1)
-    if (outline) at = Math.max(at, outline.createdAt + 1)
-
-    for (const { working, parent } of changes) {
-      const version: Version = {
-        id: deps.ids.next(),
-        pieceId,
-        sectionId: working.sectionId,
-        parentId: parent?.id ?? null,
-        seq: (parent?.seq ?? 0) + 1,
-        createdAt: at,
-        content: working.content,
-        ...(opts.kept ? { kept: true } : {}),
-      }
-      await tx.putVersion(version)
-      await tx.putWorking({ ...working, baseVersionId: version.id })
-    }
-
-    let outlineId = piece.outlineId
-    if (outlineChanged) {
-      const next: Outline = {
-        id: deps.ids.next(),
-        pieceId,
-        parentId: outline?.id ?? null,
-        seq: (outline?.seq ?? 0) + 1,
-        createdAt: at,
-        title: piece.title,
-        ...(piece.subtitle ? { subtitle: piece.subtitle } : {}),
-        sections: piece.sections.map((s) => ({ ...s })),
-      }
-      await tx.putOutline(next)
-      outlineId = next.id
-    }
-    await tx.putPiece({ ...piece, outlineId })
-    return changes.length + (outlineChanged ? 1 : 0)
+    await tx.putPiece(next)
+    return next
   })
+}
+
+/** The shortened section's count no longer holds on any screen: it is unknown until it is laid out again. */
+function withoutCount(pages: Piece['pages'], sectionId: string): Piece['pages'] {
+  if (!pages) return pages
+  const left = (counts: Record<string, number> | undefined): Record<string, number> =>
+    Object.fromEntries(Object.entries(counts ?? {}).filter(([id]) => id !== sectionId))
+  return { ...pages, phone: left(pages.phone), desktop: left(pages.desktop) }
+}
+
+/** A place's snippet: the first paragraph's words, as the page shows them. */
+function openingWords(markdown: string): string {
+  const first = parse(markdown)[0]
+  if (!first) return ''
+  return (first.type === 'raw' ? first.text : first.spans.map((s) => s.text).join('')).slice(0, 160)
 }
 
 /** On launch: text left in working copies by a crash enters history first (0005, 0010). */

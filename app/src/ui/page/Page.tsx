@@ -21,6 +21,7 @@ import { PageFoot, StatusLine } from './PageFoot'
 import { SectionTitle, TitlePage } from './Titles'
 import { HeadTools, pageLine, TextSettings } from './Tools'
 import { useCaretFollowing, useCaretKeys } from './useCaret'
+import { useChapterStart } from './useChapterStart'
 import { useEditor } from './useEditor'
 import { raiseKeyboard, useFocusOnOpen } from './useFocusOnOpen'
 import { useOpenAtPlace } from './useOpenAtPlace'
@@ -50,8 +51,10 @@ interface Props {
   onLibrary(): void
   /** Opens another section of this piece, once this one is saved. `writing`: the caret goes with the writer. */
   onOpenSection(sectionId: string, writing: boolean, at: OpenAt): void
-  /** Opens a new chapter at the end of the book, once this section is saved. */
-  onNewChapter(): void
+  /** Opens a new chapter once this section is saved: at the end of the book, or right after the section given. */
+  onNewChapter(after?: string): void
+  /** A chapter started in this section's text is stored: it opens, with `content` as its text. */
+  onChapterStarted(piece: Piece, sectionId: string, content: string): void
   onChange(piece: Piece): void
 }
 
@@ -77,6 +80,7 @@ export function Page({
   onLibrary,
   onOpenSection,
   onNewChapter,
+  onChapterStarted,
   onChange,
 }: Props): ReactElement {
   const { piece, sectionId } = opened
@@ -198,9 +202,9 @@ export function Page({
   // The count is kept with the piece whenever it changes (a turn of the text settings, a first reading
   // on this kind of screen), so the library shows a book's pages without laying it out (DESIGN.md).
   useEffect(() => {
-    if (readOnly || !pager || !screen.current) return
+    if (readOnly || !pager || !screen.current || saving?.sealed()) return
     void savePages(deps, piece.id, screenOf(screen.current.clientWidth), sectionId, count).catch(() => {})
-  }, [deps, piece.id, sectionId, count, pager, readOnly])
+  }, [deps, piece.id, sectionId, count, pager, readOnly, saving])
 
   const shown = numbers(page, count)
 
@@ -224,6 +228,7 @@ export function Page({
       setSelection(focused && e ? { rect: selectionBox(e.view), active: e.active() } : null)
       if (!focused) void saving?.flush()
     },
+    onChapterLine: (at) => chapter.line(at),
     onSelection(view, tr) {
       const e = editorNow.current
       if (e) setSelection({ rect: selectionBox(view), active: e.active() })
@@ -403,13 +408,26 @@ export function Page({
 
   // A new chapter opens with the caret in its title: the keyboard comes up from this tap, or not at
   // all on iOS. As when choosing a chapter, the words being left are safe in the journal first.
-  function addChapter(): void {
+  function addChapter(after?: string): void {
     saving?.journal()
     raiseKeyboard()
-    onNewChapter()
+    onNewChapter(after)
   }
   // Only the window that writes starts a chapter (0010). Whatever holds Contents places it.
-  const newChapter = readOnly ? null : <NewChapter onAdd={addChapter} />
+  const newChapter = readOnly ? null : <NewChapter onAdd={() => addChapter()} />
+  const chapter = useChapterStart({
+    deps,
+    pieceId: piece.id,
+    sectionId,
+    writes: book && !readOnly,
+    editor,
+    saving,
+    title: titles.title,
+    keyboard,
+    onAddAfter: () => addChapter(sectionId),
+    onStarted: onChapterStarted,
+  })
+  const chapterHere = book && !readOnly ? chapter.here : undefined
 
   // Escape closes what is open, innermost first: a sheet, then the tools. One listener reads what
   // is open now from a ref: re-attached on each change, an Escape pressed right after one (Done,
@@ -566,10 +584,12 @@ export function Page({
       </div>
       <div className="scroll-mark" aria-hidden="true" />
 
-      {editor && !readOnly && writing && keyboard && selection ? <WritingBar editor={editor} active={selection.active} barRef={writingBar} /> : null}
+      {editor && !readOnly && writing && keyboard && selection ? (
+        <WritingBar editor={editor} active={selection.active} barRef={writingBar} onChapter={chapterHere} />
+      ) : null}
       {!readOnly && keyboard && field ? <FieldBar field={field} barRef={writingBar} /> : null}
       {editor && !readOnly && !keyboard && selection?.rect ? (
-        <SelectionMenu editor={editor} rect={selection.rect} active={selection.active} onKeep={() => void keepMoment()} />
+        <SelectionMenu editor={editor} rect={selection.rect} active={selection.active} onKeep={() => void keepMoment()} onChapter={chapterHere} />
       ) : null}
 
       <PageFoot
