@@ -16,6 +16,7 @@ import { readLast, writeLast } from '../stores/last'
 import { askToPersist } from './persist'
 import { replayJournal } from './replay'
 import { settled } from './settled'
+import { useBookNumbers } from './useBookNumbers'
 import { useRoute } from './useRoute'
 import { useWriterLock } from './useWriterLock'
 
@@ -125,6 +126,18 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
 
   // The open page's save, for whoever needs it first (another window, an export, the library);
   // and its last save as it closes, which the lock is let go only after.
+  const [counted, setCounted] = useState(0)
+  useBookNumbers({
+    deps,
+    ready,
+    openId: openedId,
+    pieces,
+    onCounted() {
+      setCounted((n) => n + 1)
+      void refresh().catch(() => {})
+    },
+  })
+
   const flushPage = useRef<(() => Promise<void>) | null>(null)
   const closing = useRef<Promise<void>>(Promise.resolve())
   const { writer, writeHere } = useWriterLock(lock, opened?.piece.id, flushPage, closing)
@@ -197,6 +210,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
           flushRef={flushPage}
           closingRef={closing}
           covered={inLibrary || inSettings}
+          counted={counted}
           onLibrary={async () => {
             // Save first, so the library already lists what was just written; never wait long for it.
             // The first save also opens the database; a stuck one never holds the writer on the page for long.

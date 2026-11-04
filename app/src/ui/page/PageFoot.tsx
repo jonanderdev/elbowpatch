@@ -1,11 +1,12 @@
 import type { ReactElement, RefObject } from 'react'
 import { words as wordsLine } from '../../domain/words'
 import { Icon } from '../components/Icon'
-import { ToolsBar } from './Tools'
+import { pageLine, ToolsBar } from './Tools'
 
 interface PageFootProps {
-  page: number
-  count: number
+  /** The page shown, from 1, and the pages; in a book, the book's, each once it is known. */
+  page?: number
+  count?: number
   words: number
   journal: boolean
   /** A book's or a journal's title page, which carries no folio. */
@@ -43,12 +44,13 @@ export function PageFoot({
   onContents,
   contents,
 }: PageFootProps): ReactElement {
-  const folio = !journal && !titlePage && !tools && !keyboard
+  const folio = page !== undefined && !journal && !titlePage && !tools && !keyboard
+  const said = pageLine(page, count)
   return (
     <>
       {folio && (
         <div className="folio" aria-hidden="true">
-          {page + 1}
+          {page}
         </div>
       )}
       <div className={keyboard ? 'foot raised' : 'foot'}>
@@ -57,7 +59,7 @@ export function PageFoot({
         {journal && !tools && !keyboard && <span className="day-words">{wordsLine(words)}</span>}
         {tools ? (
           <ToolsBar
-            page={page + 1}
+            page={page}
             count={count}
             words={words}
             onContents={onContents}
@@ -71,7 +73,7 @@ export function PageFoot({
             ref={pageButtonRef}
             type="button"
             className="page-button surface"
-            aria-label={`Page ${page + 1} of ${count}. Open tools`}
+            aria-label={said ? `${said}. Open tools` : 'Open tools'}
             onClick={onOpenTools}
           >
             <Icon name="asterisk" />

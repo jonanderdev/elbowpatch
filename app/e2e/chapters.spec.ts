@@ -15,6 +15,12 @@ const TWO = '# One\n\nFirst chapter.\n\n# Two\n\nSecond.\n'
 /** Long enough that each chapter has later pages, and with them a running head. */
 const THREE = `# One\n\n${long(12)}\n\n# Two\n\n${long(12)}\n\n# Three\n\nThe end.\n`
 
+/** Nothing is measured off screen, so only the chapters opened have a count. */
+const measureNothing = (page: Page) =>
+  page.addInitScript(() => {
+    window.requestIdleCallback = () => 0
+  })
+
 /** Imports a Markdown file as a book and opens it. */
 async function importBook(page: Page, markdown: string) {
   await page.goto('./#/settings/export')
@@ -153,6 +159,7 @@ test('Contents lists each chapter, says Untitled for one with no title, and mark
 })
 
 test('start pages and the total show only once they are known; nothing is guessed', async ({ page }) => {
+  await measureNothing(page)
   await importBook(page, THREE)
   await contentsFromCount(page)
   const pages = rows(page).locator('.contents-page')
@@ -192,6 +199,7 @@ test('Contents works by keyboard, Escape gives the focus back, and a screen read
   await page.keyboard.press('Enter')
   await expect(rows(page).nth(0)).toBeFocused()
   await rows(page).nth(1).focus()
+  const start = Number(await rows(page).nth(1).locator('.contents-page').textContent())
   await page.keyboard.press('Enter')
   await expect(page.locator('.title')).toHaveText('Two')
   // The focus is not left on nothing, and the chapter is said.
@@ -199,7 +207,7 @@ test('Contents works by keyboard, Escape gives the focus back, and a screen read
   await expect(page.locator('.page-screen > [aria-live]')).toHaveText('Two')
   // And a turn after it is still said.
   await page.keyboard.press('PageDown')
-  await expect(page.locator('.page-screen > [aria-live]')).toHaveText(/^Page 2 of /)
+  await expect(page.locator('.page-screen > [aria-live]')).toHaveText(new RegExp(`^Page ${start + 1}( of \\d+)?$`))
 })
 
 test('a long Contents scrolls inside itself, and its foot stays in reach', async ({ page }) => {
@@ -366,6 +374,7 @@ test('journals and essays are unchanged: no control on the running head, and the
 const toggle = (page: Page) => page.locator('.head').getByRole('button', { name: 'Contents' })
 
 test('the rail says the size of the book, and lists what the sheet lists', async ({ page }) => {
+  await measureNothing(page)
   desktopOnly(page)
   await importBook(page, TWO)
   const line = contents(page).locator('.rail-line')
