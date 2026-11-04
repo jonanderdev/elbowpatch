@@ -6,6 +6,9 @@ import type { Pager } from '../../page/pager'
 /** How far beside the text a click in the margin must be to turn the page. */
 const MARGIN_CLEAR = 80
 
+/** The click that turned into another chapter: the page it opens shows the same arrow at once, so clicking through never flickers it. */
+let crossedBy: MouseEvent | undefined
+
 /**
  * Turning pages by hand (DESIGN.md, Behaviour): Page Up / Page Down and Alt + ← / → everywhere, a
  * sideways swipe on a phone, a click in the side margins on desktop, where the pointer becomes an
@@ -116,7 +119,8 @@ export function usePageTurns({ screen, viewport, bookTitle, editor, pager, cover
     const onMouseMove = (e: MouseEvent): void => {
       if (e.buttons) return
       const dir = side(e)
-      const can = dir < 0 ? pager.page > 0 : dir > 0 && pager.page < pager.count - 1
+      const within = dir < 0 ? pager.page > 0 : pager.page < pager.count - 1
+      const can = dir !== 0 && (within || !!now.current.beyond(dir))
       el.dataset.turn = can ? (dir < 0 ? 'back' : 'on') : ''
     }
     let down: { x: number; y: number } | undefined
@@ -130,8 +134,10 @@ export function usePageTurns({ screen, viewport, bookTitle, editor, pager, cover
       down = undefined
       const dir = side(e)
       if (!dir || (from && Math.hypot(e.clientX - from.x, e.clientY - from.y) > 4) || !getSelection()?.isCollapsed) return
+      const page = pager.page
       turn(dir)
       onMouseMove(e)
+      if (pager.page === page && now.current.beyond(dir)) crossedBy = e
     }
 
     // A tap below the text (under its last line, or on a short page) is not on anything editable:
@@ -142,6 +148,9 @@ export function usePageTurns({ screen, viewport, bookTitle, editor, pager, cover
       const view = editor.view
       if (caretToEnd(view, viewportEl)) view.focus()
     }
+
+    if (crossedBy) onMouseMove(crossedBy)
+    crossedBy = undefined
 
     window.addEventListener('keydown', onKey)
     viewportEl.addEventListener('click', onPagerClick)
