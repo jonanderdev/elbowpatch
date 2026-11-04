@@ -21,6 +21,8 @@ export interface EditorOptions {
   onSelection?(view: EditorView, tr: Transaction): void
   /** A key the page handles first (arrows at a page's edge); true when it did. */
   onKey?(view: EditorView, event: KeyboardEvent): boolean
+  /** `# ` was typed at the start of a line, at this position. It is in the text by now, as typed. */
+  onChapterLine?(at: number): void
 }
 
 export interface Editor {
@@ -31,10 +33,13 @@ export interface Editor {
   focus(): void
   /** Formatting from the selection menu or the writing bar. */
   run(command: 'bold' | 'italic' | 'quote' | 'undo' | 'redo'): void
+  /** While a chapter starts in it: the text is what is being split, so it takes no change. */
+  hold(on: boolean): void
   destroy(): void
 }
 
 export function createEditor(mount: HTMLElement, options: EditorOptions): Editor {
+  let held = false
   const state = EditorState.create({
     doc: toDoc(parse(options.content)),
     plugins: [
@@ -53,6 +58,7 @@ export function createEditor(mount: HTMLElement, options: EditorOptions): Editor
       history({ newGroupDelay: 1000 }),
       placeholder(),
       nightFocus(),
+      new Plugin({ filterTransaction: (tr) => !held || !tr.docChanged }),
     ],
   })
 
@@ -82,6 +88,8 @@ export function createEditor(mount: HTMLElement, options: EditorOptions): Editor
         view.updateState(next)
         if (tr.docChanged) options.onChange(serialize(toBlocks(next.doc)))
         if (tr.selectionSet || tr.docChanged || tr.storedMarksSet) options.onSelection?.(view, tr)
+        const line = tr.getMeta(CHAPTER_LINE) as number | undefined
+        if (line !== undefined) options.onChapterLine?.(line)
       },
     },
   )
@@ -105,6 +113,9 @@ export function createEditor(mount: HTMLElement, options: EditorOptions): Editor
       }
       commands[command](view.state, view.dispatch, view)
       view.focus()
+    },
+    hold(on) {
+      held = on
     },
     destroy: () => view.destroy(),
   }
@@ -182,7 +193,26 @@ function markdownRules(): InputRule[] {
     markRule(/\*\*([^*\s](?:[^*]*[^*\s])?)\*\*$/, schema.marks.strong),
     markRule(/(?<![*\\])\*([^*\s](?:[^*]*[^*\s])?)\*$/, schema.marks.em),
     textblockTypeInputRule(/^>\s$/, schema.nodes.quote),
+    chapterLineRule(),
   ]
+}
+
+const CHAPTER_LINE = 'chapterLine'
+
+/**
+ * `# ` at the start of a line, or after a line break in a paragraph: the space goes in as typed and
+ * the page is told. Only a book makes anything of it, and pasting runs no rule (0003).
+ */
+function chapterLineRule(): InputRule {
+  return new InputRule(
+    /(?:^|\ufffc)#\s$/,
+    (state, match, start, end) => {
+      if (state.doc.resolve(start).parent.type !== schema.nodes.paragraph) return null
+      const hash = start + match[0].length - 2
+      return state.tr.insertText(match[0].slice(-1), state.selection.from, end).setMeta(CHAPTER_LINE, hash)
+    },
+    { undoable: false },
+  )
 }
 
 /** `*word*` becomes italic as you type the closing star. */

@@ -92,6 +92,19 @@ export function fieldChanged(el: HTMLElement, at: number): void {
   histories.get(el)?.note(el.textContent ?? '', at)
 }
 
+/** The caret at the end of a field that has the focus. */
+export function caretToFieldEnd(el: HTMLElement): void {
+  const selection = getSelection()
+  selection?.selectAllChildren(el)
+  selection?.collapseToEnd()
+}
+
+/** Writes a field's text as if it were typed, so the page sees and saves it. */
+export function fillField(el: HTMLElement, text: string): void {
+  el.textContent = text
+  el.dispatchEvent(new InputEvent('input', { bubbles: true }))
+}
+
 /**
  * Takes a field a step back or on, and leaves the caret at its end. The change goes through the
  * field's own input, so the page sees and saves it as if it were typed.
@@ -99,11 +112,8 @@ export function fieldChanged(el: HTMLElement, at: number): void {
 export function stepField(el: HTMLElement, way: 'undo' | 'redo'): void {
   const text = histories.get(el)?.[way]()
   if (text === null || text === undefined) return
-  el.textContent = text
-  el.dispatchEvent(new InputEvent('input', { bubbles: true }))
-  const selection = getSelection()
-  selection?.selectAllChildren(el)
-  selection?.collapseToEnd()
+  fillField(el, text)
+  caretToFieldEnd(el)
 }
 
 /** ⌘/Ctrl + Z and ⌘/Ctrl + Shift + Z in a field, as in the text. ⌘/Ctrl + Alt + Z is the Time Machine's. */
