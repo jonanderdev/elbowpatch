@@ -52,7 +52,7 @@ export function usePager({ screen, viewport, flow, columns, kind, settings, keyb
     const p = new Pager(viewportEl, flowEl, columnsEl, (next, total) => {
       setPage(next)
       setCount(total)
-      if (shown !== -1 && next !== shown) setAnnouncement(`Page ${next + 1} of ${total}`)
+      if (!p.opening && shown !== -1 && next !== shown) setAnnouncement(`Page ${next + 1} of ${total}`)
       shown = next
     })
     layOut(p, screenEl, kind)
