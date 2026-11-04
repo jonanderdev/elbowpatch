@@ -267,6 +267,10 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     }
   }, [saving, pager, editor])
 
+  // The latest thing to say wins: a turn is said after a kept moment or a chapter opening.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: \`announcement\` is the trigger.
+  useEffect(() => setKept(''), [announcement])
+
   // The page changed under a screen reader: it hears which chapter it is in.
   useEffect(() => {
     if (opened.at) setKept(titleOf(opened).trim() || 'Untitled')

@@ -188,6 +188,9 @@ test('Contents works by keyboard, Escape gives the focus back, and a screen read
   // The focus is not left on nothing, and the chapter is said.
   expect(await page.evaluate(() => document.activeElement === document.body)).toBe(false)
   await expect(page.locator('.page-screen > [aria-live]')).toHaveText('Two')
+  // And a turn after it is still said.
+  await page.keyboard.press('PageDown')
+  await expect(page.locator('.page-screen > [aria-live]')).toHaveText(/^Page 2 of /)
 })
 
 test('a long Contents scrolls inside itself, and its foot stays in reach', async ({ page }) => {
