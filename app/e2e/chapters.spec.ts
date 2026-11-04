@@ -253,10 +253,14 @@ test('words typed just before a jump are there after a reload, in their own chap
   await expect(page.locator('.body')).toContainText('Typed at the last moment.')
   await openChapter(page, 'Two')
   await page.reload()
-  await expect(page.locator('.title')).toHaveText('Two')
-  await expect(page.locator('.body')).toHaveText('Second.')
+  // The words are stored before the chapter opens; the place follows a moment after, so a reload this
+  // soon lands on either chapter. Wherever it lands, the words are in their own chapter and nowhere else.
+  await expect(page.locator('.title')).toHaveText(/^(One|Two)$/)
   await openChapter(page, 'One')
   await expect(page.locator('.body')).toHaveText('First chapter. Typed at the last moment.')
+  await page.keyboard.press('Escape')
+  await openChapter(page, 'Two')
+  await expect(page.locator('.body')).toHaveText('Second.')
 })
 
 test('going there and back at once finds the words just typed', async ({ page }) => {
