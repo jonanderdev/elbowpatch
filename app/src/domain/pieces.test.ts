@@ -5,13 +5,16 @@ import {
   bookCount,
   bookPages,
   contents,
+  forgetPages,
   history,
   library,
+  measureNext,
   newPiece,
   openPiece,
   putAway,
   recover,
   rename,
+  renameSection,
   restore,
   savePages,
   setSubtitle,
@@ -79,6 +82,142 @@ describe("a book's count", () => {
   it('counts a chapter with no words yet as none', () => {
     const fresh = { ...book, words: { a: 100 } }
     expect(bookCount(fresh, 'phone', open('a', 8, 120), 0).words).toBe(120)
+  })
+})
+
+describe('measuring a book off screen', () => {
+  /** A stored book of chapters, as an import leaves it: text in working copies, no page counts. */
+  async function storedBook(d: ReturnType<typeof setup>, texts: string[]) {
+    let piece = newPiece(d.deps, 'book', 'es')
+    const ids = texts.map((_, i) => (i === 0 ? piece.sections[0]!.sectionId : `chapter${piece.id}-${i}`))
+    piece = { ...piece, sections: ids.map((sectionId, i) => ({ sectionId, title: `Chapter ${i + 1}` })) }
+    for (const [i, text] of texts.entries()) await write(d.deps, piece, ids[i]!, text)
+    for (const [i, id] of ids.entries()) await renameSection(d.deps, piece, id, `Chapter ${i + 1}`)
+    return { piece, ids }
+  }
+  const stored = (d: ReturnType<typeof setup>, id: string) => d.store.transaction((tx) => tx.piece(id)) as Promise<Piece>
+
+  it('lays out one chapter at a time, in order, until every count is known, and then stops', async () => {
+    const d = setup()
+    const { piece, ids } = await storedBook(d, ['One.', 'Two.'])
+    const seen: unknown[] = []
+    const layOut = async (chapter: unknown) => (seen.push(chapter), 5)
+
+    expect(await measureNext(d.deps, 'phone', layOut)).toBe(true)
+    expect((await stored(d, piece.id)).pages).toEqual({ phone: { [ids[0]!]: 5 } })
+    expect(await measureNext(d.deps, 'phone', layOut)).toBe(true)
+    expect(bookPages(await stored(d, piece.id), 'phone')).toBe(10)
+    expect(await measureNext(d.deps, 'phone', layOut)).toBe(false)
+
+    expect(seen).toEqual([
+      { title: 'Chapter 1', content: 'One.', lang: 'es', titlePage: true },
+      { title: 'Chapter 2', content: 'Two.', lang: 'es', titlePage: false },
+    ])
+  })
+
+  it('does not date the piece or make a moment', async () => {
+    const d = setup()
+    const { piece } = await storedBook(d, ['One.', 'Two.'])
+    const before = await stored(d, piece.id)
+    d.clock.set(9_000_000)
+    await measureNext(d.deps, 'phone', async () => 5)
+    const after = await stored(d, piece.id)
+    expect(after.updatedAt).toBe(before.updatedAt)
+    expect(after.outlineId).toBe(before.outlineId)
+    expect(await d.store.transaction((tx) => tx.outlinesOf(piece.id))).toEqual([])
+    expect(await d.store.transaction((tx) => tx.versionsOf(piece.sections[0]!.sectionId))).toEqual([])
+  })
+
+  it('leaves a known count alone, and measures only on the screen asked for', async () => {
+    const d = setup()
+    const { piece, ids } = await storedBook(d, ['One.', 'Two.'])
+    await savePages(d.deps, piece.id, 'phone', ids[0]!, 3)
+    await measureNext(d.deps, 'phone', async () => 5)
+    expect((await stored(d, piece.id)).pages).toEqual({ phone: { [ids[0]!]: 3, [ids[1]!]: 5 } })
+    expect(await measureNext(d.deps, 'phone', async () => 7)).toBe(false)
+    expect(await measureNext(d.deps, 'desktop', async () => 7)).toBe(true)
+  })
+
+  it('takes the open book first', async () => {
+    const d = setup()
+    await storedBook(d, ['Older.'])
+    const open = await storedBook(d, ['Open.'])
+    await measureNext(d.deps, 'phone', async () => 5, open.piece.id)
+    expect(bookPages(await stored(d, open.piece.id), 'phone')).toBe(5)
+  })
+
+  it('measures only books that are in the library', async () => {
+    const d = setup()
+    const { piece } = await storedBook(d, ['One.'])
+    await putAway(d.deps, piece.id)
+    expect(await measureNext(d.deps, 'phone', async () => 5)).toBe(false)
+
+    const journal = newPiece(d.deps, 'journal', 'en')
+    const { piece: withToday, sectionId } = withDay(d.deps, journal, '2026-11-04')
+    await write(d.deps, withToday, sectionId, 'A day.')
+    const essay = newPiece(d.deps, 'essay', 'en')
+    await write(d.deps, essay, essay.sections[0]!.sectionId, 'A thought.')
+    expect(await measureNext(d.deps, 'phone', async () => 5)).toBe(false)
+  })
+
+  it('drops the count of a text that changed while it was laid out, and measures it again', async () => {
+    const d = setup()
+    const { piece, ids } = await storedBook(d, ['One.'])
+    expect(
+      await measureNext(d.deps, 'phone', async () => {
+        await write(d.deps, piece, ids[0]!, 'One, and then a great deal more.')
+        return 5
+      }),
+    ).toBe(true)
+    expect((await stored(d, piece.id)).pages).toBeUndefined()
+    const seen: string[] = []
+    await measureNext(d.deps, 'phone', async ({ content }) => (seen.push(content), 9))
+    expect(seen).toEqual(['One, and then a great deal more.'])
+    expect(bookPages(await stored(d, piece.id), 'phone')).toBe(9)
+  })
+
+  it('drops the count of a title that changed while it was laid out: a title moves the page breaks', async () => {
+    const d = setup()
+    const { piece, ids } = await storedBook(d, ['One.'])
+    await measureNext(d.deps, 'phone', async () => {
+      await renameSection(d.deps, piece, ids[0]!, 'A title long enough to take two lines')
+      return 5
+    })
+    expect((await stored(d, piece.id)).pages).toBeUndefined()
+  })
+
+  it('never overwrites a count the page kept meanwhile: the page is the one that knows', async () => {
+    const d = setup()
+    const { piece, ids } = await storedBook(d, ['One.'])
+    await measureNext(d.deps, 'phone', async () => {
+      await savePages(d.deps, piece.id, 'phone', ids[0]!, 2)
+      return 5
+    })
+    expect(bookPages(await stored(d, piece.id), 'phone')).toBe(2)
+  })
+
+  it('stops when the layout gives up, keeping nothing', async () => {
+    const d = setup()
+    const { piece } = await storedBook(d, ['One.'])
+    expect(await measureNext(d.deps, 'phone', async () => undefined)).toBe(false)
+    expect((await stored(d, piece.id)).pages).toBeUndefined()
+  })
+
+  it("forgets every book's counts on both screens, leaving dates and everything else: safe to run twice", async () => {
+    const d = setup()
+    const one = await storedBook(d, ['One.'])
+    const two = await storedBook(d, ['Two.'])
+    await savePages(d.deps, one.piece.id, 'phone', one.ids[0]!, 3)
+    await savePages(d.deps, two.piece.id, 'desktop', two.ids[0]!, 4)
+    const before = await stored(d, one.piece.id)
+    d.clock.set(9_000_000)
+
+    await forgetPages(d.deps)
+    await forgetPages(d.deps)
+
+    const { pages: _, ...rest } = before
+    expect(await stored(d, one.piece.id)).toEqual(rest)
+    expect((await stored(d, two.piece.id)).pages).toBeUndefined()
   })
 })
 
