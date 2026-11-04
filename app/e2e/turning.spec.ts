@@ -182,7 +182,8 @@ test("margin hints show a turn is possible across a chapter's end, and a click t
   await toLastPage(page)
   const col = (await page.locator('.pager').boundingBox())!
   const right = { x: col.x + col.width + 200, y: col.y + 200 }
-  const left = { x: col.x - 200, y: col.y + 200 }
+  // Between the rail and the text.
+  const left = { x: col.x - 100, y: col.y + 200 }
   const hint = () => page.locator('.page-screen').getAttribute('data-turn')
 
   await page.mouse.move(right.x, right.y)
@@ -192,9 +193,12 @@ test("margin hints show a turn is possible across a chapter's end, and a click t
   // The arrow holds through the turn, so clicking through pages never flickers it.
   await expect.poll(hint).toBe('on')
 
-  // On a chapter's opening page, the arrow still points back.
+  // On a chapter's opening page, the arrow still points back; over the rail there is none.
   await page.mouse.move(left.x, left.y)
   await expect.poll(hint).toBe('back')
+  await page.locator('.contents-rail [aria-current="true"]').hover()
+  await expect.poll(hint).toBe('')
+  await page.mouse.move(left.x, left.y)
   await page.mouse.click(left.x, left.y)
   await expect(title(page)).toHaveText('One')
 

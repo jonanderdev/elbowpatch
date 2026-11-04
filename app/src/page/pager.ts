@@ -122,6 +122,8 @@ export class Pager {
   page = 0
   count = 1
   g: Geometry = { measure: 0, side: 0, stride: 1 }
+  /** The page is opening on a later page: moving there is not a turn, and nothing says it. */
+  opening = false
   /** Called when the browser scrolled on its own: the page shows the caret's page again. */
   onDrift?: () => void
 

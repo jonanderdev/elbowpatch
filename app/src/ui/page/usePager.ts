@@ -49,15 +49,10 @@ export function usePager({ screen, viewport, flow, columns, kind, settings, keyb
     const columnsEl = columns.current
     if (!viewportEl || !flowEl || !screenEl || !columnsEl) return
     let shown = -1
-    // Before the first paint the page is only opening at its place: that is not a turn.
-    let painted = false
-    const firstFrame = requestAnimationFrame(() => {
-      painted = true
-    })
     const p = new Pager(viewportEl, flowEl, columnsEl, (next, total) => {
       setPage(next)
       setCount(total)
-      if (painted && shown !== -1 && next !== shown) setAnnouncement(`Page ${next + 1} of ${total}`)
+      if (!p.opening && shown !== -1 && next !== shown) setAnnouncement(`Page ${next + 1} of ${total}`)
       shown = next
     })
     layOut(p, screenEl, kind)
@@ -76,7 +71,6 @@ export function usePager({ screen, viewport, flow, columns, kind, settings, keyb
     window.addEventListener('resize', relayout)
     return () => {
       alive = false
-      cancelAnimationFrame(firstFrame)
       document.fonts.removeEventListener('loadingdone', remeasure)
       window.removeEventListener('resize', relayout)
     }
