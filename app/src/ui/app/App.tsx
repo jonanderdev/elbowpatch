@@ -130,10 +130,16 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
   // Another section of the open piece. The lock is the piece's, so it stays. The last chapter chosen
   // wins, should the writer choose again while a save runs.
   const chosen = useRef(0)
+  /** Where the opening under way is going: a key held down asks again and again, and if each asking replaced the last, none would finish. */
+  const going = useRef('')
   const openSection = async (pieceId: string, sectionId: string, writing: boolean, at: OpenAt): Promise<void> => {
+    const where = `${sectionId}:${at}`
+    if (going.current === where) return
+    going.current = where
     const turn = ++chosen.current
     await saveFirst()
     const next = await open(pieceId, sectionId).catch(() => null)
+    if (going.current === where) going.current = ''
     if (next && turn === chosen.current) setOpened({ ...next, at, writing })
   }
 
