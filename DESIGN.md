@@ -1,6 +1,6 @@
 # Design
 
-The look of Elbowpatch. Builders follow this file. PROJECT.md §9 still applies: calm, analog, typography first, accessibility required.
+The look of Elbowpatch. Builders follow this file. The look stays calm, analog and typography first, and accessibility is required.
 
 ## Sources of truth
 - **This file** holds the direction and the rules: what the look is, why, and what it never does. It wins on principle.
@@ -64,7 +64,7 @@ Two themes, both first-class. Paper follows light system appearance, night follo
 - **Thousands take a dot, European style:** 1.240 words, never 1,240.
 
 ## Control
-- No filled button on the page, and no text in letter-spaced capitals. On a phone the tools appear only when summoned (PROJECT.md §4.1) and on selection, and leave when dismissed. On desktop they sit quietly in the head, unraised, and stay while you type (see Layout, Desktop).
+- No filled button on the page, and no text in letter-spaced capitals. On a phone the tools appear only when summoned and on selection, and leave when dismissed. On desktop they sit quietly in the head, unraised, and stay while you type (see Layout, Desktop).
 - **The page button (phone):** a 44px circle at the bottom right, 16px from the edge, on a surface with a soft lift, showing an asterisk: Literata's own, outlined as an icon (12px wide, in the title colour) so it never depends on the font, and centred by its drawn shape — the glyph sits high on its line. Its label for assistive tech says "Page N of M. Open tools". The page number is the folio at the foot (see Type). (Changed on 2026-10-30 from a face showing the page number, which read as a page indicator, not an action. The line "Your tools are here", shown once beside it since 2026-10-28 to explain the number, is gone with it.)
 - **The tools bar (phone):** the page button opens into one rounded bar, in place: "3 of 12 · 1.240 words" in secondary grey, then icon buttons — export, Time Machine, text settings (Aa), paper / night (moon or sun), close. The rarest sits furthest from where the bar opens, so the bar's old order stays where the thumb already knows it. Escape or close folds it back into the button. The bar never comes closer than 16px to the screen's edges: when a long count would push it there on a phone, the count drops its last word — "148 of 312 · 41.240" — and its label for assistive tech still says it in full. (Export added on 2026-10-28. Measured: 333px with "1 of 5 · 1.040 words"; 363px with "148 of 312 · 41.240 words", too wide even for a 390px phone; 325px without the word.)
 - **Icons:** one set, drawn for this app: 20px, 1.5px stroke, round caps and joins, all the same colour, none highlighted. Icons that stay on screen — the desktop head's tools, the rail toggle, the library's view switch, paper / night and settings — rest in secondary grey (5.09:1 on paper, 5.73:1 at night) and take the title colour on hover, when pressed, and while the sheet they opened is open, so the text keeps the attention. Icons in a bar you summoned (the tools bar, the writing bar, the selection menu) are in the title colour. (Chosen on 2026-10-30: in the title colour, the head's icons drew the eye away from the page, most of all at night.) Icons sit by their drawn centre, not their box: next to a line of text they centre between its capitals and its lowercase (the rail toggle sits 1.5px lower than its box would put it). Icon buttons are 36px circles with a soft round pressed tint, no border — every round control is fully round.
@@ -257,5 +257,5 @@ Paged writing is new ground: typing on a paged page, a phone keyboard, Markdown,
 - Let the rail push or shift the text column: the page stays centred on the window.
 - Put a filled button on the page, or reader features (search book, bookmarks, ratings, bylines).
 - Use any text colour below 4.5:1 on its page.
-- Use Git words in the UI (PROJECT.md §3): say moments, drafts, bring this back.
+- Use Git words in the UI (MANIFESTO.md): say moments, drafts, bring this back.
 - Borrow another product's name, typefaces or colours.

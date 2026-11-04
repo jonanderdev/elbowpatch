@@ -3,7 +3,7 @@
 Date: 2026-10-27 · Status: accepted
 
 ## Context
-Data loss is the worst bug (PROJECT.md §3). Three ways to lose words have nothing to do with the editor: two windows saving over each other, an update reloading the app mid-sentence, and stored data that a later version cannot read.
+Data loss is the worst bug (MANIFESTO.md). Three ways to lose words have nothing to do with the editor: two windows saving over each other, an update reloading the app mid-sentence, and stored data that a later version cannot read.
 
 ## Decision
 

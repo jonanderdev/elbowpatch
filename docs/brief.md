@@ -24,7 +24,7 @@ App. A tool people install and come back to every day, on any device, and it wor
 
 ## V1 and later
 - v1: all four flows on phone and desktop. That includes the Time Machine, chapters and Contents, the journal calendar, PDF export, and a plain About & privacy page.
-- later: keep a copy and drafts, sync to one place you connect, search, collections, reordering chapters.
+- later, only once the maintainer has written in it daily for 2–3 weeks and it feels good: keep a copy and drafts, sync to one place you connect, search, collections, reordering chapters.
 
 ## Constraints
 - Never lose a word: the latest text is always safe, you can always go back, and older moments thin out with age. A piece put away can come back for 30 days.

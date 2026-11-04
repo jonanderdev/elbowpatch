@@ -52,7 +52,7 @@ The other scripts (tests, lint, typecheck) are listed in [`app/package.json`](ap
 ## Learn more
 
 - [MANIFESTO.md](MANIFESTO.md): why this exists and what it will never do.
-- [PROJECT.md](PROJECT.md): the full idea, scope and architecture.
+- [docs/brief.md](docs/brief.md): what it is, who it is for, and what the first version holds.
 - [DESIGN.md](DESIGN.md): the look, with the screens in Figma.
 - [docs/decisions/](docs/decisions/): the choices we made and why.
 
