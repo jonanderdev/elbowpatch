@@ -30,6 +30,19 @@ Add-ons, offered once when needed (`npx longbeard update --skill <name>`): secur
 Write so a person can use the reply in one read. End with what you did not check.
 <!-- longbeard:end -->
 
+# Product rules
+
+Read docs/brief.md and MANIFESTO.md before changing anything. When in doubt, choose the quieter, simpler option.
+
+- A feature belongs only if it makes the page quieter, the history more trustworthy, or the writing more the writer's own.
+- Add nothing to the writing view without a reason.
+- No network call carries writing unless the writer connected a place.
+- Keep the bundle small, and justify every dependency.
+- Data loss is the worst bug: test snapshots, restore, import, export and sync edge cases.
+- Human language in everything the writer sees. No Git words.
+- Record decisions in `docs/decisions/`.
+- Keep commits small and the app runnable at every step.
+
 # Public repository
 
 This repo is public and open source (MIT). Everything committed is published.
