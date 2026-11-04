@@ -27,7 +27,7 @@ test('on a slow launch the launch screen shows, and stays long enough to read', 
     const { shown, gone } = window as unknown as { shown: number; gone: number }
     return gone - shown
   })
-  expect(onScreen).toBeGreaterThan(900)
+  expect(onScreen).toBeGreaterThan(250)
   // The mark comes with the page, so it needs no second trip to the network.
   expect(asked.filter((url) => url.includes('launch-mark'))).toEqual([])
 })

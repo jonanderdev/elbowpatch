@@ -21,7 +21,7 @@ import { useWriterLock } from './useWriterLock'
 /** Counts the sections read from storage, so each reading opens a new page. */
 let reads = 0
 /** The least time the launch screen shows, from its first frame, in ms. */
-const MIN_LAUNCH = 1000
+const MIN_LAUNCH = 300
 
 const AREAS: Record<string, Area> = {
   '/settings/export': 'export',
