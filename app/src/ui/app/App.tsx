@@ -15,6 +15,7 @@ import { type Area, Settings } from '../settings/Settings'
 import { readLast, writeLast } from '../stores/last'
 import { askToPersist } from './persist'
 import { replayJournal } from './replay'
+import { settled } from './settled'
 import { useRoute } from './useRoute'
 import { useWriterLock } from './useWriterLock'
 
@@ -44,7 +45,8 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
   }, [deps])
 
   const open = useCallback(
-    async (pieceId: string): Promise<Opened | null> => {
+    /** Opens a piece: at the section asked for, else the writer's place, else the first chapter. A journal opens on today. */
+    async (pieceId: string, wanted?: string): Promise<Opened | null> => {
       const found = await openPiece(deps, pieceId)
       // A put-away piece waits in Settings; a URL or the Back button does not open it.
       if (!found || found.piece.putAwayAt !== undefined) return null
@@ -54,10 +56,9 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
         // The journal opens on today.
         ;({ piece, sectionId } = withDay(deps, piece, isoDay(new Date())))
       } else {
-        // At the writer's place, if its section is still there; else the first chapter.
-        const place = piece.place
-        const placed = place !== undefined && piece.sections.some((s) => s.sectionId === place.sectionId)
-        sectionId = placed ? place.sectionId : piece.sections[0]!.sectionId
+        const sections = piece.sections
+        const there = (id: string | undefined): boolean => sections.some((s) => s.sectionId === id)
+        sectionId = [wanted, piece.place?.sectionId].find(there) ?? sections[0]!.sectionId
       }
       const section = found.sections.find((s) => s.sectionId === sectionId)
       return { piece, sectionId, content: section?.content ?? '', updatedAt: section?.updatedAt, readAt: ++reads }
@@ -123,6 +124,19 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
   const closing = useRef<Promise<void>>(Promise.resolve())
   const { writer, writeHere } = useWriterLock(lock, opened?.piece.id, flushPage, closing)
 
+  /** The open page saved, and the last one's closing save done; never waiting long for either. */
+  const saveFirst = () => Promise.race([Promise.all([flushPage.current?.(), settled(closing.current)]), new Promise((r) => setTimeout(r, 1500))])
+
+  // Another section of the open piece. The lock is the piece's, so it stays. The last chapter chosen
+  // wins, should the writer choose again while a save runs.
+  const chosen = useRef(0)
+  const openSection = async (pieceId: string, sectionId: string, writing: boolean): Promise<void> => {
+    const turn = ++chosen.current
+    await saveFirst()
+    const next = await open(pieceId, sectionId).catch(() => null)
+    if (next && turn === chosen.current) setOpened({ ...next, at: 'opening', writing })
+  }
+
   const startNew = (kind: Kind) => {
     raiseKeyboard()
     let piece = newPiece(deps, kind, navigator.language || 'en')
@@ -152,7 +166,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
           onWriteHere={() =>
             // The other window has saved: start from what it left.
             void writeHere(async () => {
-              const fresh = opened && (await open(opened.piece.id))
+              const fresh = opened && (await open(opened.piece.id, opened.sectionId))
               if (fresh) setOpened(fresh)
             })
           }
@@ -162,10 +176,11 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
           onLibrary={async () => {
             // Save first, so the library already lists what was just written; never wait long for it.
             // The first save also opens the database; a stuck one never holds the writer on the page for long.
-            await Promise.race([flushPage.current?.(), new Promise((r) => setTimeout(r, 1500))])
+            await saveFirst()
             await refresh().catch(() => {})
             go('/')
           }}
+          onOpenSection={(sectionId, writing) => void openSection(opened.piece.id, sectionId, writing)}
           onChange={(piece) => {
             askToPersist()
             setPieces((all) => {
@@ -200,7 +215,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
             // The page behind holds the old title: open it again, or its next save would put it back.
             if (opened?.piece.id === piece.id) {
               await flushPage.current?.()
-              const fresh = await open(piece.id)
+              const fresh = await open(piece.id, opened.sectionId)
               if (fresh) setOpened(fresh)
             }
           }}

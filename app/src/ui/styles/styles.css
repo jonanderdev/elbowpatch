@@ -536,6 +536,52 @@ button {
   pointer-events: none;
 }
 
+/* A book's running head on a phone: a control that drops Contents (DESIGN.md, Control). Level with §,
+   centred on the screen and clear of § on both sides. */
+.running-control {
+  position: absolute;
+  top: calc(var(--head) / 2 - 16px);
+  left: 0;
+  right: 0;
+  width: fit-content;
+  max-width: calc(100% - 144px);
+  height: 32px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 6px 0 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--secondary);
+  transition: background-color 160ms;
+}
+/* A 44px tap area round the 32px pill. */
+.running-control::after {
+  content: '';
+  position: absolute;
+  inset: -6px 0;
+}
+.running-control:active,
+.running-control[aria-expanded='true'] {
+  background: var(--pressed);
+}
+@media (hover: hover) {
+  .running-control:hover {
+    background: var(--pressed);
+  }
+}
+.running-title {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.running-control .icon {
+  flex: none;
+}
+
 .pager {
   position: absolute;
   top: var(--top);
@@ -750,6 +796,15 @@ button {
   color: var(--secondary);
   font-variant-numeric: lining-nums tabular-nums;
 }
+/* A book's count opens Contents on a phone. */
+button.count {
+  border-radius: 14px;
+  transition: background-color 160ms;
+}
+button.count:active,
+button.count[aria-expanded='true'] {
+  background: var(--pressed);
+}
 @media (min-width: 700px) {
   .count {
     padding: 0 10px 0 12px;
@@ -772,6 +827,10 @@ button {
   line-height: 1.4;
   color: var(--title);
   z-index: 3;
+}
+/* The tools bar stands where the line does: the line waits above it, so the bar can still be pressed. */
+.page-screen[data-tools] .line {
+  bottom: calc(var(--lift) + (var(--foot) - 44px) / 2 + 44px + 12px);
 }
 .line button {
   color: var(--title);
@@ -1361,6 +1420,79 @@ button {
 .sheet-row:hover .sheet-row-name {
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+/* Contents on a phone: dropped under the head, its list scrolling inside it, so its head and foot
+   stay in reach. With the keyboard up it ends above the keyboard. */
+.sheet.contents {
+  top: 56px;
+  bottom: auto;
+  max-height: calc(var(--visible-height, 100dvh) - 68px);
+  overflow: hidden;
+  gap: 0;
+  padding: 18px 10px 16px;
+}
+.contents .sheet-title {
+  flex: none;
+  padding: 0 10px 10px;
+}
+.contents-list {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.contents-row {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  text-align: left;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--title);
+  transition: background-color 160ms;
+}
+/* Inside the row: the list clips what stands outside it. */
+.contents-row:focus-visible {
+  outline-offset: -2px;
+}
+.contents-row:active,
+.contents-row[aria-current='true'] {
+  background: var(--pressed);
+}
+@media (hover: hover) {
+  .contents-row:hover {
+    background: var(--pressed);
+  }
+}
+.contents-title {
+  flex: 1;
+  min-width: 0;
+}
+.contents-page {
+  flex: none;
+  font-size: 13px;
+  color: var(--secondary);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.contents-foot {
+  flex: none;
+  display: flex;
+  justify-content: flex-end;
+  margin: 18px 10px 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--surface-line);
+}
+.contents-foot .text-link {
+  margin: -4px 0;
 }
 
 /* The library's foot is not reserved: the + floats over the last rows. */

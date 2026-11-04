@@ -47,6 +47,12 @@ export function showCaret(view: EditorView, pager: Pager, force: boolean = false
   if (rect) pager.show(rect.left)
 }
 
+/** The caret to the start of the text, and the page to the one that holds it: a section's opening page. */
+export function toOpeningPage(view: EditorView, pager: Pager): void {
+  view.dispatch(view.state.tr.setSelection(TextSelection.atStart(view.state.doc)))
+  showCaret(view, pager, true)
+}
+
 /**
  * Scrolls the page in its scroller so the caret stands clear of the head above and, with the phone
  * keyboard up, the writing bar below it. Only the scroll moves, so the writer can scroll it back.

@@ -2,25 +2,29 @@ import { TextSelection } from 'prosemirror-state'
 import { type CSSProperties, type ReactElement, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { countWords } from '../../domain/markdown'
 import type { Piece } from '../../domain/model'
-import { type Deps, savePages } from '../../domain/pieces'
-import { scrollToCaret, showCaret } from '../../page/caret'
+import { contents, type Deps, savePages } from '../../domain/pieces'
+import { scrollToCaret, showCaret, toOpeningPage } from '../../page/caret'
 import { type Editor, selectionBox } from '../../page/editor'
 import { screenOf } from '../../page/pager'
 import { placeOf } from '../../page/place'
+import { settled } from '../app/settled'
 import { ExportSheet } from '../components/ExportSheet'
 import { Path } from '../components/Path'
+import { usePhone } from '../components/usePhone'
 import { useScrolled } from '../components/useScrolled'
 import { download } from '../files/download'
 import { markdownFile } from '../files/markdownFile'
 import { useSettings } from '../stores/settings'
-import { fillTitleFields, keptFor, type Opened, type TitleRefs } from './fields'
+import { ContentsSheet, RunningHeadControl } from './Contents'
+import { fillTitleFields, keptFor, type Opened, type TitleRefs, titleOf } from './fields'
 import { PageFoot, StatusLine } from './PageFoot'
 import { SectionTitle, TitlePage } from './Titles'
 import { HeadTools, TextSettings } from './Tools'
 import { useCaretFollowing, useCaretKeys } from './useCaret'
 import { useEditor } from './useEditor'
-import { useFocusOnOpen } from './useFocusOnOpen'
+import { raiseKeyboard, useFocusOnOpen } from './useFocusOnOpen'
 import { useOpenAtPlace } from './useOpenAtPlace'
+import { useOutline } from './useOutline'
 import { usePager } from './usePager'
 import { usePageTurns } from './usePageTurns'
 import { useSaving } from './useSaving'
@@ -41,6 +45,8 @@ interface Props {
   /** The library shows over the page; the page stays laid out behind it, inert. */
   covered: boolean
   onLibrary(): void
+  /** Opens another section of this piece, once this one is saved. `writing`: the caret goes with the writer. */
+  onOpenSection(sectionId: string, writing: boolean): void
   onChange(piece: Piece): void
 }
 
@@ -54,7 +60,7 @@ interface SelectionState {
  * The writing page: one section of a piece, paged (DESIGN.md, The page). The app makes a new page
  * for each section it opens. Each hook below owns one part; this component lays out the page.
  */
-export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, covered, onLibrary, onChange }: Props): ReactElement {
+export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, covered, onLibrary, onOpenSection, onChange }: Props): ReactElement {
   const { piece, sectionId } = opened
   const readOnly = writer !== 'here'
   // A book or a journal opens on its title page: its name, then chapter 1 or the first day on the next page.
@@ -66,8 +72,13 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
 
   const settings = useSettings()
   const keyboard = useKeyboard()
+  const phone = usePhone()
+  const book = piece.kind === 'book'
+  const live = useOutline(deps, piece)
   const [tools, setTools] = useState(false)
-  const [sheet, setSheet] = useState<'text' | 'export' | null>(null)
+  const [sheet, setSheet] = useState<'text' | 'export' | 'contents' | null>(null)
+  /** Contents was opened by keyboard, so it takes the focus. */
+  const [contentsFocus, setContentsFocus] = useState(false)
   const [line, setLine] = useState<string | null>(null)
   const [words, setWords] = useState(() => countWords(content))
   const [heading, setHeading] = useState('')
@@ -143,7 +154,10 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
       return place
     },
     pages: () => (pager && screen.current ? { screen: screenOf(screen.current.clientWidth), count: pager.count } : null),
-    onStored: onChange,
+    onStored: (stored) => {
+      live.stored(stored)
+      onChange(stored)
+    },
     flushRef,
     closingRef,
   })
@@ -235,7 +249,28 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
       moved.current = true
     },
   })
-  const focus = useFocusOnOpen({ opened, editor, saving, titles, covered, readOnly, titlePage, titleEditable })
+  const focus = useFocusOnOpen({ opened, editor, saving, titles, covered, readOnly, titlePage, titleEditable, pageButton })
+
+  // A chapter chosen in Contents: the writer's place follows, once the page they left has had its
+  // last save, so its place never lands after this one. Once, as the page opens.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `opened` and the closing save are this page's, fixed while it is open.
+  useEffect(() => {
+    if (!opened.at || !saving || !pager || !editor || readOnly) return
+    let alive = true
+    void settled(closingRef.current).then(() => {
+      if (!alive) return
+      moved.current = true
+      void saving.flush()
+    })
+    return () => {
+      alive = false
+    }
+  }, [saving, pager, editor])
+
+  // The page changed under a screen reader: it hears which chapter it is in.
+  useEffect(() => {
+    if (opened.at) setKept(titleOf(opened).trim() || 'Untitled')
+  }, [opened])
 
   // Writing here or not changed (another window took the piece, or Write here): the editor asks
   // `editable` again at once.
@@ -265,14 +300,47 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     setSheet(null)
     const back = opener.current
     opener.current = null
-    if (back) requestAnimationFrame(() => back.focus())
+    // Only from the sheet: the focus left in the text stays there, and the keyboard with it.
+    const active = document.activeElement
+    if (back && (!active || active === document.body || active.closest('.sheet'))) requestAnimationFrame(() => back.focus())
   }, [])
+
+  // Contents drops under the head; pressed again, the running head closes it.
+  function openContents(from: HTMLElement): void {
+    if (sheet === 'contents') {
+      closeSheet()
+      return
+    }
+    opener.current = from
+    setContentsFocus(document.activeElement === from)
+    setAnchor(undefined)
+    setSheet('contents')
+    live.reread()
+  }
+
+  // A chapter chosen in Contents opens at its opening page; the words being left are safe in the
+  // journal first, in case the save that follows never ends.
+  function openChapter(chosen: string): void {
+    if (!editor || !pager) return
+    const writing = editor.view.hasFocus()
+    if (chosen === sectionId) {
+      setSheet(null)
+      opener.current = null
+      toOpeningPage(editor.view, pager)
+      moved.current = true
+      void saving?.flush()
+      return
+    }
+    saving?.journal()
+    if (keyboard) raiseKeyboard()
+    onOpenSection(chosen, writing)
+  }
 
   // Escape closes what is open, innermost first: a sheet, then the tools. One listener reads what
   // is open now from a ref: re-attached on each change, an Escape pressed right after one (Done,
   // then Escape) would reach the listener from before it.
-  const open = useRef({ tools, sheet })
-  open.current = { tools, sheet }
+  const open = useRef({ tools, sheet, anchor })
+  open.current = { tools, sheet, anchor }
   useEffect(() => {
     if (covered) return
     const onKey = (e: KeyboardEvent): void => {
@@ -289,13 +357,14 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
   // On a phone, a tap outside a sheet closes it; the tools bar beneath it is not outside. One opened
   // from the desktop head stays, so the page can be seen beside it.
   useEffect(() => {
-    if (!sheet || covered || opener.current) return
+    if (covered) return
     const onDown = (e: PointerEvent): void => {
-      if (!(e.target as Element).closest?.('.sheet, .tools')) closeSheet()
+      if (!open.current.sheet || open.current.anchor) return
+      if (!(e.target as Element).closest?.('.sheet, .tools, .running-control')) closeSheet()
     }
     window.addEventListener('pointerdown', onDown)
     return () => window.removeEventListener('pointerdown', onDown)
-  }, [sheet, covered, closeSheet])
+  }, [covered, closeSheet])
 
   // A calm line at the foot for a few seconds.
   useEffect(() => {
@@ -328,6 +397,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
       ref={screen}
       className={piece.kind === 'journal' ? 'page-screen journal' : 'page-screen'}
       data-keyboard={keyboard || undefined}
+      data-tools={tools || undefined}
       inert={covered}
       aria-hidden={covered}
     >
@@ -342,12 +412,16 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
             onLibrary()
           }}
         />
-        {page > (titlePage ? 1 : 0) ? <div className="running-head">{heading}</div> : null}
+        {page <= (titlePage ? 1 : 0) ? null : book && phone ? (
+          <RunningHeadControl title={heading} open={sheet === 'contents'} onOpen={openContents} />
+        ) : (
+          <div className="running-head">{heading}</div>
+        )}
         <HeadTools
           page={page + 1}
           count={count}
           words={words}
-          sheet={anchor ? sheet : null}
+          sheet={anchor && sheet !== 'contents' ? sheet : null}
           onTextSettings={(from) => openSheet('text', from)}
           onExport={(from) => openSheet('export', from)}
         />
@@ -416,8 +490,19 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
         onCloseTools={closeTools}
         onTextSettings={() => openSheet('text')}
         onExport={() => openSheet('export')}
+        onContents={book ? openContents : undefined}
+        contents={sheet === 'contents'}
       />
 
+      {sheet === 'contents' && phone ? (
+        <ContentsSheet
+          {...contents(live.outline, 'phone', pager ? { sectionId, title: heading, pages: count } : undefined)}
+          current={sectionId}
+          takeFocus={contentsFocus}
+          onOpen={openChapter}
+          onDone={closeSheet}
+        />
+      ) : null}
       {sheet === 'text' ? <TextSettings onDone={closeSheet} style={anchor} /> : null}
       {sheet === 'export' ? (
         <ExportSheet

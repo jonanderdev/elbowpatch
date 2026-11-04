@@ -18,6 +18,9 @@ interface PageFootProps {
   onCloseTools(): void
   onTextSettings(): void
   onExport(): void
+  /** A book's count opens Contents. */
+  onContents?(from: HTMLElement): void
+  contents: boolean
 }
 
 /**
@@ -37,6 +40,8 @@ export function PageFoot({
   onCloseTools,
   onTextSettings,
   onExport,
+  onContents,
+  contents,
 }: PageFootProps): ReactElement {
   const folio = !journal && !titlePage && !tools && !keyboard
   return (
@@ -51,7 +56,16 @@ export function PageFoot({
             while the keyboard is up, so they never sit over the text. */}
         {journal && !tools && !keyboard && <span className="day-words">{wordsLine(words)}</span>}
         {tools ? (
-          <ToolsBar page={page + 1} count={count} words={words} onClose={onCloseTools} onTextSettings={onTextSettings} onExport={onExport} />
+          <ToolsBar
+            page={page + 1}
+            count={count}
+            words={words}
+            onContents={onContents}
+            contents={contents}
+            onClose={onCloseTools}
+            onTextSettings={onTextSettings}
+            onExport={onExport}
+          />
         ) : (
           <button
             ref={pageButtonRef}
