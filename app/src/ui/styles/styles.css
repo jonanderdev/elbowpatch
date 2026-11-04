@@ -965,6 +965,12 @@ button.count[aria-expanded='true'] {
   left: 20px;
 }
 @media (prefers-reduced-motion: no-preference) {
+  /* The rail folds under the path. It stays until it has gone, then leaves the tab order. */
+  .contents-rail {
+    transition:
+      transform 200ms ease,
+      visibility 200ms;
+  }
   .switch,
   .switch::after {
     transition:
@@ -2185,6 +2191,67 @@ button.count[aria-expanded='true'] {
     font-size: 13px;
     color: var(--secondary);
     font-variant-numeric: lining-nums tabular-nums;
+  }
+  /* The path and its toggle, on the head's line (DESIGN.md, Layout). Above the rail, which starts under
+     them, so the rail never covers its own toggle. */
+  .head-path {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .rail-toggle {
+    margin-top: 1.5px;
+  }
+  /* Contents on a book's page. It stands in the head, under the path, and starts under the head's line. */
+  .contents-rail {
+    z-index: 0;
+    padding: 76px 12px 24px 20px;
+  }
+  .contents-rail[data-folded] {
+    visibility: hidden;
+    transform: translateX(-100%);
+  }
+  .rail-line {
+    flex: none;
+    margin: 0 0 20px;
+    font-size: 13px;
+    color: var(--secondary);
+  }
+  /* One line, 36px tall, as the library's places; 4px apart, so two tints never touch. */
+  .contents-rail .contents-list {
+    gap: 4px;
+    width: 296px;
+  }
+  .contents-rail .contents-row {
+    align-items: center;
+    gap: 12px;
+    height: 36px;
+    padding: 0 12px;
+    border-radius: 18px;
+    line-height: normal;
+    color: var(--text);
+  }
+  .contents-rail .contents-row:hover,
+  .contents-rail .contents-row[aria-current='true'] {
+    color: var(--title);
+  }
+  .contents-rail .contents-title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  /* Under the chapters, on the rail's line; it stays in reach while a long list scrolls. */
+  .contents-rail .new-chapter {
+    flex: none;
+    align-self: flex-start;
+    margin-top: 8px;
+    font-size: 15px;
+    line-height: normal;
+  }
+  .contents-rail .new-chapter-mark {
+    margin-right: 0.25em;
   }
   /* Write's menu drops under it, right-aligned to it, never over it. */
   .write-menu-anchor {

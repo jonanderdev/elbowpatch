@@ -1,10 +1,8 @@
 import { expect, type Page, test } from '@playwright/test'
 import { saved, write } from './helpers'
 
-// + New chapter (#60), from the phone's Contents. On desktop it stands in the rail, which comes with #57.
-test.beforeEach(({ page }) => {
-  test.skip(page.viewportSize()!.width >= 700, 'on desktop Contents is the rail')
-})
+// + New chapter (#60): at the foot of the phone's sheet, and under the chapters in the desktop's rail.
+const onDesktop = (page: Page) => page.viewportSize()!.width >= 700
 
 const TWO = '# One\n\nFirst chapter.\n\n# Two\n\nSecond.\n'
 const PARAGRAPH =
@@ -26,11 +24,18 @@ async function importBook(page: Page, markdown: string) {
   await expect(page.locator('.book-title')).toHaveText('harbour')
 }
 
-const contents = (page: Page) => page.getByRole('dialog', { name: 'Contents' })
+const contents = (page: Page) => (onDesktop(page) ? page.getByRole('navigation', { name: 'Contents' }) : page.getByRole('dialog', { name: 'Contents' }))
 const titles = (page: Page) => contents(page).locator('.contents-title')
+const head = (page: Page) => page.locator('.running-control, .running-head')
 const newChapterLink = (page: Page) => contents(page).getByRole('button', { name: '+ New chapter' })
 
+/** Closes the phone's sheet; the rail stays. */
+async function closeContents(page: Page) {
+  if (!onDesktop(page)) await contents(page).getByRole('button', { name: 'Done' }).click()
+}
+
 async function openContents(page: Page) {
+  if (onDesktop(page)) return expect(contents(page)).toBeVisible()
   // After Done the tools are still open.
   if (await page.locator('.page-button').isVisible()) await page.locator('.page-button').click()
   await page.locator('.tools .count').click()
@@ -78,7 +83,7 @@ const storedBook = (page: Page) =>
             db.close()
             const piece = pieces.result[0] ?? { sections: [] }
             const ids = new Map<string, string>(piece.sections.map((s: { sectionId: string; title: string }) => [s.sectionId, s.title]))
-            const counted = [...Object.keys(piece.words ?? {}), ...Object.keys(piece.pages?.phone ?? {})]
+            const counted = [...Object.keys(piece.words ?? {}), ...Object.values(piece.pages ?? {}).flatMap((counts) => Object.keys(counts as object))]
             done({
               titles: [...ids.values()],
               strayCounts: counted.filter((id) => !ids.has(id)),
@@ -93,7 +98,8 @@ const storedBook = (page: Page) =>
       }),
   )
 
-test('+ New chapter stands at the foot of Contents, left of Done, in the title colour', async ({ page }) => {
+test('+ New chapter stands at the foot of the sheet, left of Done, in the title colour', async ({ page }) => {
+  test.skip(onDesktop(page), 'the sheet is on a phone')
   await importBook(page, TWO)
   await openContents(page)
   const link = await newChapterLink(page).boundingBox()
@@ -104,15 +110,26 @@ test('+ New chapter stands at the foot of Contents, left of Done, in the title c
   expect(await newChapterLink(page).evaluate(colour)).toBe(await titles(page).first().evaluate(colour))
 })
 
+test('+ New chapter stands under the chapters in the rail, on its line, and stays in reach of a long list', async ({ page }) => {
+  test.skip(!onDesktop(page), 'the rail is on desktop')
+  await importBook(page, Array.from({ length: 40 }, (_, i) => `# Chapter ${i + 1}\n\nWords.`).join('\n\n'))
+  const link = (await newChapterLink(page).boundingBox())!
+  const line = (await contents(page).locator('.rail-line').boundingBox())!
+  const list = (await contents(page).locator('.contents-list').boundingBox())!
+  expect(link.x).toBe(line.x)
+  expect(link.y).toBeGreaterThanOrEqual(list.y + list.height)
+  await expect(newChapterLink(page)).toBeInViewport({ ratio: 1 })
+})
+
 test('it adds a chapter at the end: the caret in its title, Return on to the text, both placeholders showing', async ({ page }) => {
   await importBook(page, TWO)
   await newChapter(page)
-  await expect(contents(page)).toHaveCount(0)
+  if (!onDesktop(page)) await expect(contents(page)).toHaveCount(0)
   await expect(page.locator('.title')).toHaveAttribute('data-placeholder', 'Chapter title')
   await expect(page.locator('.title')).toHaveAttribute('data-empty', '')
   await expect(page.locator('.body [data-placeholder="Begin anywhere."]')).toBeVisible()
   await expect(page.locator('.title')).toBeInViewport()
-  await expect(page.locator('.running-control')).toHaveCount(0)
+  await expect(head(page)).toHaveCount(0)
 
   await page.keyboard.type('Three')
   await page.keyboard.press('Enter')
@@ -134,7 +151,7 @@ test('Contents lists the chapter while it is a draft, and its title as it is typ
   await openContents(page)
   await expect(titles(page)).toHaveText(['One', 'Two', 'Untitled'])
   await expect(contents(page).locator('[aria-current="true"] .contents-title')).toHaveText('Untitled')
-  await contents(page).getByRole('button', { name: 'Done' }).click()
+  await closeContents(page)
 
   await page.locator('.title').click()
   await page.keyboard.type('Thr')
@@ -151,7 +168,7 @@ test('a chapter left empty is gone, and leaves nothing behind', async ({ page })
 
   await openContents(page)
   await expect(titles(page)).toHaveText(['One', 'Two'])
-  await contents(page).getByRole('button', { name: 'Done' }).click()
+  await closeContents(page)
   await expect.poll(() => storedBook(page)).toMatchObject({ titles: ['One', 'Two'], strayCounts: [], working: before.working })
   // Leaving took the book's first moment: no outline ever had the empty chapter.
   expect((await storedBook(page)).outlines.every((o) => o.length === 2)).toBe(true)
@@ -190,8 +207,8 @@ test('a chapter with only a title stays, with its page counted, and the next mom
   await expect.poll(async () => (await storedBook(page)).outlines.at(-1)).toEqual(['One', 'Two', 'Outline only'])
   await openContents(page)
   await expect(titles(page)).toHaveText(['One', 'Two', 'Outline only'])
-  await expect(contents(page).locator('.sheet-aside')).toBeVisible()
-  await contents(page).getByRole('button', { name: 'Done' }).click()
+  await expect(contents(page).locator('.contents-pages')).toBeVisible()
+  await closeContents(page)
   await goTo(page, 'Outline only')
 })
 
@@ -210,10 +227,10 @@ test('the running head shows from the second page of a new chapter, and not on i
   await page.keyboard.type('Three')
   await page.keyboard.press('Enter')
   await page.keyboard.insertText(long(12))
-  await expect(page.locator('.running-control')).toContainText('Three')
-  await page.locator('.running-control').click()
+  await expect(head(page)).toContainText('Three')
+  if (!onDesktop(page)) await head(page).click()
   await contents(page).locator('.contents-row', { hasText: 'Three' }).click()
-  await expect(page.locator('.running-control')).toHaveCount(0)
+  await expect(head(page)).toHaveCount(0)
   await expect(page.locator('.title')).toBeInViewport()
 })
 
@@ -249,5 +266,4 @@ test('a window that is not writing has no + New chapter, and still reads Content
   await openContents(second)
   await expect(titles(second)).toHaveText(['One', 'Two'])
   await expect(newChapterLink(second)).toHaveCount(0)
-  await expect(contents(second).getByRole('button', { name: 'Done' })).toBeVisible()
 })

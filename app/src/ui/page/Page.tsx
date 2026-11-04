@@ -15,7 +15,7 @@ import { useScrolled } from '../components/useScrolled'
 import { download } from '../files/download'
 import { markdownFile } from '../files/markdownFile'
 import { useSettings } from '../stores/settings'
-import { ContentsSheet, NewChapter, RunningHeadControl } from './Contents'
+import { ContentsRail, ContentsSheet, NewChapter, RailToggle, RunningHeadControl } from './Contents'
 import { fillTitleFields, keptFor, type Opened, type TitleRefs, titleOf } from './fields'
 import { PageFoot, StatusLine } from './PageFoot'
 import { SectionTitle, TitlePage } from './Titles'
@@ -27,6 +27,7 @@ import { useOpenAtPlace } from './useOpenAtPlace'
 import { useOutline } from './useOutline'
 import { usePager } from './usePager'
 import { usePageTurns } from './usePageTurns'
+import { useRail } from './useRail'
 import { useSaving } from './useSaving'
 import { FieldBar, SelectionMenu, useKeyboard, WritingBar } from './Writing'
 
@@ -89,6 +90,9 @@ export function Page({
   const phone = usePhone()
   const book = piece.kind === 'book'
   const live = useOutline(deps, piece, sectionId)
+  const rail = useRail()
+  /** On a book's page, on desktop: Contents is the rail. Essays and journals have none yet. */
+  const railed = book && !phone
   const [tools, setTools] = useState(false)
   const [sheet, setSheet] = useState<'text' | 'export' | 'contents' | null>(null)
   /** Contents was opened by keyboard, so it takes the focus. */
@@ -113,6 +117,7 @@ export function Page({
   const flow = useRef<HTMLDivElement>(null)
   const mount = useRef<HTMLDivElement>(null)
   const pageButton = useRef<HTMLButtonElement>(null)
+  const railToggle = useRef<HTMLButtonElement>(null)
   const head = useRef<HTMLDivElement>(null)
   const writingBar = useRef<HTMLDivElement>(null)
   // A window smaller than the page scrolls, and the page in its scroller with the keyboard up: either
@@ -150,6 +155,7 @@ export function Page({
     keyboard,
     onRelayout: (p) => {
       if (editorNow.current) showCaret(editorNow.current.view, p)
+      rail.laidOut(p.g.side)
     },
   })
 
@@ -263,7 +269,10 @@ export function Page({
       moved.current = true
     },
   })
-  const focus = useFocusOnOpen({ opened, editor, saving, titles, covered, readOnly, titlePage, titleEditable, pageButton })
+  // With no caret to take it: the page button, or on desktop the chapter in the rail, or its toggle.
+  const noCaret = (): HTMLElement | null =>
+    phone ? pageButton.current : (screen.current?.querySelector<HTMLElement>('.contents-rail:not([data-folded]) [aria-current="true"]') ?? railToggle.current)
+  const focus = useFocusOnOpen({ opened, editor, saving, titles, covered, readOnly, titlePage, titleEditable, noCaret })
 
   // A chapter chosen in Contents: the writer's place follows, once the page they left has had its
   // last save, so its place never lands after this one. Once, as the page opens.
@@ -295,6 +304,11 @@ export function Page({
   useEffect(() => {
     editor?.view.setProps({ editable: () => !readOnly })
   }, [editor, readOnly])
+
+  // Always in view, so read as it opens: a window that is not writing is not told of what changes.
+  useEffect(() => {
+    if (railed && rail.open) live.reread()
+  }, [railed, rail.open, live.reread])
 
   // Closing the tools closes what was opened from them; the focus goes back to the page button.
   const closeTools = useCallback((): void => {
@@ -432,14 +446,32 @@ export function Page({
       <div ref={head} className="head" data-scrolled={scrolled || undefined}>
         {/* Pressed, § leaves the caret where it is, so the place kept is the caret's. On desktop the
             piece's name follows it; a phone shows § alone. */}
-        <Path
-          crumbs={[{ word: (piece.kind === 'essay' ? heading : name).trim() || 'Untitled' }]}
-          keepFocus
-          onHome={() => {
-            focus.leaving()
-            onLibrary()
-          }}
-        />
+        <div className="head-path">
+          <Path
+            crumbs={[{ word: (piece.kind === 'essay' ? heading : name).trim() || 'Untitled' }]}
+            keepFocus
+            onHome={() => {
+              focus.leaving()
+              onLibrary()
+            }}
+          />
+          {railed ? <RailToggle open={rail.open} onToggle={rail.toggle} buttonRef={railToggle} /> : null}
+        </div>
+        {/* In the head, so the toggle's next stop is what it opens, then the tools. */}
+        {railed ? (
+          <ContentsRail
+            {...contents(live.outline, 'desktop', pager ? { sectionId, title: heading, pages: count } : undefined)}
+            current={sectionId}
+            open={rail.open}
+            onOpen={openChapter}
+            onLeave={() => {
+              rail.letGo()
+              railToggle.current?.focus()
+            }}
+          >
+            {newChapter}
+          </ContentsRail>
+        ) : null}
         {page <= (titlePage ? 1 : 0) ? null : book && phone ? (
           <RunningHeadControl title={heading} open={sheet === 'contents'} onOpen={openContents} />
         ) : (
