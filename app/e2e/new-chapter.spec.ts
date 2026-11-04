@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-import { saved } from './helpers'
+import { saved, write } from './helpers'
 
 // + New chapter (#60), from the phone's Contents. On desktop it stands in the rail, which comes with #57.
 test.beforeEach(({ page }) => {
@@ -76,7 +76,7 @@ const storedBook = (page: Page) =>
           const outlines = tx.objectStore('outlines').getAll()
           tx.oncomplete = () => {
             db.close()
-            const piece = pieces.result[0]
+            const piece = pieces.result[0] ?? { sections: [] }
             const ids = new Map<string, string>(piece.sections.map((s: { sectionId: string; title: string }) => [s.sectionId, s.title]))
             const counted = [...Object.keys(piece.words ?? {}), ...Object.keys(piece.pages?.phone ?? {})]
             done({
@@ -215,6 +215,30 @@ test('the running head shows from the second page of a new chapter, and not on i
   await contents(page).locator('.contents-row', { hasText: 'Three' }).click()
   await expect(page.locator('.running-control')).toHaveCount(0)
   await expect(page.locator('.title')).toBeInViewport()
+})
+
+test('in a book with nothing stored yet it opens too; left empty, nothing is stored, and the first chapter can be reached', async ({ page }) => {
+  await page.goto('./')
+  await write(page, 'Book')
+  await expect(page.locator('.book-title')).toBeFocused()
+  await newChapter(page)
+  await newChapter(page)
+  await openContents(page)
+  await expect(titles(page)).toHaveText(['Untitled', 'Untitled'])
+  await contents(page).locator('.contents-row').first().click()
+  await expect(page.locator('.book-title')).toBeVisible()
+  await page.locator('.head .home').click()
+  await expect(page.locator('.row')).toHaveCount(0)
+})
+
+test('in a book with nothing stored yet, a second chapter written in keeps the book at two chapters', async ({ page }) => {
+  await page.goto('./')
+  await write(page, 'Book')
+  await expect(page.locator('.book-title')).toBeFocused()
+  await newChapter(page)
+  await newChapter(page)
+  await page.keyboard.type('Second')
+  await expect.poll(async () => (await storedBook(page)).titles).toEqual(['', 'Second'])
 })
 
 test('a window that is not writing has no + New chapter, and still reads Contents', async ({ page, context }) => {

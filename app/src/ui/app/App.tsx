@@ -31,6 +31,11 @@ const AREAS: Record<string, Area> = {
   '/settings/about': 'about',
 }
 
+/** A book with nothing stored yet: its first chapter is all it has, and a chapter left empty in the draft goes. */
+function neverStored(draft: Piece): Piece {
+  return { ...draft, sections: draft.sections.slice(0, 1) }
+}
+
 export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElement | null {
   const [route, go] = useRoute()
   const [ready, setReady] = useState(false)
@@ -130,21 +135,23 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
   // Another section of the open piece. The lock is the piece's, so it stays. The last chapter chosen
   // wins, should the writer choose again while a save runs.
   const chosen = useRef(0)
-  const openSection = async (pieceId: string, sectionId: string, writing: boolean): Promise<void> => {
+  const openSection = async (draft: Piece, sectionId: string, writing: boolean): Promise<void> => {
     const turn = ++chosen.current
     await saveFirst()
-    const next = await open(pieceId, sectionId).catch(() => null)
-    if (next && turn === chosen.current) setOpened({ ...next, at: 'opening', writing })
+    const next = await open(draft.id, sectionId).catch(() => undefined)
+    if (next === undefined || turn !== chosen.current) return
+    const there = next ?? { piece: neverStored(draft), sectionId, content: '', readAt: ++reads }
+    setOpened({ ...there, at: 'opening', writing })
   }
 
   // A new chapter at the end of the book, read from what is stored once the section left is saved.
   // It is a draft: it joins the piece with its first words or title, so one left empty is gone.
-  const newChapter = async (pieceId: string): Promise<void> => {
+  const newChapter = async (draft: Piece): Promise<void> => {
     const turn = ++chosen.current
     await saveFirst()
-    const next = await open(pieceId).catch(() => null)
-    if (!next || turn !== chosen.current) return
-    const { piece, sectionId } = withChapter(deps, next.piece)
+    const next = await open(draft.id).catch(() => undefined)
+    if (next === undefined || turn !== chosen.current) return
+    const { piece, sectionId } = withChapter(deps, next?.piece ?? neverStored(draft))
     setOpened({ piece, sectionId, content: '', fresh: true, readAt: ++reads })
   }
 
@@ -191,8 +198,8 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
             await refresh().catch(() => {})
             go('/')
           }}
-          onOpenSection={(sectionId, writing) => void openSection(opened.piece.id, sectionId, writing)}
-          onNewChapter={() => void newChapter(opened.piece.id)}
+          onOpenSection={(sectionId, writing) => void openSection(opened.piece, sectionId, writing)}
+          onNewChapter={() => void newChapter(opened.piece)}
           onChange={(piece) => {
             askToPersist()
             setPieces((all) => {

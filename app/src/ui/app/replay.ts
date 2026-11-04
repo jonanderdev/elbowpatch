@@ -11,7 +11,11 @@ import { unsaved } from '../stores/unsaved'
  */
 export async function replayJournal(deps: Deps, lock: WriterLock): Promise<void> {
   for (const u of unsaved.all()) {
-    const stored = await deps.store.transaction(async (tx) => ({ working: await tx.working(u.sectionId), piece: await tx.piece(u.pieceId) }))
+    const stored = await deps.store.transaction(async (tx) => ({
+      working: await tx.working(u.sectionId),
+      piece: await tx.piece(u.pieceId),
+      versions: await tx.versionsOf(u.sectionId),
+    }))
     const sameText = stored.working?.content === u.markdown
     const sameTitle =
       (u.title === null || titleIn(stored.piece, u.sectionId) === u.title) &&
@@ -27,10 +31,11 @@ export async function replayJournal(deps: Deps, lock: WriterLock): Promise<void>
     try {
       // The journal's piece is only a draft: write() keeps what is stored and adds a section it lacks.
       await write(deps, u.piece, u.sectionId, u.markdown)
-      // A title only if it changed here and nothing renamed the piece since. A chapter still a draft
-      // has no other title, and may be stored by this one alone.
+      // A title only if it changed here and nothing renamed the piece since. A chapter never stored
+      // has no other title, and may be stored by this one alone; one that left the book stays out.
       const quiet = !stored.piece || stored.piece.updatedAt <= u.at
-      if (u.title !== null && (quiet || titleIn(stored.piece, u.sectionId) === undefined)) {
+      const neverStored = titleIn(stored.piece, u.sectionId) === undefined && !stored.working && stored.versions.length === 0
+      if (u.title !== null && (quiet || neverStored)) {
         if (u.piece.kind === 'essay') await rename(deps, u.piece, u.title)
         else await renameSection(deps, u.piece, u.sectionId, u.title)
       }
