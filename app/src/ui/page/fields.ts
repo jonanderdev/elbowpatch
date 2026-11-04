@@ -10,9 +10,10 @@ import { type FieldHistory, fieldHistory } from './fieldHistory'
 
 /**
  * Where a section opens when the writer goes to it: its opening page, from Contents; its opening
- * page turned on to, which takes the caret along as any turn does; or its last page, turned back to.
+ * page turned on to, which takes the caret along as any turn does; its last page, turned back to; or
+ * the join, where undo has just put the next chapter back onto its end.
  */
-export type OpenAt = 'opening' | 'turned-on' | 'last'
+export type OpenAt = 'opening' | 'turned-on' | 'last' | 'join'
 
 /** A section of a piece, open on the page. */
 export interface Opened {
@@ -107,18 +108,20 @@ export function fillField(el: HTMLElement, text: string): void {
 
 /**
  * Takes a field a step back or on, and leaves the caret at its end. The change goes through the
- * field's own input, so the page sees and saves it as if it were typed.
+ * field's own input, so the page sees and saves it as if it were typed. False with no step left.
  */
-export function stepField(el: HTMLElement, way: 'undo' | 'redo'): void {
+export function stepField(el: HTMLElement, way: 'undo' | 'redo'): boolean {
   const text = histories.get(el)?.[way]()
-  if (text === null || text === undefined) return
+  if (text === null || text === undefined) return false
   fillField(el, text)
   caretToFieldEnd(el)
+  return true
 }
 
 /** ⌘/Ctrl + Z and ⌘/Ctrl + Shift + Z in a field, as in the text. ⌘/Ctrl + Alt + Z is the Time Machine's. */
-export function fieldUndoKeys(e: KeyboardEvent): void {
+export function fieldUndoKeys(e: KeyboardEvent, onUndoPast?: () => void): void {
   if (!(e.metaKey || e.ctrlKey) || e.altKey || e.key.toLowerCase() !== 'z') return
   e.preventDefault()
-  stepField(e.currentTarget as HTMLElement, e.shiftKey ? 'redo' : 'undo')
+  const stepped = stepField(e.currentTarget as HTMLElement, e.shiftKey ? 'redo' : 'undo')
+  if (!stepped && !e.shiftKey) onUndoPast?.()
 }

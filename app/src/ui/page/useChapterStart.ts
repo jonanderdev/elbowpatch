@@ -3,6 +3,7 @@ import type { Piece } from '../../domain/model'
 import { type Deps, startChapterAt } from '../../domain/pieces'
 import type { Editor } from '../../page/editor'
 import { type Halves, halvesAt, halvesAtLine } from '../../page/split'
+import { rememberSplit } from '../../page/undoMemory'
 import { caretToFieldEnd, fillField } from './fields'
 import type { Saving } from './saving'
 import { raiseKeyboard } from './useFocusOnOpen'
@@ -53,6 +54,7 @@ export function useChapterStart({ deps, pieceId, sectionId, writes, editor, savi
       return piece
     })
     if (done && piece) {
+      rememberSplit(newSectionId, { into: sectionId, after: halves.after, seam: halves.seam })
       onStarted(piece, newSectionId, halves.after)
       return
     }

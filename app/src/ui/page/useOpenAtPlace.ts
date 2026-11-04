@@ -9,7 +9,8 @@ import type { Opened } from './fields'
  * Opens the section at the writer's place (DESIGN.md, Behaviour), before the first paint, so it
  * never shows a frame of page 1 first; again once the fonts are in, since they move the breaks.
  * A chapter chosen in Contents opens at its opening page instead; one turned to, at the page next to
- * the chapter left, with the caret at the end of its text, as any turn leaves it.
+ * the chapter left, with the caret at the end of its text, as any turn leaves it. One that took a
+ * chapter back opens at the join, which its stored place holds.
  */
 export function useOpenAtPlace(editor: Editor | null, pager: Pager | null, opened: Opened): void {
   // Once, when the editor and the pager exist; the page is remounted for each section.
@@ -17,7 +18,16 @@ export function useOpenAtPlace(editor: Editor | null, pager: Pager | null, opene
   useLayoutEffect(() => {
     if (!editor || !pager) return
     const { place } = opened.piece
-    if (opened.at === 'last') toLastPage(editor.view, pager)
+    // Not a turn: nothing says it.
+    const show = (): void => {
+      pager.opening = true
+      showCaret(editor.view, pager, true)
+      pager.opening = false
+    }
+    if (opened.at === 'join') {
+      restorePlace(editor.view, place, opened.sectionId)
+      show()
+    } else if (opened.at === 'last') toLastPage(editor.view, pager)
     else if (opened.at) {
       toOpeningPage(editor.view, pager)
       if (opened.at === 'turned-on') caretToEnd(editor.view, pager.viewport)
@@ -27,7 +37,7 @@ export function useOpenAtPlace(editor: Editor | null, pager: Pager | null, opene
       showCaret(editor.view, pager, true)
     }
     let alive = true
-    void document.fonts.ready.then(() => alive && showCaret(editor.view, pager, true))
+    void document.fonts.ready.then(() => alive && show())
     return () => {
       alive = false
     }

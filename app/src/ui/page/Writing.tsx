@@ -134,8 +134,26 @@ export function WritingBar({
 }
 
 /** The bar in a title field, which takes no formatting. */
-export function FieldBar({ field, barRef }: { field: HTMLElement; barRef: RefObject<HTMLDivElement | null> }): ReactElement {
-  return <KeyboardBar onUndo={() => stepField(field, 'undo')} onRedo={() => stepField(field, 'redo')} onHide={() => field.blur()} barRef={barRef} />
+export function FieldBar({
+  field,
+  barRef,
+  onUndoPast,
+}: {
+  field: HTMLElement
+  barRef: RefObject<HTMLDivElement | null>
+  /** Undo with no step left in the field. */
+  onUndoPast(): void
+}): ReactElement {
+  return (
+    <KeyboardBar
+      onUndo={() => {
+        if (!stepField(field, 'undo')) onUndoPast()
+      }}
+      onRedo={() => stepField(field, 'redo')}
+      onHide={() => field.blur()}
+      barRef={barRef}
+    />
+  )
 }
 
 /** The tallest the visible height has been at this width. Outlives a page: a chapter can open with the keyboard up. */
