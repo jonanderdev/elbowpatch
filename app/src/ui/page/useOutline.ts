@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { Piece } from '../../domain/model'
 import { type Deps, withDraft } from '../../domain/pieces'
 
@@ -11,8 +11,11 @@ export interface LiveOutline {
   reread(): void
 }
 
-/** The open piece's outline as it stands now, for Contents: the piece the page opened with is only a snapshot. */
-export function useOutline(deps: Deps, piece: Piece, sectionId: string): LiveOutline {
+/**
+ * The open piece's outline as it stands now, for Contents and the book's numbers: the piece the page opened
+ * with is only a snapshot. `counted` changes when a chapter's count was measured or forgotten.
+ */
+export function useOutline(deps: Deps, piece: Piece, sectionId: string, counted: number): LiveOutline {
   const [last, stored] = useState(piece)
   const reread = useCallback(() => {
     void deps.store
@@ -22,5 +25,8 @@ export function useOutline(deps: Deps, piece: Piece, sectionId: string): LiveOut
       })
       .catch(() => {})
   }, [deps, piece.id])
+  // Counts kept or forgotten from outside the page.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `counted` is the trigger.
+  useEffect(reread, [reread, counted])
   return { outline: withDraft(last, piece, sectionId), stored, reread }
 }

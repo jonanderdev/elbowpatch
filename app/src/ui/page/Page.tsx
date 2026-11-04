@@ -2,7 +2,7 @@ import { TextSelection } from 'prosemirror-state'
 import { type CSSProperties, type ReactElement, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { countWords } from '../../domain/markdown'
 import type { Piece } from '../../domain/model'
-import { contents, type Deps, savePages } from '../../domain/pieces'
+import { type BookCount, bookCount, contents, type Deps, savePages } from '../../domain/pieces'
 import { scrollToCaret, showCaret, toOpeningPage } from '../../page/caret'
 import { type Editor, selectionBox } from '../../page/editor'
 import { screenOf } from '../../page/pager'
@@ -19,7 +19,7 @@ import { ContentsRail, ContentsSheet, NewChapter, RailToggle, RunningHeadControl
 import { fillTitleFields, keptFor, type OpenAt, type Opened, type TitleRefs, titleOf } from './fields'
 import { PageFoot, StatusLine } from './PageFoot'
 import { SectionTitle, TitlePage } from './Titles'
-import { HeadTools, TextSettings } from './Tools'
+import { HeadTools, pageLine, TextSettings } from './Tools'
 import { useCaretFollowing, useCaretKeys } from './useCaret'
 import { useChapterStart } from './useChapterStart'
 import { useEditor } from './useEditor'
@@ -46,6 +46,8 @@ interface Props {
   closingRef: { current: Promise<void> }
   /** The library shows over the page; the page stays laid out behind it, inert. */
   covered: boolean
+  /** Changes when a chapter's page count was measured or forgotten, away from this page. */
+  counted: number
   onLibrary(): void
   /** Opens another section of this piece, once this one is saved. `writing`: the caret goes with the writer. */
   onOpenSection(sectionId: string, writing: boolean, at: OpenAt): void
@@ -74,6 +76,7 @@ export function Page({
   flushRef,
   closingRef,
   covered,
+  counted,
   onLibrary,
   onOpenSection,
   onNewChapter,
@@ -93,7 +96,7 @@ export function Page({
   const keyboard = useKeyboard()
   const phone = usePhone()
   const book = piece.kind === 'book'
-  const live = useOutline(deps, piece, sectionId)
+  const live = useOutline(deps, piece, sectionId, counted)
   const rail = useRail()
   /** On a book's page, on desktop: Contents is the rail. Essays and journals have none yet. */
   const railed = book && !phone
@@ -149,6 +152,12 @@ export function Page({
     if (titles.bookTitle.current) setName(titles.bookTitle.current.textContent ?? '')
   }, [openedFirst, titles.title, titles.bookTitle, titles.subtitle])
 
+  // The numbers beside the page, at a page of this section: a book's are the whole book's.
+  function numbers(at: number, total: number): BookCount {
+    if (!book) return { page: at + 1, pages: total, words }
+    return bookCount(live.outline, phone ? 'phone' : 'desktop', { sectionId, title: heading, pages: total, words }, at)
+  }
+
   const { pager, page, count, announcement } = usePager({
     screen,
     viewport,
@@ -160,6 +169,10 @@ export function Page({
     onRelayout: (p) => {
       if (editorNow.current) showCaret(editorNow.current.view, p)
       rail.laidOut(p.g.side)
+    },
+    say: (at, total) => {
+      const { page: n, pages } = numbers(at, total)
+      return pageLine(n, pages) || 'Page turned'
     },
   })
 
@@ -192,6 +205,8 @@ export function Page({
     if (readOnly || !pager || !screen.current) return
     void savePages(deps, piece.id, screenOf(screen.current.clientWidth), sectionId, count).catch(() => {})
   }, [deps, piece.id, sectionId, count, pager, readOnly])
+
+  const shown = numbers(page, count)
 
   const caretKeys = useCaretKeys(pager, flow)
   const editor = useEditor(mount, content, piece.lang, {
@@ -514,9 +529,9 @@ export function Page({
           <div className="running-head">{heading}</div>
         )}
         <HeadTools
-          page={page + 1}
-          count={count}
-          words={words}
+          page={shown.page}
+          count={shown.pages}
+          words={shown.words}
           sheet={anchor && sheet !== 'contents' ? sheet : null}
           onTextSettings={(from) => openSheet('text', from)}
           onExport={(from) => openSheet('export', from)}
@@ -578,9 +593,9 @@ export function Page({
       ) : null}
 
       <PageFoot
-        page={page}
-        count={count}
-        words={words}
+        page={shown.page}
+        count={shown.pages}
+        words={shown.words}
         journal={piece.kind === 'journal'}
         titlePage={titlePage && page === 0}
         tools={tools}

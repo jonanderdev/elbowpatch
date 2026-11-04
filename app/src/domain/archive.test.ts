@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { memoryStore } from '../adapters/memory-store'
 import { exportAll, FORMAT_VERSION, guessKind, importArchive, importMarkdown, readDay } from './archive'
-import { newPiece, openPiece, putAway, rename, renameSection, savePages, startChapterAt, takeMoment, withChapter, withDay, write } from './pieces'
+import { newPiece, openPiece, putAway, rename, renameSection, savePages, startChapterAt, takeMoment, totalWords, withChapter, withDay, write } from './pieces'
 import type { Store } from './ports'
 
 function setup(start = Date.UTC(2026, 9, 1)) {
@@ -172,7 +172,7 @@ describe('export and import', () => {
     expect(titles).toHaveLength(2)
   })
 
-  it("a copy keeps its chapters' page counts under its own ids", async () => {
+  it('a book arrives with no page counts: they belong to the screen and the text settings it left', async () => {
     const a = setup()
     const book = newPiece(a, 'book', 'en')
     const chapter = book.sections[0]!.sectionId
@@ -182,7 +182,13 @@ describe('export and import', () => {
     await write(a, book, chapter, 'Changed since the export.')
     await importArchive(a, files)
     const copy = (await a.store.transaction((tx) => tx.pieces())).find((p) => p.copyOf)!
-    expect(copy.pages).toEqual({ desktop: { [copy.sections[0]!.sectionId]: 7 } })
+    expect(copy.pages).toBeUndefined()
+  })
+
+  it('an imported Markdown book knows its words, chapter by chapter', async () => {
+    const a = setup()
+    const piece = await importMarkdown(a, 'harbour.md', '# One\n\nThree small words.\n\n# Two\n\nTwo more.\n', 'book', 'en')
+    expect(totalWords((await a.store.transaction((tx) => tx.piece(piece.id)))!)).toBe(5)
   })
 
   it('the same export imported twice adds one copy, not two', async () => {
