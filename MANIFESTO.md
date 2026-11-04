@@ -13,7 +13,7 @@ You sit down, the page is there, and the words that end up on it are the ones yo
 
 **Calm is a feature.** One column, good type, nothing else on screen. Everything else waits until you ask for it and leaves when you are done.
 
-**Never lose a word.** Saving is not your job. Every moment is kept, and going back never throws anything away, so you can try, cut and rewrite without fear.
+**Never lose a word.** Saving is not your job. Your latest words are always safe, you can always go back, and older moments thin out with age. Going back never throws anything away, so you can try, cut and rewrite without fear.
 
 **Your words are yours.** They live on your device, in plain Markdown, and leave only for a place you connect yourself. You can take everything with you, in one click, at any time.
 

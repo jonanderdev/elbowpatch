@@ -1,14 +1,14 @@
 <div align="center">
   <p><img src="docs/brand/logo.svg" alt="Elbowpatch" width="200"></p>
   <p><strong>Elbowpatch</strong></p>
-  <p><strong>A quiet place to write, with a memory. <br/> Local-first and private: your words stay with you, and every draft is kept safe.</strong></p>
+  <p><strong>A quiet place to write, with a memory. <br/> Local-first and private: your words stay with you, and you never lose one.</strong></p>
 </div>
 
 ***
 
 Elbowpatch is a writing app for journals, essays and books.  
 It opens on one page and nothing else, like a book you are writing in.  
-Behind that page it quietly remembers every moment of your writing, so you can walk back through it and bring back anything you lost, with no save button and no version control to learn.
+Behind that page it quietly remembers your writing as it grows, so you can walk back through it and bring back anything you lost, with no save button and no version control to learn.
 
 It runs in the browser, installs on phone, tablet or desktop, and works offline.  
 Your writing stays on your device as plain Markdown and goes nowhere unless you choose a place to keep a copy.
@@ -21,7 +21,7 @@ A writing tool you want to open every day, that never loses a word, and that lea
 Other apps get one or two of these right. Elbowpatch tries to do all of them in one small app:
 
 - **A quiet page.** One column, good type, pages that fill and turn like a book. Tools stay hidden until you ask for them.
-- **A history you can walk through.** Every moment is kept automatically. Look back, bring a chapter or a day back, keep a copy to try something different. Nothing is ever deleted.
+- **A history you can walk through.** Moments are kept automatically, and older ones thin out with age. Look back, bring a chapter or a day back, keep a copy to try something different. Going back never throws anything away.
 - **Your own files.** Plain Markdown, all of it exportable in one click. Sync, when it comes, goes only to a place you connect.
 - **Everywhere, free forever.** An installable web app with no server of its own, so anyone can host it. No subscription, now or later.
 - **Your own words.** No AI writing for you. A calm place to be creative on your own.
