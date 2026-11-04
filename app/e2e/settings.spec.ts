@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
+import manifest from '../package.json' with { type: 'json' }
 import { openTools, saved, write } from './helpers'
 
 async function essay(page: Page, title: string, text: string) {
@@ -217,6 +218,16 @@ test('About & privacy says what it promises, and only what is true here', async 
   await expect(page.getByText('Elbowpatch is provided as-is, with no warranty. Keep a copy of what matters:')).toBeVisible()
   await page.getByRole('link', { name: 'Export & import' }).click()
   await expect(page.getByRole('heading', { name: 'Export & import', level: 1 })).toBeVisible()
+})
+
+test('Settings shows the version in full, and About & privacy shows the same', async ({ page }) => {
+  await page.goto('./#/settings')
+  await expect(page.locator('.row-title')).toHaveText(['Export & import', 'Put away', 'About & privacy', 'Help'])
+  const row = page.getByRole('button', { name: /^About & privacy/ })
+  await expect(row).toContainText(`Version ${manifest.version}`)
+  await row.click()
+  await expect(page.getByRole('heading', { name: 'About & privacy', level: 1 })).toBeFocused()
+  await expect(page.getByRole('definition').filter({ hasText: manifest.version })).toBeVisible()
 })
 
 test('in Safari on an iPhone, Show me how lands on the Home Screen steps', async ({ browser }) => {

@@ -3,6 +3,7 @@ import type { Piece } from '../../domain/model'
 import type { Deps } from '../../domain/pieces'
 import { longDate, number } from '../../domain/words'
 import { Path } from '../components/Path'
+import { VERSION } from '../components/project'
 import { useScrolled } from '../components/useScrolled'
 import { lastExport } from '../files/everything'
 import { About } from './About'
@@ -86,6 +87,12 @@ function List({ pieces, go }: Pick<Props, 'pieces' | 'go'>) {
           <span className="row-meta">
             {away.length === 0 ? 'Nothing put away' : `${number(away.length)} ${away.length === 1 ? 'piece' : 'pieces'} · the next goes ${goesIn(away[0]!)}`}
           </span>
+        </button>
+      </li>
+      <li>
+        <button type="button" className="row" onClick={() => go('/settings/about')}>
+          <span className="row-title">About &amp; privacy</span>
+          <span className="row-meta">Version {VERSION}</span>
         </button>
       </li>
       <li>

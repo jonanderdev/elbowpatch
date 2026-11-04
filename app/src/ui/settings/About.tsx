@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react'
+import { VERSION } from '../components/project'
 import { Part } from './parts'
 
 // About & privacy (DESIGN.md, Settings; docs/decisions/0014): the promises, inside the app so it works offline.
@@ -27,6 +28,12 @@ export function About(): ReactElement {
       <Part heading="The project">
         <p>Open source under the MIT License. The main copy runs on a best-effort basis, and anyone can host their own.</p>
       </Part>
+      <dl className="key-rows about-rows">
+        <div>
+          <dt>Version</dt>
+          <dd>{VERSION}</dd>
+        </div>
+      </dl>
       <p className="settings-note">Set in Literata by TypeTogether and EB Garamond by Georg Duffner, both under the SIL Open Font License.</p>
     </>
   )

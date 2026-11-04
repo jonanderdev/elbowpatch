@@ -1,6 +1,7 @@
 /// <reference types="vitest/config" />
 import { defineConfig, loadEnv, type Plugin, type UserConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import manifest from './package.json' with { type: 'json' }
 
 // A link preview needs full addresses, which a build for any host cannot know: they come from
 // SITE_URL, or from URL, which Netlify sets. With neither, a link shows no picture (docs/decisions/0016).
@@ -31,6 +32,8 @@ function linkPreview(): Plugin {
 const config: UserConfig = defineConfig({
   // Relative paths, so any static host works, in a subfolder too.
   base: './',
+  // Only the version enters the bundle, never the manifest.
+  define: { __APP_VERSION__: JSON.stringify(manifest.version) },
   plugins: [
     linkPreview(),
     VitePWA({

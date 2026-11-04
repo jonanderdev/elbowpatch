@@ -1576,26 +1576,46 @@ button {
     display: block;
   }
 }
-.help-keys dl {
+/* A word and its value at the right: Help's keys, About & privacy's rows. */
+.key-rows {
   margin: 0;
 }
-.help-keys dl div {
+.key-rows div {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: 16px;
   padding: 9px 0;
 }
-.help-keys dt {
+.key-rows dt {
   font-size: 15px;
   line-height: 1.4;
   color: var(--text);
 }
-.help-keys dd {
+.key-rows dd {
   margin: 0;
   font-size: 13px;
   line-height: 1.6;
   color: var(--secondary);
+}
+/* Closer to the last part than parts are to each other (Figma, About & privacy). */
+.about-rows {
+  margin-top: -8px;
+}
+.about-rows div {
+  padding: 9px 12px;
+}
+.about-rows dt {
+  color: var(--title);
+}
+.about-rows + .settings-note {
+  padding-top: 27px;
+}
+@media (max-width: 699px) {
+  .about-rows div {
+    align-items: center;
+    min-height: 44px;
+  }
 }
 .area-rows {
   display: flex;
