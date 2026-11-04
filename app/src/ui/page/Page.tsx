@@ -16,7 +16,7 @@ import { download } from '../files/download'
 import { markdownFile } from '../files/markdownFile'
 import { useSettings } from '../stores/settings'
 import { ContentsSheet, RunningHeadControl } from './Contents'
-import { fillTitleFields, keptFor, type Opened, type TitleRefs, titleOf } from './fields'
+import { fillTitleFields, keptFor, type OpenAt, type Opened, type TitleRefs, titleOf } from './fields'
 import { PageFoot, StatusLine } from './PageFoot'
 import { SectionTitle, TitlePage } from './Titles'
 import { HeadTools, TextSettings } from './Tools'
@@ -30,7 +30,7 @@ import { usePageTurns } from './usePageTurns'
 import { useSaving } from './useSaving'
 import { FieldBar, SelectionMenu, useKeyboard, WritingBar } from './Writing'
 
-export type { Opened } from './fields'
+export type { OpenAt, Opened } from './fields'
 
 interface Props {
   deps: Deps
@@ -46,7 +46,7 @@ interface Props {
   covered: boolean
   onLibrary(): void
   /** Opens another section of this piece, once this one is saved. `writing`: the caret goes with the writer. */
-  onOpenSection(sectionId: string, writing: boolean): void
+  onOpenSection(sectionId: string, writing: boolean, at: OpenAt): void
   onChange(piece: Piece): void
 }
 
@@ -248,6 +248,11 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     onTurn: () => {
       moved.current = true
     },
+    beyond: chapterBeyond,
+    onCross: (dir) => {
+      const next = chapterBeyond(dir)
+      if (next) leaveFor(next, !!editor?.view.hasFocus() || keyboard, dir > 0 ? 'turned-on' : 'last')
+    },
   })
   const focus = useFocusOnOpen({ opened, editor, saving, titles, covered, readOnly, titlePage, titleEditable, pageButton })
 
@@ -322,8 +327,23 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     live.reread()
   }
 
-  // A chapter chosen in Contents opens at its opening page; the words being left are safe in the
-  // journal first, in case the save that follows never ends.
+  // The chapter before or after this one in the book as it stands now.
+  function chapterBeyond(dir: 1 | -1): string | undefined {
+    if (!book) return undefined
+    const { sections } = live.outline
+    const here = sections.findIndex((s) => s.sectionId === sectionId)
+    return here < 0 ? undefined : sections[here + dir]?.sectionId
+  }
+
+  // Going to another chapter: the words being left are safe in the journal first, in case the save
+  // that follows never ends.
+  function leaveFor(chosen: string, writing: boolean, at: OpenAt): void {
+    saving?.journal()
+    if (keyboard) raiseKeyboard()
+    onOpenSection(chosen, writing, at)
+  }
+
+  // A chapter chosen in Contents opens at its opening page.
   function openChapter(chosen: string): void {
     if (!editor || !pager) return
     const writing = editor.view.hasFocus()
@@ -335,9 +355,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
       void saving?.flush()
       return
     }
-    saving?.journal()
-    if (keyboard) raiseKeyboard()
-    onOpenSection(chosen, writing)
+    leaveFor(chosen, writing, 'opening')
   }
 
   // Escape closes what is open, innermost first: a sheet, then the tools. One listener reads what

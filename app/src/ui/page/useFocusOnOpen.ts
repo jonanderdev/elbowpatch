@@ -42,7 +42,7 @@ interface Options {
  * - a new piece: its title (its name on a title page; the text, in a journal);
  * - a piece left while writing, reopened or back from the library: the caret where it was;
  * - a piece left while reading: nowhere, the page opens on their place;
- * - a chapter chosen in Contents: the text, as a turn does; on a phone only if they were writing.
+ * - a chapter chosen in Contents or turned to: the text, as a turn does; on a phone only if they were writing.
  * On a phone the caret waits for a tap, so the keyboard does not cover the page unasked.
  *
  * Going to the library keeps a moment. Returns `leaving()`, for the Library button to call first:

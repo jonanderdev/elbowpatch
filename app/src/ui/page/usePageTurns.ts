@@ -9,8 +9,8 @@ const MARGIN_CLEAR = 80
 /**
  * Turning pages by hand (DESIGN.md, Behaviour): Page Up / Page Down and Alt + ← / → everywhere, a
  * sideways swipe on a phone, a click in the side margins on desktop, where the pointer becomes an
- * arrow while there is a page to go to. Scrolling turns nothing (nothing listens to the wheel). Off while
- * the library covers the page.
+ * arrow while there is a page to go to. Past a chapter's end a turn opens the chapter next to it, by
+ * the same ways. Scrolling turns nothing (nothing listens to the wheel). Off while the library covers the page.
  */
 interface Options {
   screen: RefObject<HTMLDivElement | null>
@@ -23,12 +23,16 @@ interface Options {
   readOnly: boolean
   /** A turn by hand is the writer moving: their place follows. */
   onTurn(): void
+  /** The chapter past this one's end, if any. */
+  beyond(dir: 1 | -1): string | undefined
+  /** A turn past this chapter's end, to the chapter there. */
+  onCross(dir: 1 | -1): void
 }
 
-export function usePageTurns({ screen, viewport, bookTitle, editor, pager, covered, readOnly, onTurn }: Options): void {
+export function usePageTurns({ screen, viewport, bookTitle, editor, pager, covered, readOnly, onTurn, beyond, onCross }: Options): void {
   // Read when a turn happens.
-  const now = useRef({ readOnly, onTurn })
-  now.current = { readOnly, onTurn }
+  const now = useRef({ readOnly, onTurn, beyond, onCross })
+  now.current = { readOnly, onTurn, beyond, onCross }
 
   useEffect(() => {
     const el = screen.current
@@ -40,15 +44,21 @@ export function usePageTurns({ screen, viewport, bookTitle, editor, pager, cover
      * words are added next: always while writing, and on desktop also while reading, so a turn
      * leaves the page ready to type (DESIGN.md, Behaviour). Not taken from the tools or a sheet;
      * on a phone a swipe does not raise the keyboard, and a tap places it. With `extend` (Shift +
-     * Page Up / Down while writing), the selection grows there instead.
+     * Page Up / Down while writing), the selection grows there instead, and stops at the chapter's
+     * end: it never crosses into the next one.
      */
     const turn = (dir: 1 | -1, extend = false): void => {
       now.current.onTurn()
       const from = pager.page
       if (dir > 0) pager.next()
       else pager.previous()
-      // At the first or last page nothing turns, and the caret stays put.
-      if (pager.page === from || now.current.readOnly) return
+      // At a chapter's first or last page the chapter next to it opens, in a window not writing too.
+      // At the book's own ends nothing turns, and the caret stays put.
+      if (pager.page === from) {
+        if (!extend) now.current.onCross(dir)
+        return
+      }
+      if (now.current.readOnly) return
       const view = editor.view
       const writing = view.hasFocus()
       if (!writing && (!matchMedia('(pointer: fine)').matches || document.activeElement?.closest('.sheet, .foot, .head'))) return
