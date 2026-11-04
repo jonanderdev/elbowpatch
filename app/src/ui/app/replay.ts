@@ -6,8 +6,8 @@ import { unsaved } from '../stores/unsaved'
 /**
  * Words the last session could not store before it closed (see page/saving.ts, journal)
  * go into the database first, under the piece's lock (one writer, 0010). An
- * entry already stored is dropped. One older than its section's stored copy
- * was overtaken elsewhere: it is not applied, and waits for Save a copy.
+ * entry already stored is dropped. One no newer than its section's stored copy
+ * was overtaken: it is not applied, and waits for Save a copy.
  */
 export async function replayJournal(deps: Deps, lock: WriterLock): Promise<void> {
   for (const u of unsaved.all()) {
@@ -25,7 +25,7 @@ export async function replayJournal(deps: Deps, lock: WriterLock): Promise<void>
       unsaved.saved(u.sectionId)
       continue
     }
-    if (stored.working && stored.working.updatedAt > u.at) continue
+    if (stored.working && stored.working.updatedAt >= u.at) continue
     const held = await lock.hold(u.pieceId, async () => {})
     if (!held) continue // another window writes it now; the words wait for Save a copy
     try {

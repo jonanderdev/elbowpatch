@@ -52,13 +52,24 @@ export interface Saving {
   journal(): void
   /** The page closes: one last save on what it holds now, then nothing more. */
   close(): Promise<void>
+  /**
+   * Reshapes the section (a chapter starting in it): `reshape` runs on the text the page holds, once
+   * that is stored. From then on this page writes nothing, for the text it holds is no longer the
+   * section's. False, with everything as it was, when the words could not be stored or `reshape` failed.
+   */
+  split(reshape: (whole: string) => Promise<Piece>): Promise<boolean>
 }
+
+/** How long a split waits for the words to be stored before leaving the text as it is. */
+const SPLIT_WAIT = 1500
 
 export function createSaving(o: SavingOptions): Saving {
   const stored: Stored = { ...o.stored }
   let piece = o.piece
   let failed = false
   let closed = false
+  /** A split is running or has run: what the page holds must never be written again. */
+  let sealed = false
   let retry: ReturnType<typeof setTimeout> | undefined
 
   const changed = (h: Held): boolean =>
@@ -80,6 +91,7 @@ export function createSaving(o: SavingOptions): Saving {
   })
 
   async function saveWords(): Promise<void> {
+    if (sealed) return
     const { deps, sectionId } = o
     // Read everything before the first await: the page may close while this runs.
     const since = Date.now()
@@ -136,8 +148,10 @@ export function createSaving(o: SavingOptions): Saving {
 
   async function keepMoment(): Promise<void> {
     await save.flush().catch(() => {})
-    if (failed || o.readOnly()) return
+    if (failed || sealed || o.readOnly()) return
     await takeMoment(o.deps, o.piece.id).catch(() => {})
+    // A split may have started during the moment: the place has gone to the new chapter.
+    if (sealed) return
     const place = o.place()
     if (place) await savePlace(o.deps, o.piece.id, place).catch(() => {})
     const found = await openPiece(o.deps, o.piece.id).catch(() => undefined)
@@ -160,14 +174,14 @@ export function createSaving(o: SavingOptions): Saving {
     flush,
     async keep(): Promise<boolean> {
       await save.flush().catch(() => {})
-      if (failed || o.readOnly()) return false
+      if (failed || sealed || o.readOnly()) return false
       return takeMoment(o.deps, o.piece.id, { kept: true }).then(
         () => true,
         () => false,
       )
     },
     journal(): void {
-      if (closed || o.readOnly()) return
+      if (closed || sealed || o.readOnly()) return
       const held = o.read()
       if (changed(held)) unsaved.keep(entry(held))
     },
@@ -179,6 +193,40 @@ export function createSaving(o: SavingOptions): Saving {
       })
       closed = true
       return last
+    },
+    async split(reshape): Promise<boolean> {
+      if (closed || sealed || o.readOnly()) return false
+      // Text read differently from how it is stored counts as a change too: it is stored first.
+      if (changed(o.read())) save.touch()
+      const stored = await Promise.race([
+        save.flush().then(
+          () => true,
+          () => false,
+        ),
+        new Promise<boolean>((r) => setTimeout(() => r(false), SPLIT_WAIT)),
+      ])
+      const held = o.read()
+      if (!stored || closed || o.readOnly() || changed(held)) return false
+      // No await between the check above and this: nothing can be typed or saved in between.
+      sealed = true
+      clearTimeout(retry)
+      save.cancel()
+      moment.cancel()
+      try {
+        const piece = await reshape(held.markdown)
+        // Whatever the journal held for this section is older than the split, or the same words.
+        unsaved.saved(o.sectionId)
+        o.onStored(piece)
+        // The closing moment. A crash before it is recovered from the working copies.
+        void takeMoment(o.deps, o.piece.id).catch(() => {})
+        return true
+      } catch {
+        sealed = false
+        failed = true
+        o.onFailed(true)
+        retry = setTimeout(() => save.touch(), 5000)
+        return false
+      }
     },
   }
 }
