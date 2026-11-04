@@ -31,6 +31,8 @@ const config: UserConfig = defineConfig({
       workbox: {
         // Every font is precached, so a page in any script opens offline (0011).
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // iOS reads launch images itself; the app never asks for them.
+        globIgnores: ['launch-*.png'],
         navigateFallback: 'index.html',
       },
     }),
