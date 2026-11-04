@@ -1371,7 +1371,7 @@ button {
 .library-lines {
   position: fixed;
   left: calc(var(--frame) + var(--edge));
-  bottom: calc((92px - 44px) / 2);
+  bottom: calc(var(--lift) + (var(--foot) - 44px) / 2);
   max-width: calc(100% - 2 * var(--edge) - 56px);
   display: flex;
   flex-direction: column;
