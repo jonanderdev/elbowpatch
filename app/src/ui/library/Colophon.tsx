@@ -1,6 +1,5 @@
 import type { ReactElement } from 'react'
-
-const SOURCE = 'https://github.com/jonanderdev/elbowpatch'
+import { SOURCE } from '../components/project'
 
 /** Help · About · Source: the library's plain links (DESIGN.md, The colophon). */
 export function FootLinks({ atFoot }: { atFoot?: boolean }): ReactElement {

@@ -1,5 +1,7 @@
 // What the app says about itself.
 
+export const SOURCE = 'https://github.com/jonanderdev/elbowpatch'
+
 /** Set at build time from package.json, so the manifest itself stays out of the bundle (vite.config.ts). */
 declare const __APP_VERSION__: string
 

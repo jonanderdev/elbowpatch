@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import { VERSION } from '../components/project'
+import { SOURCE, VERSION } from '../components/project'
 import { Part } from './parts'
 
 // About & privacy (DESIGN.md, Settings; docs/decisions/0014): the promises, inside the app so it works offline.
@@ -32,6 +32,14 @@ export function About(): ReactElement {
         <div>
           <dt>Version</dt>
           <dd>{VERSION}</dd>
+        </div>
+        <div>
+          <dt>Source</dt>
+          <dd>
+            <a href={SOURCE} target="_blank" rel="noopener noreferrer">
+              GitHub
+            </a>
+          </dd>
         </div>
       </dl>
       <p className="settings-note">Set in Literata by TypeTogether and EB Garamond by Georg Duffner, both under the SIL Open Font License.</p>

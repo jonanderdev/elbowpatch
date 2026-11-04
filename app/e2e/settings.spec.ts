@@ -230,6 +230,17 @@ test('Settings shows the version in full, and About & privacy shows the same', a
   await expect(page.getByRole('definition').filter({ hasText: manifest.version })).toBeVisible()
 })
 
+test("Source in About & privacy opens the library's address in a new tab", async ({ page }) => {
+  await page.goto('./#/')
+  const address = await page.getByRole('link', { name: 'Source', exact: true }).getAttribute('href')
+  expect(address).toBe('https://github.com/jonanderdev/elbowpatch')
+  await page.goto('./#/settings/about')
+  const source = page.getByRole('link', { name: 'GitHub' })
+  await expect(source).toHaveAttribute('href', address ?? '')
+  await expect(source).toHaveAttribute('target', '_blank')
+  await expect(source).toHaveAttribute('rel', /\bnoopener\b/)
+})
+
 test('in Safari on an iPhone, Show me how lands on the Home Screen steps', async ({ browser }) => {
   const iphone = await browser.newContext({
     userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',

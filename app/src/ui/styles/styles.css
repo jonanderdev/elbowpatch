@@ -1605,16 +1605,27 @@ button {
 .about-rows div {
   padding: 9px 12px;
 }
-.about-rows dt {
+.about-rows dt,
+.about-rows a {
   color: var(--title);
+}
+.about-rows a {
+  text-decoration: underline;
 }
 .about-rows + .settings-note {
   padding-top: 27px;
 }
 @media (max-width: 699px) {
   .about-rows div {
+    position: relative;
     align-items: center;
     min-height: 44px;
+  }
+  /* On a phone the whole row is the link, which is why it is 44px tall. */
+  .about-rows a::after {
+    content: '';
+    position: absolute;
+    inset: 0;
   }
 }
 .area-rows {
