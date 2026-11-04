@@ -4,6 +4,7 @@ import { defineConfig, devices, type PlaywrightTestConfig } from '@playwright/te
 const phone = { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: false }
 const desktop = { viewport: { width: 1440, height: 900 } }
 // Worktrees running side by side each take their own port.
+declare const process: { env: Record<string, string | undefined> }
 const port = process.env.E2E_PORT ?? '5198'
 
 const config: PlaywrightTestConfig = defineConfig({
