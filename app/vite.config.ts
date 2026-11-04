@@ -12,7 +12,7 @@ const config: UserConfig = defineConfig({
       // A new version downloads quietly and waits for the next launch: it never reloads the page you write in (0010).
       registerType: 'prompt',
       injectRegister: false,
-      includeAssets: ['launch-mark.svg', 'icon.svg', 'apple-touch-icon.png'],
+      includeAssets: ['icon.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'Elbowpatch',
         short_name: 'Elbowpatch',
