@@ -19,6 +19,10 @@ export interface Opened {
   fresh?: boolean
   /** Which reading from storage this is: the page starts over for each. */
   readAt: number
+  /** Chosen in Contents: it opens here rather than at the writer's place, and their place follows. */
+  at?: 'opening'
+  /** The writer was in the text when they chose it: the caret goes with them. */
+  writing?: boolean
 }
 
 export interface TitleFields {

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { memoryStore } from '../adapters/memory-store'
+import type { Piece } from './model'
 import {
   bookPages,
+  contents,
   history,
   library,
   newPiece,
@@ -26,6 +28,57 @@ function setup(start = 1_000_000) {
   const store = memoryStore()
   return { store, clock, ids, deps: { store, clock, ids } }
 }
+
+describe('Contents', () => {
+  const book = (pages?: Piece['pages']): Piece => ({
+    id: 'book',
+    kind: 'book',
+    lang: 'en',
+    createdAt: 0,
+    updatedAt: 0,
+    title: 'The harbour',
+    sections: [
+      { sectionId: 'a', title: 'The ferry at seven' },
+      { sectionId: 'b', title: '' },
+      { sectionId: 'c', title: 'Salt on the windows' },
+    ],
+    outlineId: null,
+    ...(pages ? { pages } : {}),
+  })
+
+  it('starts each chapter after the pages before it, the title page being part of chapter 1', () => {
+    const { chapters, pages } = contents(book({ phone: { a: 8, b: 8, c: 9 } }), 'phone')
+    expect(chapters.map((c) => [c.title, c.startPage])).toEqual([
+      ['The ferry at seven', 1],
+      ['', 9],
+      ['Salt on the windows', 17],
+    ])
+    expect(pages).toBe(25)
+  })
+
+  it('never guesses: past a chapter with no count there are no start pages, and no total', () => {
+    const { chapters, pages } = contents(book({ phone: { a: 8, c: 9 } }), 'phone')
+    expect(chapters.map((c) => c.startPage)).toEqual([1, 9, undefined])
+    expect(pages).toBeUndefined()
+  })
+
+  it("reads this screen's counts, never the other screen's", () => {
+    const { chapters, pages } = contents(book({ desktop: { a: 3, b: 3, c: 3 } }), 'phone')
+    expect(chapters.map((c) => c.startPage)).toEqual([1, undefined, undefined])
+    expect(pages).toBeUndefined()
+  })
+
+  it('takes the open chapter as it stands on the page: its title as typed, its pages as laid out', () => {
+    const open = { sectionId: 'b', title: 'A room above', pages: 2 }
+    const { chapters, pages } = contents(book({ phone: { a: 8, b: 8, c: 9 } }), 'phone', open)
+    expect(chapters.map((c) => [c.title, c.startPage])).toEqual([
+      ['The ferry at seven', 1],
+      ['A room above', 9],
+      ['Salt on the windows', 11],
+    ])
+    expect(pages).toBe(19)
+  })
+})
 
 describe('pieces', () => {
   it("keeps each chapter's pages per screen, without dating the piece; a book counts only when every chapter has", async () => {

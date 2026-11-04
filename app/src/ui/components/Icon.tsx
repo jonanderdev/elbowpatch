@@ -2,6 +2,7 @@ import type { CSSProperties, ReactElement } from 'react'
 import add from './icons/add.svg'
 import alignLeft from './icons/align-left.svg'
 import asterisk from './icons/asterisk.svg'
+import chevronDown from './icons/chevron-down.svg'
 import close from './icons/close.svg'
 import exportIcon from './icons/export.svg'
 import history from './icons/history.svg'
@@ -22,6 +23,7 @@ export type IconName =
   | 'add'
   | 'alignLeft'
   | 'asterisk'
+  | 'chevronDown'
   | 'close'
   | 'export'
   | 'history'
@@ -42,6 +44,7 @@ const icons: Record<IconName, string> = {
   add,
   alignLeft,
   asterisk,
+  chevronDown,
   close,
   export: exportIcon,
   history,

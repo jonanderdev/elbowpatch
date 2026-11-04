@@ -1,5 +1,5 @@
 import { countWords } from './markdown'
-import type { Kind, Outline, Piece, Place, Screen, Version, Working } from './model'
+import type { Kind, Outline, OutlineSection, Piece, Place, Screen, Version, Working } from './model'
 import type { Clock, Ids, Store, Tx } from './ports'
 
 export interface Deps {
@@ -110,6 +110,35 @@ export function bookPages(piece: Piece, screen: Screen): number | undefined {
     total += n
   }
   return total
+}
+
+/** A line of Contents. Its start page is unknown while a chapter before it has not been laid out on this screen's page. */
+export interface ContentsChapter extends OutlineSection {
+  startPage?: number
+}
+
+/** The open chapter as it stands on the page, newer than what is stored. */
+export interface OpenChapter {
+  sectionId: string
+  title: string
+  pages: number
+}
+
+/**
+ * Contents: each chapter and the page it starts on, and the book's pages, on a screen's page. The title
+ * page is part of chapter 1, so chapter 1 starts on page 1. Nothing is guessed: a number that would rest
+ * on an unknown count stays unknown.
+ */
+export function contents(piece: Piece, screen: Screen, open?: OpenChapter): { chapters: ContentsChapter[]; pages?: number } {
+  let start: number | undefined = 1
+  const chapters = piece.sections.map((s): ContentsChapter => {
+    const here = s.sectionId === open?.sectionId
+    const chapter: ContentsChapter = { ...s, title: here ? open.title : s.title, ...(start === undefined ? {} : { startPage: start }) }
+    const pages = here ? open.pages : piece.pages?.[screen]?.[s.sectionId]
+    start = start === undefined || pages === undefined ? undefined : start + pages
+    return chapter
+  })
+  return { chapters, ...(start === undefined ? {} : { pages: start - 1 }) }
 }
 
 /** Keeps a section's page count on a screen's page. Not a change to the piece: its date stays. Safe to run twice. */
