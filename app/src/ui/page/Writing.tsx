@@ -1,6 +1,7 @@
-import { type ReactElement, type RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { type ReactElement, type ReactNode, type RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { Editor } from '../../page/editor'
 import { Icon, IconButton } from '../components/Icon'
+import { stepField } from './fields'
 
 type Command = Parameters<Editor['run']>[0]
 
@@ -77,9 +78,36 @@ export function SelectionMenu({
 }
 
 /**
- * Above the phone keyboard: undo, redo, then the formatting, then hide
+ * The bar above the phone keyboard: undo, redo, whatever the place being written in adds, then hide
  * keyboard. A phone has no reliable undo of its own (DESIGN.md, Control).
  */
+function KeyboardBar({
+  onUndo,
+  onRedo,
+  onHide,
+  barRef,
+  children,
+}: {
+  onUndo(): void
+  onRedo(): void
+  onHide(): void
+  barRef: RefObject<HTMLDivElement | null>
+  children?: ReactNode
+}): ReactElement {
+  return (
+    <div ref={barRef} className="bar surface writing-bar" role="toolbar" aria-label="Writing" onMouseDown={(e) => e.preventDefault()}>
+      <IconButton icon="undo" label="Undo" onClick={onUndo} />
+      <IconButton icon="redo" label="Redo" onClick={onRedo} />
+      <span className="bar-separator" />
+      {children}
+      <button type="button" className="icon-button" aria-label="Hide keyboard" onClick={onHide}>
+        <Icon name="keyboard" />
+      </button>
+    </div>
+  )
+}
+
+/** The bar in the text, with its formatting. */
 export function WritingBar({
   editor,
   active,
@@ -90,17 +118,16 @@ export function WritingBar({
   barRef: RefObject<HTMLDivElement | null>
 }): ReactElement {
   return (
-    <div ref={barRef} className="bar surface writing-bar" role="toolbar" aria-label="Writing" onMouseDown={(e) => e.preventDefault()}>
-      <IconButton icon="undo" label="Undo" onClick={() => editor.run('undo')} />
-      <IconButton icon="redo" label="Redo" onClick={() => editor.run('redo')} />
-      <span className="bar-separator" />
+    <KeyboardBar onUndo={() => editor.run('undo')} onRedo={() => editor.run('redo')} onHide={() => editor.view.dom.blur()} barRef={barRef}>
       <Formatting editor={editor} active={active} />
       <span className="bar-separator" />
-      <button type="button" className="icon-button" aria-label="Hide keyboard" onClick={() => editor.view.dom.blur()}>
-        <Icon name="keyboard" />
-      </button>
-    </div>
+    </KeyboardBar>
   )
+}
+
+/** The bar in a title field, which takes no formatting. */
+export function FieldBar({ field, barRef }: { field: HTMLElement; barRef: RefObject<HTMLDivElement | null> }): ReactElement {
+  return <KeyboardBar onUndo={() => stepField(field, 'undo')} onRedo={() => stepField(field, 'redo')} onHide={() => field.blur()} barRef={barRef} />
 }
 
 /**
