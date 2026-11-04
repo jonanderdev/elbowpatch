@@ -4,6 +4,9 @@ import { update, useSettings } from '../stores/settings'
 /** The rail's width (DESIGN.md, Layout). */
 const RAIL_WIDTH = 336
 
+/** The last layout's answer: each chapter opens a new page, which must not start from a guess and slide. */
+let roomLastSeen: boolean | undefined
+
 export interface Rail {
   open: boolean
   toggle(): void
@@ -20,13 +23,16 @@ export interface Rail {
  */
 export function useRail(): Rail {
   const { railFolded } = useSettings()
-  const [room, setRoom] = useState(() => window.innerWidth >= 1280)
+  const [room, setRoom] = useState(() => roomLastSeen ?? window.innerWidth >= 1280)
   const [over, setOver] = useState(false)
   const toggle = useCallback(() => {
     if (room) update({ railFolded: !railFolded })
     else setOver((o) => !o)
   }, [room, railFolded])
   const letGo = useCallback(() => setOver(false), [])
-  const laidOut = useCallback((side: number) => setRoom(side >= RAIL_WIDTH), [])
+  const laidOut = useCallback((side: number) => {
+    roomLastSeen = side >= RAIL_WIDTH
+    setRoom(roomLastSeen)
+  }, [])
   return { open: room ? !railFolded : over, toggle, letGo, laidOut }
 }

@@ -501,6 +501,23 @@ test('where the window has no room for it beside the text, the rail starts folde
   await expect(contents(page)).toBeVisible()
 })
 
+test('just wide enough for the rail, a chapter opens with the rail standing still', async ({ page }) => {
+  desktopOnly(page)
+  await importBook(page, TWO)
+  await page.setViewportSize({ width: 1220, height: 900 })
+  await expect(contents(page)).toBeVisible()
+  await page.evaluate(() => {
+    new MutationObserver(() => {
+      if (document.querySelector('.contents-rail[data-folded]')) document.body.dataset.railSlid = 'yes'
+    }).observe(document.body, { subtree: true, childList: true, attributes: true })
+  })
+  await chapter(page, 'Two').click()
+  await expect(page.locator('.title')).toHaveText('Two')
+  await chapter(page, 'One').click()
+  await expect(page.locator('.title')).toHaveText('One')
+  await expect(page.locator('body')).not.toHaveAttribute('data-rail-slid')
+})
+
 test('an essay and a journal have no rail and no toggle', async ({ page }) => {
   desktopOnly(page)
   await page.goto('./')
