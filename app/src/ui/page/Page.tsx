@@ -24,7 +24,7 @@ import { useOpenAtPlace } from './useOpenAtPlace'
 import { usePager } from './usePager'
 import { usePageTurns } from './usePageTurns'
 import { useSaving } from './useSaving'
-import { SelectionMenu, useKeyboard, WritingBar } from './Writing'
+import { FieldBar, SelectionMenu, useKeyboard, WritingBar } from './Writing'
 
 export type { Opened } from './fields'
 
@@ -74,6 +74,8 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
   // A book's or a journal's name, as on its title page: the desktop path shows it while it is written.
   const [name, setName] = useState(piece.title)
   const [writing, setWriting] = useState(false)
+  /** The title field being written in, if any: the writing bar stands for it too. */
+  const [field, setField] = useState<HTMLElement | null>(null)
   const [selection, setSelection] = useState<SelectionState | null>(null)
   const [kept, setKept] = useState('')
   // Where a sheet opened from the desktop head drops: under its control, right-aligned to it.
@@ -353,7 +355,15 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
 
       <div ref={scroller} className="page-scroll">
         <div ref={viewport} className="pager">
-          <div ref={flow} className="flow" lang={piece.lang} data-title-page={titlePage || undefined}>
+          {/* biome-ignore lint/a11y/noStaticElementInteractions: it only hears the focus of the fields inside it. */}
+          <div
+            ref={flow}
+            className="flow"
+            lang={piece.lang}
+            data-title-page={titlePage || undefined}
+            onFocus={(e) => setField(e.target === editor?.view.dom ? null : (e.target as HTMLElement))}
+            onBlur={() => setField(null)}
+          >
             {titlePage ? (
               <TitlePage
                 nameRef={titles.bookTitle}
@@ -388,6 +398,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
       <div className="scroll-mark" aria-hidden="true" />
 
       {editor && !readOnly && writing && keyboard && selection ? <WritingBar editor={editor} active={selection.active} barRef={writingBar} /> : null}
+      {!readOnly && keyboard && field ? <FieldBar field={field} barRef={writingBar} /> : null}
       {editor && !readOnly && !keyboard && selection?.rect ? (
         <SelectionMenu editor={editor} rect={selection.rect} active={selection.active} onKeep={() => void keepMoment()} />
       ) : null}

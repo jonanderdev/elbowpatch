@@ -6,6 +6,7 @@ import type { RefObject } from 'react'
 import type { Piece } from '../../domain/model'
 import { dayTitle } from '../../domain/words'
 import { type Unsaved, unsaved } from '../stores/unsaved'
+import { type FieldHistory, fieldHistory } from './fieldHistory'
 
 /** A section of a piece, open on the page. */
 export interface Opened {
@@ -47,6 +48,9 @@ export function keptFor(opened: Opened): Unsaved | undefined {
   return kept && kept.at > (opened.updatedAt ?? 0) ? kept : undefined
 }
 
+/** Each title field's history, from the text it was filled with. */
+const histories = new WeakMap<HTMLElement, FieldHistory>()
+
 /** Fills the fields with the titles as stored (or as kept, when newer). Returns the section's title. */
 export function fillTitleFields(opened: Opened, fields: TitleFields): string {
   const kept = keptFor(opened)
@@ -54,7 +58,11 @@ export function fillTitleFields(opened: Opened, fields: TitleFields): string {
   if (fields.title) fields.title.textContent = title
   if (fields.bookTitle) fields.bookTitle.textContent = kept?.bookTitle ?? opened.piece.title
   if (fields.subtitle) fields.subtitle.textContent = kept?.subtitle ?? opened.piece.subtitle ?? ''
-  for (const el of [fields.title, fields.bookTitle, fields.subtitle]) if (el) emptied(el)
+  for (const el of [fields.title, fields.bookTitle, fields.subtitle]) {
+    if (!el) continue
+    emptied(el)
+    histories.set(el, fieldHistory(el.textContent ?? ''))
+  }
   return title
 }
 
@@ -66,4 +74,31 @@ export function emptied(el: HTMLElement): void {
   const empty = el.textContent === ''
   if (empty && !(el.childNodes.length === 1 && el.firstChild?.nodeName === 'BR')) el.replaceChildren(document.createElement('br'))
   el.toggleAttribute('data-empty', empty)
+}
+
+/** After any change to a field's text: its placeholder and its history keep up. */
+export function fieldChanged(el: HTMLElement, at: number): void {
+  emptied(el)
+  histories.get(el)?.note(el.textContent ?? '', at)
+}
+
+/**
+ * Takes a field a step back or on, and leaves the caret at its end. The change goes through the
+ * field's own input, so the page sees and saves it as if it were typed.
+ */
+export function stepField(el: HTMLElement, way: 'undo' | 'redo'): void {
+  const text = histories.get(el)?.[way]()
+  if (text === null || text === undefined) return
+  el.textContent = text
+  el.dispatchEvent(new InputEvent('input', { bubbles: true }))
+  const selection = getSelection()
+  selection?.selectAllChildren(el)
+  selection?.collapseToEnd()
+}
+
+/** ⌘/Ctrl + Z and ⌘/Ctrl + Shift + Z in a field, as in the text. ⌘/Ctrl + Alt + Z is the Time Machine's. */
+export function fieldUndoKeys(e: KeyboardEvent): void {
+  if (!(e.metaKey || e.ctrlKey) || e.altKey || e.key.toLowerCase() !== 'z') return
+  e.preventDefault()
+  stepField(e.currentTarget as HTMLElement, e.shiftKey ? 'redo' : 'undo')
 }

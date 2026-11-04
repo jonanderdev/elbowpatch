@@ -1,5 +1,5 @@
 import type { ReactElement, RefObject } from 'react'
-import { emptied } from './fields'
+import { fieldChanged, fieldUndoKeys } from './fields'
 
 // The page's title fields. They are uncontrolled: their text is filled when a section opens
 // (fillTitleFields) and read when saving, so typing in them never re-renders the page.
@@ -34,10 +34,11 @@ export function TitlePage({ nameRef, subtitleRef, kind, readOnly, onFocus, onInp
         spellcheck
         onFocus={onFocus}
         onInput={(e) => {
-          emptied(e.currentTarget)
+          fieldChanged(e.currentTarget, e.timeStamp)
           onInput()
         }}
         onKeyDown={(e) => {
+          fieldUndoKeys(e)
           if (e.key !== 'Enter') return
           // Return goes on to the subtitle.
           e.preventDefault()
@@ -54,10 +55,11 @@ export function TitlePage({ nameRef, subtitleRef, kind, readOnly, onFocus, onInp
         spellcheck
         onFocus={onFocus}
         onInput={(e) => {
-          emptied(e.currentTarget)
+          fieldChanged(e.currentTarget, e.timeStamp)
           onInput()
         }}
         onKeyDown={(e) => {
+          fieldUndoKeys(e)
           if (e.key !== 'Enter') return
           e.preventDefault()
           onDone()
@@ -92,10 +94,11 @@ export function SectionTitle({ titleRef, editable, placeholder, afterTitlePage, 
       spellcheck
       onFocus={(e) => onFocus(e.currentTarget)}
       onInput={(e) => {
-        emptied(e.currentTarget)
+        fieldChanged(e.currentTarget, e.timeStamp)
         onInput(e.currentTarget.textContent ?? '')
       }}
       onKeyDown={(e) => {
+        fieldUndoKeys(e)
         if (e.key !== 'Enter') return
         e.preventDefault()
         onDone()

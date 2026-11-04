@@ -956,6 +956,80 @@ test('with the phone keyboard up the bars stand on it, and the page scrolls betw
   await expect(page.locator('.head')).not.toHaveAttribute('data-scrolled')
 })
 
+test('in a title field the writing bar keeps undo, redo and hide keyboard, and undo stays in that field', async ({ page }) => {
+  test.skip(page.viewportSize()!.width >= 700, 'the keyboard is a phone’s')
+  await page.goto('./')
+  await page.locator('.start.book').click()
+  await expect(page.locator('.book-title')).toBeFocused()
+  await page.keyboard.type('The Long Winter')
+  await page.keyboard.press('Enter')
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('Salt')
+  await page.keyboard.press('Enter')
+  await expect(page.locator('.body')).toBeFocused()
+  await page.keyboard.type('The first words.')
+  await saved(page, 'The first words.')
+  await page.setViewportSize({ width: 390, height: 500 })
+  const bar = page.locator('.writing-bar')
+  await expect(bar.getByRole('button', { name: 'Bold' })).toBeVisible()
+
+  for (const [field, words] of [
+    ['.subtitle', 'A winter'],
+    ['.book-title', ' again'],
+  ] as const) {
+    await page.locator(field).focus()
+    await expect(bar.getByRole('button', { name: 'Undo' })).toBeVisible()
+    await expect(bar.getByRole('button', { name: 'Redo' })).toBeVisible()
+    await expect(bar.getByRole('button', { name: 'Hide keyboard' })).toBeVisible()
+    for (const name of ['Bold', 'Italic', 'Pull quote']) await expect(bar.getByRole('button', { name })).toHaveCount(0)
+
+    const before = await page.locator(field).textContent()
+    await page.evaluate((el) => {
+      const s = getSelection()!
+      s.selectAllChildren(document.querySelector(el)!)
+      s.collapseToEnd()
+    }, field)
+    await page.keyboard.type(words)
+    await expect(page.locator(field)).toHaveText(`${before}${words}`)
+    await bar.getByRole('button', { name: 'Undo' }).click()
+    await expect(page.locator(field)).toHaveText(before!)
+    await bar.getByRole('button', { name: 'Redo' }).click()
+    await expect(page.locator(field)).toHaveText(`${before}${words}`)
+    // Past the field's first step, nothing else moves: the text stays, and so does the focus.
+    for (let i = 0; i < 4; i++) await bar.getByRole('button', { name: 'Undo' }).click()
+    await expect(page.locator('.body')).toHaveText('The first words.')
+    await expect(page.locator(field)).toBeFocused()
+  }
+
+  // What an undo leaves is what is stored.
+  const stored = () =>
+    page.evaluate(
+      () =>
+        new Promise<string[]>((done) => {
+          const open = indexedDB.open('elbowpatch')
+          open.onsuccess = () => {
+            const all = open.result.transaction('pieces').objectStore('pieces').getAll()
+            all.onsuccess = () => {
+              open.result.close()
+              done((all.result as { title: string }[]).map((p) => p.title))
+            }
+          }
+        }),
+    )
+  await page.locator('.book-title').focus()
+  await page.keyboard.type('Snow')
+  await expect.poll(stored, { timeout: 15000 }).toEqual(['Snow'])
+  await bar.getByRole('button', { name: 'Undo' }).click()
+  await expect.poll(stored, { timeout: 15000 }).toEqual([''])
+  await bar.getByRole('button', { name: 'Redo' }).click()
+  await expect.poll(stored, { timeout: 15000 }).toEqual(['Snow'])
+
+  // The bar goes with the keyboard's field.
+  await bar.getByRole('button', { name: 'Hide keyboard' }).click()
+  await expect(page.locator('.book-title')).not.toBeFocused()
+  await expect(bar).toHaveCount(0)
+})
+
 test('installed on iPhone, the keyboard leaves the window as it is: the bars stand on it with nothing following the scroll', async ({ page }) => {
   test.skip(page.viewportSize()!.width >= 700, 'the keyboard is a phone’s')
   // iOS shortens only the part of the window on view, and slides it to show the caret: a stand-in for it.
