@@ -655,7 +655,7 @@ test('§ and the tools: text edge on a phone, the head within the frame on deskt
     await page.waitForTimeout(100)
     const h = (await page.locator('.head .home').boundingBox())!
     const b = (await tools.boundingBox())!
-    expect(Math.round(b.x + b.width - (h.x + 10))).toBe(2560 - 30)
+    expect(Math.round(b.x + b.width - h.x)).toBe(2560 - 30)
   }
 })
 
@@ -774,7 +774,7 @@ test('in a window smaller than the smallest phone the page keeps its size, and t
         }
       }),
     )
-    .toEqual({ screen: [320, 658], column: 256, scrolls: true })
+    .toEqual({ screen: [320, 658], column: 281, scrolls: true })
   // And the wheel scrolls it.
   await page.mouse.move(100, 150)
   await page.mouse.wheel(0, 200)
@@ -787,25 +787,31 @@ test('a desktop window less than 765 tall keeps the page at its least scale, and
   await expect.poll(() => page.evaluate(() => Math.round(document.querySelector('.page-screen')!.getBoundingClientRect().height))).toBe(765)
 })
 
-test('the page holds the same words at any window size of its kind: only its scale changes', async ({ page }) => {
+test('on desktop the page holds the same words at any window size: only its scale changes', async ({ page }) => {
+  test.skip(page.viewportSize()!.width < 700, 'a phone’s page follows the height of its screen')
   await newEssay(page)
   await fill(page, 8)
   await page.keyboard.type('The end.')
   const count = () => page.locator('.page-button').getAttribute('aria-label')
   const first = await count()
-  const phone = page.viewportSize()!.width < 700
-  for (const size of phone
-    ? [
-        { width: 375, height: 667 },
-        { width: 430, height: 932 },
-      ]
-    : [
-        { width: 1920, height: 1080 },
-        { width: 1280, height: 700 },
-      ]) {
+  for (const size of [
+    { width: 1920, height: 1080 },
+    { width: 1280, height: 700 },
+  ]) {
     await page.setViewportSize(size)
     await expect.poll(count).toBe(first)
   }
+})
+
+test('on a phone the page takes all the height there is, so a shorter screen takes more pages', async ({ page }) => {
+  test.skip(page.viewportSize()!.width >= 700, 'a desktop’s page keeps its words')
+  await newEssay(page)
+  await fill(page, 16)
+  const pages = async () => Number((await pageLabel(page))?.match(/of (\d+)/)?.[1])
+  const first = await pages()
+  // A new width: at the same width a window this much shorter is a keyboard, and the page keeps its height.
+  await page.setViewportSize({ width: 375, height: 667 })
+  await expect.poll(pages).toBeGreaterThan(first)
 })
 
 test('at a normal size nothing scrolls the window, and the library covers the page whole', async ({ page }) => {
