@@ -1,9 +1,9 @@
 import { useCallback, useState } from 'react'
 import type { Piece } from '../../domain/model'
-import type { Deps } from '../../domain/pieces'
+import { type Deps, withDraft } from '../../domain/pieces'
 
 export interface LiveOutline {
-  /** The piece as last stored: its chapters, their titles and their page counts. */
+  /** The piece as last stored (its chapters, their titles and their page counts), with the open chapter if it is still a draft. */
   outline: Piece
   /** A save reported the piece. */
   stored(piece: Piece): void
@@ -12,8 +12,8 @@ export interface LiveOutline {
 }
 
 /** The open piece's outline as it stands now, for Contents: the piece the page opened with is only a snapshot. */
-export function useOutline(deps: Deps, piece: Piece): LiveOutline {
-  const [outline, stored] = useState(piece)
+export function useOutline(deps: Deps, piece: Piece, sectionId: string): LiveOutline {
+  const [last, stored] = useState(piece)
   const reread = useCallback(() => {
     void deps.store
       .transaction((tx) => tx.piece(piece.id))
@@ -22,5 +22,5 @@ export function useOutline(deps: Deps, piece: Piece): LiveOutline {
       })
       .catch(() => {})
   }, [deps, piece.id])
-  return { outline, stored, reread }
+  return { outline: withDraft(last, piece, sectionId), stored, reread }
 }

@@ -1,7 +1,7 @@
 import { type ReactElement, useCallback, useEffect, useRef, useState } from 'react'
 import { pieceAsMarkdown } from '../../domain/export'
 import type { Kind, Piece } from '../../domain/model'
-import { type Deps, library, newPiece, openPiece, putAway, recover, rename, restore, withDay } from '../../domain/pieces'
+import { type Deps, library, newPiece, openPiece, putAway, recover, rename, restore, withChapter, withDay } from '../../domain/pieces'
 import type { WriterLock } from '../../domain/ports'
 import { forgetPutAway, thin } from '../../domain/thinning'
 import { isoDay } from '../../domain/words'
@@ -29,6 +29,11 @@ const AREAS: Record<string, Area> = {
   '/settings/put-away': 'put-away',
   '/settings/help': 'help',
   '/settings/about': 'about',
+}
+
+/** A book with nothing stored yet: its first chapter is all it has, and a chapter left empty in the draft goes. */
+function neverStored(draft: Piece): Piece {
+  return { ...draft, sections: draft.sections.slice(0, 1) }
 }
 
 export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElement | null {
@@ -130,11 +135,24 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
   // Another section of the open piece. The lock is the piece's, so it stays. The last chapter chosen
   // wins, should the writer choose again while a save runs.
   const chosen = useRef(0)
-  const openSection = async (pieceId: string, sectionId: string, writing: boolean): Promise<void> => {
+  const openSection = async (draft: Piece, sectionId: string, writing: boolean): Promise<void> => {
     const turn = ++chosen.current
     await saveFirst()
-    const next = await open(pieceId, sectionId).catch(() => null)
-    if (next && turn === chosen.current) setOpened({ ...next, at: 'opening', writing })
+    const next = await open(draft.id, sectionId).catch(() => undefined)
+    if (next === undefined || turn !== chosen.current) return
+    const there = next ?? { piece: neverStored(draft), sectionId, content: '', readAt: ++reads }
+    setOpened({ ...there, at: 'opening', writing })
+  }
+
+  // A new chapter at the end of the book, read from what is stored once the section left is saved.
+  // It is a draft: it joins the piece with its first words or title, so one left empty is gone.
+  const newChapter = async (draft: Piece): Promise<void> => {
+    const turn = ++chosen.current
+    await saveFirst()
+    const next = await open(draft.id).catch(() => undefined)
+    if (next === undefined || turn !== chosen.current) return
+    const { piece, sectionId } = withChapter(deps, next?.piece ?? neverStored(draft))
+    setOpened({ piece, sectionId, content: '', fresh: true, readAt: ++reads })
   }
 
   const startNew = (kind: Kind) => {
@@ -180,7 +198,8 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
             await refresh().catch(() => {})
             go('/')
           }}
-          onOpenSection={(sectionId, writing) => void openSection(opened.piece.id, sectionId, writing)}
+          onOpenSection={(sectionId, writing) => void openSection(opened.piece, sectionId, writing)}
+          onNewChapter={() => void newChapter(opened.piece)}
           onChange={(piece) => {
             askToPersist()
             setPieces((all) => {
