@@ -19,5 +19,6 @@ Date: 2026-10-27 · Status: accepted
 - **Keep a copy stays one section** in v1. A copy of a whole book as it was is possible from the data (the outline then, plus each chapter's version then) and waits with the drafts work after dogfooding.
 
 ## Drafts in v1
+*Updated 2026-11-04:* the brief now puts keep a copy and drafts after daily use has proved the app, so they are not in v1. What follows is how they will work.
 - "Keep a copy as a new draft" creates a **new essay piece** from the section being looked at (an essay, one journal day or one chapter), titled like "Chapter 3, draft 2", with a link back to where it came from. Its history starts at that moment.
 - No comparing or switching drafts inside one piece, and no merging, in v1.
