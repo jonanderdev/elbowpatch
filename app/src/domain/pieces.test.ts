@@ -101,7 +101,10 @@ describe('measuring a book off screen', () => {
     const d = setup()
     const { piece, ids } = await storedBook(d, ['One.', 'Two.'])
     const seen: unknown[] = []
-    const layOut = async (chapter: unknown) => (seen.push(chapter), 5)
+    const layOut = async (chapter: unknown) => {
+      seen.push(chapter)
+      return 5
+    }
 
     expect(await measureNext(d.deps, 'phone', layOut)).toBe(true)
     expect((await stored(d, piece.id)).pages).toEqual({ phone: { [ids[0]!]: 5 } })
@@ -171,7 +174,10 @@ describe('measuring a book off screen', () => {
     ).toBe(true)
     expect((await stored(d, piece.id)).pages).toBeUndefined()
     const seen: string[] = []
-    await measureNext(d.deps, 'phone', async ({ content }) => (seen.push(content), 9))
+    await measureNext(d.deps, 'phone', async ({ content }) => {
+      seen.push(content)
+      return 9
+    })
     expect(seen).toEqual(['One, and then a great deal more.'])
     expect(bookPages(await stored(d, piece.id), 'phone')).toBe(9)
   })

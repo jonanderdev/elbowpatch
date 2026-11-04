@@ -1,5 +1,34 @@
 // When things are saved: timers live here, not in the domain (docs/decisions/0009).
 
+/** How long after the last keystroke the writer counts as having paused. */
+const PAUSE = 1500
+
+let lastInput = -Infinity
+if (typeof window !== 'undefined') {
+  const note = (): void => {
+    lastInput = Date.now()
+  }
+  window.addEventListener('keydown', note, { capture: true, passive: true })
+  window.addEventListener('beforeinput', note, { capture: true, passive: true })
+}
+
+/** Runs `task` once the writer has paused and the browser is idle, so it never takes a frame from typing. Returns a cancel. */
+export function whenQuiet(task: () => void): () => void {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let idle: number | undefined
+  const wait = (): void => {
+    const left = lastInput + PAUSE - Date.now()
+    if (left > 0) timer = setTimeout(wait, left)
+    else if (window.requestIdleCallback) idle = window.requestIdleCallback(() => (Date.now() < lastInput + PAUSE ? wait() : task()))
+    else timer = setTimeout(task, 50)
+  }
+  wait()
+  return () => {
+    clearTimeout(timer)
+    if (idle !== undefined) window.cancelIdleCallback(idle)
+  }
+}
+
 export interface Scheduled {
   /** Something changed. */
   touch(): void

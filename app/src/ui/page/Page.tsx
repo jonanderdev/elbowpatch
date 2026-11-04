@@ -2,7 +2,7 @@ import { TextSelection } from 'prosemirror-state'
 import { type CSSProperties, type ReactElement, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { countWords } from '../../domain/markdown'
 import type { Piece } from '../../domain/model'
-import { contents, type Deps, savePages } from '../../domain/pieces'
+import { type BookCount, bookCount, contents, type Deps, savePages } from '../../domain/pieces'
 import { scrollToCaret, showCaret, toOpeningPage } from '../../page/caret'
 import { type Editor, selectionBox } from '../../page/editor'
 import { screenOf } from '../../page/pager'
@@ -19,7 +19,7 @@ import { ContentsSheet, RunningHeadControl } from './Contents'
 import { fillTitleFields, keptFor, type Opened, type TitleRefs, titleOf } from './fields'
 import { PageFoot, StatusLine } from './PageFoot'
 import { SectionTitle, TitlePage } from './Titles'
-import { HeadTools, TextSettings } from './Tools'
+import { HeadTools, pageLine, TextSettings } from './Tools'
 import { useCaretFollowing, useCaretKeys } from './useCaret'
 import { useEditor } from './useEditor'
 import { raiseKeyboard, useFocusOnOpen } from './useFocusOnOpen'
@@ -44,6 +44,8 @@ interface Props {
   closingRef: { current: Promise<void> }
   /** The library shows over the page; the page stays laid out behind it, inert. */
   covered: boolean
+  /** Changes when a chapter's page count was measured or forgotten, away from this page. */
+  counted: number
   onLibrary(): void
   /** Opens another section of this piece, once this one is saved. `writing`: the caret goes with the writer. */
   onOpenSection(sectionId: string, writing: boolean): void
@@ -60,7 +62,7 @@ interface SelectionState {
  * The writing page: one section of a piece, paged (DESIGN.md, The page). The app makes a new page
  * for each section it opens. Each hook below owns one part; this component lays out the page.
  */
-export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, covered, onLibrary, onOpenSection, onChange }: Props): ReactElement {
+export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, covered, counted, onLibrary, onOpenSection, onChange }: Props): ReactElement {
   const { piece, sectionId } = opened
   const readOnly = writer !== 'here'
   // A book or a journal opens on its title page: its name, then chapter 1 or the first day on the next page.
@@ -74,7 +76,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
   const keyboard = useKeyboard()
   const phone = usePhone()
   const book = piece.kind === 'book'
-  const live = useOutline(deps, piece)
+  const live = useOutline(deps, piece, counted)
   const [tools, setTools] = useState(false)
   const [sheet, setSheet] = useState<'text' | 'export' | 'contents' | null>(null)
   /** Contents was opened by keyboard, so it takes the focus. */
@@ -126,6 +128,12 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     if (titles.bookTitle.current) setName(titles.bookTitle.current.textContent ?? '')
   }, [openedFirst, titles.title, titles.bookTitle, titles.subtitle])
 
+  // The numbers beside the page, at a page of this section: a book's are the whole book's.
+  function numbers(at: number, total: number): BookCount {
+    if (!book) return { page: at + 1, pages: total, words }
+    return bookCount(live.outline, phone ? 'phone' : 'desktop', { sectionId, title: heading, pages: total, words }, at)
+  }
+
   const { pager, page, count, announcement } = usePager({
     screen,
     viewport,
@@ -136,6 +144,10 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     keyboard,
     onRelayout: (p) => {
       if (editorNow.current) showCaret(editorNow.current.view, p)
+    },
+    say: (at, total) => {
+      const { page: n, pages } = numbers(at, total)
+      return pageLine(n, pages) || 'Page turned'
     },
   })
 
@@ -168,6 +180,8 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     if (readOnly || !pager || !screen.current) return
     void savePages(deps, piece.id, screenOf(screen.current.clientWidth), sectionId, count).catch(() => {})
   }, [deps, piece.id, sectionId, count, pager, readOnly])
+
+  const shown = numbers(page, count)
 
   const caretKeys = useCaretKeys(pager, flow)
   const editor = useEditor(mount, content, piece.lang, {
@@ -422,9 +436,9 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
           <div className="running-head">{heading}</div>
         )}
         <HeadTools
-          page={page + 1}
-          count={count}
-          words={words}
+          page={shown.page}
+          count={shown.pages}
+          words={shown.words}
           sheet={anchor && sheet !== 'contents' ? sheet : null}
           onTextSettings={(from) => openSheet('text', from)}
           onExport={(from) => openSheet('export', from)}
@@ -482,9 +496,9 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
       ) : null}
 
       <PageFoot
-        page={page}
-        count={count}
-        words={words}
+        page={shown.page}
+        count={shown.pages}
+        words={shown.words}
         journal={piece.kind === 'journal'}
         titlePage={titlePage && page === 0}
         tools={tools}

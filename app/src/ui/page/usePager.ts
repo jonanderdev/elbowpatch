@@ -1,17 +1,15 @@
 import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { Kind } from '../../domain/model'
-import { geometry, Pager } from '../../page/pager'
+import { layOut } from '../../page/layout'
+import { Pager } from '../../page/pager'
 import type { Settings } from '../stores/settings'
-
-/** The screen's height with no keyboard up, and the tallest the window has been, at this width: on a touch screen the keyboard shortens the window, never the page. */
-let tallest = { width: 0, height: 0, window: 0 }
 
 export interface PagerState {
   pager: Pager | null
   /** The page in view, from 0. */
   page: number
   count: number
-  /** "Page 3 of 9", after a turn; a page added by typing is not announced (DESIGN.md, Behaviour). */
+  /** What `say` said after a turn; a page added by typing is not announced (DESIGN.md, Behaviour). */
   announcement: string
 }
 
@@ -27,13 +25,15 @@ interface Options {
   keyboard: boolean
   /** After the pages were laid out again: show the caret's page. */
   onRelayout(pager: Pager): void
+  /** What a turn to this page says, when it is read out. */
+  say(page: number, count: number): string
 }
 
 /**
  * The pager for the page: the text in CSS columns, one per page (docs/decisions/0003). Laid out
  * before the first paint, and again when the window, the fonts or the text settings change.
  */
-export function usePager({ screen, viewport, flow, columns, kind, settings, keyboard, onRelayout }: Options): PagerState {
+export function usePager({ screen, viewport, flow, columns, kind, settings, keyboard, onRelayout, say }: Options): PagerState {
   const [pager, setPager] = useState<Pager | null>(null)
   const [page, setPage] = useState(0)
   const [count, setCount] = useState(1)
@@ -41,6 +41,8 @@ export function usePager({ screen, viewport, flow, columns, kind, settings, keyb
   // Read when the window or the fonts change, long after this render.
   const onRelayoutNow = useRef(onRelayout)
   onRelayoutNow.current = onRelayout
+  const sayNow = useRef(say)
+  sayNow.current = say
 
   useLayoutEffect(() => {
     const viewportEl = viewport.current
@@ -52,7 +54,7 @@ export function usePager({ screen, viewport, flow, columns, kind, settings, keyb
     const p = new Pager(viewportEl, flowEl, columnsEl, (next, total) => {
       setPage(next)
       setCount(total)
-      if (shown !== -1 && next !== shown) setAnnouncement(`Page ${next + 1} of ${total}`)
+      if (shown !== -1 && next !== shown) setAnnouncement(sayNow.current(next, total))
       shown = next
     })
     layOut(p, screenEl, kind)
@@ -91,39 +93,4 @@ export function usePager({ screen, viewport, flow, columns, kind, settings, keyb
   }, [pager, screen, kind, size, leading, measure, align, dropcap, indent, keyboard])
 
   return { pager, page, count, announcement }
-}
-
-/** Lays the pages out: the page fitted to the screen, at the text settings. */
-function layOut(pager: Pager, screen: HTMLElement, kind: Kind): void {
-  const width = screen.clientWidth
-  let height = screen.clientHeight
-  if (matchMedia('(pointer: coarse)').matches) {
-    // A keyboard shortens the window by more than 80px (as in useKeyboard): the page keeps its height and
-    // scrolls to every line. Anything less (the home bar's inset, browser chrome) is the window itself: the
-    // page is laid out again at its height, so with no keyboard nothing scrolls. While the keyboard is up
-    // the screen is only the part above it, so the page keeps its height until it goes down (turned with
-    // the keyboard up, the window's height stands in till then).
-    const windowHeight = document.documentElement.clientHeight
-    if (width !== tallest.width) tallest = { width, height: 0, window: 0 }
-    tallest.window = Math.max(tallest.window, windowHeight)
-    if (!screen.hasAttribute('data-keyboard')) {
-      if (!tallest.height || tallest.window - windowHeight <= 80) {
-        screen.style.removeProperty('--page-height')
-        tallest.height = screen.clientHeight
-      }
-    } else if (!tallest.height) tallest.height = windowHeight
-    height = tallest.height
-    // The screen keeps that height, and the page's scroller its length.
-    screen.style.setProperty('--page-height', `${height}px`)
-  }
-  const g = geometry(width, height, document.documentElement.dataset.measure === 'wide', kind === 'journal')
-  const set = (name: string, px: number): void => screen.style.setProperty(name, `${px}px`)
-  screen.style.setProperty('--k', `${g.k}`)
-  set('--side', g.side)
-  set('--measure-px', g.measure)
-  set('--stride', g.stride)
-  set('--top', g.top)
-  set('--bottom', g.bottom)
-  set('--text-height', g.height)
-  pager.layout(g)
 }
