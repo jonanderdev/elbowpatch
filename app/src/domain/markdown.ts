@@ -36,6 +36,49 @@ export function countWords(markdown: string): number {
   return count
 }
 
+/** How two texts met: as separate blocks, inside one block, or inside one with a line break between them. */
+export type Meeting = 'apart' | 'inside' | 'line'
+
+/** What a split took out of the text, so the halves can go back as they were. Kept for the session only. */
+export interface Seam {
+  /** How what stayed met what followed it. */
+  front: Meeting
+  /** The title came from a `# ` line: how that line met what moved. */
+  back?: Meeting
+  /** The point was inside Markdown kept as written, which only its own characters can put back. */
+  raw: boolean
+  /** A backslash was added to what moved, so it would not read as a heading. */
+  escaped: boolean
+}
+
+/**
+ * The two halves of a split as one text again, with the title between them if it has one. Blocks that
+ * met inside a paragraph are one block again: their spans meet, so a mark cut in two is one mark.
+ */
+export function joinHalves(before: string, after: string, seam: Seam, title: string): string {
+  const moved = seam.escaped && after.startsWith('\\# ') ? after.slice(1) : after
+  if (seam.back === undefined && !title.trim()) return meet(before, moved, seam.front, seam.raw)
+  const line = serialize([{ type: 'paragraph', spans: [{ text: `# ${title}`, marks: [] }] }])
+  return meet(meet(before, line, seam.back === undefined ? 'apart' : seam.front), moved, seam.back ?? 'apart')
+}
+
+function meet(before: string, after: string, how: Meeting, raw = false): string {
+  if (!before.trim()) return after
+  if (!after.trim()) return before
+  const apart = `${before}\n\n${after}`
+  if (how === 'apart') return apart
+  const gap = how === 'line' ? BREAK : ''
+  if (raw) return before + gap + after
+  const left = parse(before)
+  const right = parse(after)
+  const a = left.at(-1)!
+  const b = right[0]!
+  // Changed since the split: a pull quote and a paragraph are not one block.
+  if (a.type === 'raw' || b.type === 'raw' || a.type !== b.type) return apart
+  const between: Span[] = gap ? [{ text: gap, marks: a.spans.at(-1)?.marks ?? [] }] : []
+  return serialize([...left.slice(0, -1), { type: a.type, spans: [...a.spans, ...between, ...b.spans] }, ...right.slice(1)])
+}
+
 function parseBlock(source: string): Block {
   const lines = source.split('\n')
   const quoted = lines.every((l) => l.startsWith('> '))

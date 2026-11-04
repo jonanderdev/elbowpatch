@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { countWords, parse } from '../domain/markdown'
-import { schema, toDoc } from './schema'
+import { countWords, joinHalves, parse, serialize } from '../domain/markdown'
+import { schema, toBlocks, toDoc } from './schema'
 import { halvesAt, halvesAtLine } from './split'
 
 const docOf = (markdown: string) => toDoc(parse(markdown))
@@ -23,20 +23,20 @@ const cutBefore = (markdown: string, words: string) => {
 
 describe('where a chapter starts', () => {
   it('between paragraphs, each half keeps its own', () => {
-    expect(cutBefore('One.\n\nTwo.\n\nThree.', 'Two')).toEqual({ before: 'One.', after: 'Two.\n\nThree.', title: '' })
+    expect(cutBefore('One.\n\nTwo.\n\nThree.', 'Two')).toMatchObject({ before: 'One.', after: 'Two.\n\nThree.', title: '' })
   })
 
   it('inside a paragraph, the paragraph splits there, every character kept', () => {
-    expect(cutBefore('The ferry at seven.', 'at seven')).toEqual({ before: 'The ferry ', after: 'at seven.', title: '' })
+    expect(cutBefore('The ferry at seven.', 'at seven')).toMatchObject({ before: 'The ferry ', after: 'at seven.', title: '' })
   })
 
   it('a mark across the point closes on each side', () => {
-    expect(cutBefore('Salt *on the windows* and rail.', 'the windows')).toEqual({ before: 'Salt *on *', after: '*the windows* and rail.', title: '' })
-    expect(cutBefore('**Bold *and italic* here**', 'italic')).toEqual({ before: '**Bold *and ***', after: '***italic* here**', title: '' })
+    expect(cutBefore('Salt *on the windows* and rail.', 'the windows')).toMatchObject({ before: 'Salt *on *', after: '*the windows* and rail.', title: '' })
+    expect(cutBefore('**Bold *and italic* here**', 'italic')).toMatchObject({ before: '**Bold *and ***', after: '***italic* here**', title: '' })
   })
 
   it('a pull quote splits into two pull quotes', () => {
-    expect(cutBefore('> One two', 'two')).toEqual({ before: '> One ', after: '> two', title: '' })
+    expect(cutBefore('> One two', 'two')).toMatchObject({ before: '> One ', after: '> two', title: '' })
   })
 
   it('Markdown outside the v1 marks stays exactly as written on both sides', () => {
@@ -45,7 +45,7 @@ describe('where a chapter starts', () => {
     expect(before).toBe('Before.\n\n- one')
     expect(after).toBe('- two\n- [link](http://example.com)\n\nAfter.')
     // An unpaired mark is outside them too, and neither half closes it.
-    expect(cutBefore('Two **stars and no end', 'and no end')).toEqual({ before: 'Two **stars ', after: 'and no end', title: '' })
+    expect(cutBefore('Two **stars and no end', 'and no end')).toMatchObject({ before: 'Two **stars ', after: 'and no end', title: '' })
   })
 
   it('every word lands in one half, exactly once', () => {
@@ -63,7 +63,7 @@ describe('where a chapter starts', () => {
   })
 
   it('a line break at the point goes: it is only space', () => {
-    expect(cutBefore('One\nTwo', 'Two')).toEqual({ before: 'One', after: 'Two', title: '' })
+    expect(cutBefore('One\nTwo', 'Two')).toMatchObject({ before: 'One', after: 'Two', title: '' })
   })
 
   it('an empty paragraph at the point leaves nothing behind', () => {
@@ -72,7 +72,7 @@ describe('where a chapter starts', () => {
       schema.nodes.paragraph.create(),
       schema.nodes.paragraph.create(null, schema.text('Two.')),
     ])
-    expect(halvesAt(doc, 7)).toEqual({ before: 'One.', after: 'Two.', title: '' })
+    expect(halvesAt(doc, 7)).toMatchObject({ before: 'One.', after: 'Two.', title: '' })
   })
 
   it('a # or > that now starts the moved text stays ordinary text', () => {
@@ -93,21 +93,87 @@ describe('where a chapter starts', () => {
 describe('a # line', () => {
   it('the rest of the line is the title, and what follows it moves', () => {
     const { doc, pos } = posOf('Before.\n\n\\# The harbour\n\nAfter.', '# The')
-    expect(halvesAtLine(doc, pos)).toEqual({ before: 'Before.', title: 'The harbour', after: 'After.' })
+    expect(halvesAtLine(doc, pos)).toMatchObject({ before: 'Before.', title: 'The harbour', after: 'After.' })
   })
 
   it('a line ends at a line break; the rest of the paragraph moves', () => {
     const { doc, pos } = posOf('Before.\n\n\\# The harbour\nIn winter.', '# The')
-    expect(halvesAtLine(doc, pos)).toEqual({ before: 'Before.', title: 'The harbour', after: 'In winter.' })
+    expect(halvesAtLine(doc, pos)).toMatchObject({ before: 'Before.', title: 'The harbour', after: 'In winter.' })
   })
 
   it('a line after a line break starts there, and the break goes', () => {
     const { doc, pos } = posOf('Before.\n\\# The harbour', '# The')
-    expect(halvesAtLine(doc, pos)).toEqual({ before: 'Before.', title: 'The harbour', after: '' })
+    expect(halvesAtLine(doc, pos)).toMatchObject({ before: 'Before.', title: 'The harbour', after: '' })
   })
 
   it('a line with nothing on it gives an empty title', () => {
     const { doc, pos } = posOf('Before.\n\n\\# \n\nAfter.', '# ')
-    expect(halvesAtLine(doc, pos)).toEqual({ before: 'Before.', title: '', after: 'After.' })
+    expect(halvesAtLine(doc, pos)).toMatchObject({ before: 'Before.', title: '', after: 'After.' })
+  })
+})
+
+describe('the halves back together', () => {
+  const back = (h: ReturnType<typeof halvesAt>) => joinHalves(h.before, h.after, h.seam, h.title)
+  /** The text as the page writes it, which is what a split starts from. */
+  const whole = (markdown: string) => serialize(toBlocks(docOf(markdown)))
+
+  const TEXTS = [
+    'One.\n\nTwo.\n\nThree.',
+    'Salt on the *windows and* the rail.',
+    '**Bold *and italic* here** and *more*',
+    'Salt *on the* **windows** of\nthe shop.\n\n> A quote\n> of four.\n\nThe end.',
+    '*Across\nthe break* and on\nand on',
+    'Rule # one and > two \\* three',
+    'Two **stars and no end',
+    'a **b # c',
+    '*em* tail **unpaired',
+    '- one\n- two\n- [link](http://example.com)\n\nAfter.',
+    '> a lazy quote\nthat runs on',
+    'Before.\n\n# A heading kept as written\n\nAfter.',
+    '| a | table |\n\n```\ncode # here\n```',
+  ]
+
+  it('at every point of every text, the text comes back as it was', () => {
+    for (const text of TEXTS) {
+      for (let pos = 1; pos < docOf(text).content.size; pos++) {
+        const doc = docOf(text)
+        if (!doc.resolve(pos).parent.isTextblock) continue
+        const halves = halvesAt(doc, pos)
+        if (!halves.before || !halves.after) continue
+        expect(back(halves), `${text} at ${pos}`).toBe(whole(text))
+      }
+    }
+  })
+
+  it('two halves of one mark are one mark again, not two strung together', () => {
+    expect(joinHalves('Salt on the *windows *', '*and* the rail.', { front: 'inside', raw: false, escaped: false }, '')).toBe(
+      'Salt on the *windows and* the rail.',
+    )
+  })
+
+  it('a # line comes back as an escaped line, where it stood', () => {
+    for (const text of ['Before.\n\n\\# The harbour\n\nAfter.', 'Before.\n\n\\# The harbour\nIn winter.', 'Before.\n\\# The harbour', 'A\n\\# The harbour\nB']) {
+      const { doc, pos } = posOf(text, '# The')
+      expect(back(halvesAtLine(doc, pos)), text).toBe(text)
+    }
+  })
+
+  it('a # line with nothing on it comes back too', () => {
+    const { doc, pos } = posOf('Before.\n\n\\# \n\nAfter.', '# ')
+    expect(back(halvesAtLine(doc, pos))).toBe('Before.\n\n\\# \n\nAfter.')
+  })
+
+  it('a title given since the split comes back as a line, so no word is lost', () => {
+    const h = cutBefore('The ferry at seven.', 'at seven')
+    expect(joinHalves(h.before, h.after, h.seam, 'Salt')).toBe('The ferry \n\n\\# Salt\n\nat seven.')
+  })
+
+  it('when the halves are no longer of a kind, they stand apart with every word', () => {
+    expect(joinHalves('One', '> two', { front: 'inside', raw: false, escaped: false }, '')).toBe('One\n\n> two')
+  })
+
+  it('an empty half leaves the other as it is', () => {
+    expect(joinHalves('', 'Two.', { front: 'inside', raw: false, escaped: false }, '')).toBe('Two.')
+    expect(joinHalves('One.', '', { front: 'inside', raw: false, escaped: false }, '')).toBe('One.')
   })
 })
