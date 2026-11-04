@@ -1,5 +1,5 @@
 # Keep the site out of search engines while it is unfinished.
-# Delete this file to allow indexing.
+# Delete this rule at v1 to allow indexing, and keep the one below (docs/decisions/0016).
 /*
   X-Robots-Tag: noindex, nofollow
 
