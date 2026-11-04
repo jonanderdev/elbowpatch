@@ -6,11 +6,14 @@ import type { Pager } from '../../page/pager'
 /** How far beside the text a click in the margin must be to turn the page. */
 const MARGIN_CLEAR = 80
 
+/** The click that turned into another chapter: the page it opens shows the same arrow at once, so clicking through never flickers it. */
+let crossedBy: MouseEvent | undefined
+
 /**
  * Turning pages by hand (DESIGN.md, Behaviour): Page Up / Page Down and Alt + ← / → everywhere, a
  * sideways swipe on a phone, a click in the side margins on desktop, where the pointer becomes an
- * arrow while there is a page to go to. Scrolling turns nothing (nothing listens to the wheel). Off while
- * the library covers the page.
+ * arrow while there is a page to go to. Past a chapter's end a turn opens the chapter next to it, by
+ * the same ways. Scrolling turns nothing (nothing listens to the wheel). Off while the library covers the page.
  */
 interface Options {
   screen: RefObject<HTMLDivElement | null>
@@ -23,12 +26,16 @@ interface Options {
   readOnly: boolean
   /** A turn by hand is the writer moving: their place follows. */
   onTurn(): void
+  /** The chapter past this one's end, if any. */
+  beyond(dir: 1 | -1): string | undefined
+  /** A turn past this chapter's end, to the chapter there. */
+  onCross(dir: 1 | -1): void
 }
 
-export function usePageTurns({ screen, viewport, bookTitle, editor, pager, covered, readOnly, onTurn }: Options): void {
+export function usePageTurns({ screen, viewport, bookTitle, editor, pager, covered, readOnly, onTurn, beyond, onCross }: Options): void {
   // Read when a turn happens.
-  const now = useRef({ readOnly, onTurn })
-  now.current = { readOnly, onTurn }
+  const now = useRef({ readOnly, onTurn, beyond, onCross })
+  now.current = { readOnly, onTurn, beyond, onCross }
 
   useEffect(() => {
     const el = screen.current
@@ -40,15 +47,21 @@ export function usePageTurns({ screen, viewport, bookTitle, editor, pager, cover
      * words are added next: always while writing, and on desktop also while reading, so a turn
      * leaves the page ready to type (DESIGN.md, Behaviour). Not taken from the tools or a sheet;
      * on a phone a swipe does not raise the keyboard, and a tap places it. With `extend` (Shift +
-     * Page Up / Down while writing), the selection grows there instead.
+     * Page Up / Down while writing), the selection grows there instead, and stops at the chapter's
+     * end: it never crosses into the next one.
      */
     const turn = (dir: 1 | -1, extend = false): void => {
       now.current.onTurn()
       const from = pager.page
       if (dir > 0) pager.next()
       else pager.previous()
-      // At the first or last page nothing turns, and the caret stays put.
-      if (pager.page === from || now.current.readOnly) return
+      // At a chapter's first or last page the chapter next to it opens, in a window not writing too.
+      // At the book's own ends nothing turns, and the caret stays put.
+      if (pager.page === from) {
+        if (!extend) now.current.onCross(dir)
+        return
+      }
+      if (now.current.readOnly) return
       const view = editor.view
       const writing = view.hasFocus()
       if (!writing && (!matchMedia('(pointer: fine)').matches || document.activeElement?.closest('.sheet, .foot, .head'))) return
@@ -106,7 +119,8 @@ export function usePageTurns({ screen, viewport, bookTitle, editor, pager, cover
     const onMouseMove = (e: MouseEvent): void => {
       if (e.buttons) return
       const dir = side(e)
-      const can = dir < 0 ? pager.page > 0 : dir > 0 && pager.page < pager.count - 1
+      const within = dir < 0 ? pager.page > 0 : pager.page < pager.count - 1
+      const can = dir !== 0 && (within || !!now.current.beyond(dir))
       el.dataset.turn = can ? (dir < 0 ? 'back' : 'on') : ''
     }
     let down: { x: number; y: number } | undefined
@@ -120,8 +134,10 @@ export function usePageTurns({ screen, viewport, bookTitle, editor, pager, cover
       down = undefined
       const dir = side(e)
       if (!dir || (from && Math.hypot(e.clientX - from.x, e.clientY - from.y) > 4) || !getSelection()?.isCollapsed) return
+      const page = pager.page
       turn(dir)
       onMouseMove(e)
+      if (pager.page === page && now.current.beyond(dir)) crossedBy = e
     }
 
     // A tap below the text (under its last line, or on a short page) is not on anything editable:
@@ -132,6 +148,9 @@ export function usePageTurns({ screen, viewport, bookTitle, editor, pager, cover
       const view = editor.view
       if (caretToEnd(view, viewportEl)) view.focus()
     }
+
+    if (crossedBy) onMouseMove(crossedBy)
+    crossedBy = undefined
 
     window.addEventListener('keydown', onKey)
     viewportEl.addEventListener('click', onPagerClick)

@@ -8,6 +8,12 @@ import { dayTitle } from '../../domain/words'
 import { type Unsaved, unsaved } from '../stores/unsaved'
 import { type FieldHistory, fieldHistory } from './fieldHistory'
 
+/**
+ * Where a section opens when the writer goes to it: its opening page, from Contents; its opening
+ * page turned on to, which takes the caret along as any turn does; or its last page, turned back to.
+ */
+export type OpenAt = 'opening' | 'turned-on' | 'last'
+
 /** A section of a piece, open on the page. */
 export interface Opened {
   piece: Piece
@@ -19,9 +25,9 @@ export interface Opened {
   fresh?: boolean
   /** Which reading from storage this is: the page starts over for each. */
   readAt: number
-  /** Chosen in Contents: it opens here rather than at the writer's place, and their place follows. */
-  at?: 'opening'
-  /** The writer was in the text when they chose it: the caret goes with them. */
+  /** Chosen, not returned to: it opens here rather than at the writer's place, and their place follows. */
+  at?: OpenAt
+  /** The writer was in the text when they went there: the caret goes with them. */
   writing?: boolean
 }
 

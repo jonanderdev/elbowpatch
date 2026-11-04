@@ -53,6 +53,14 @@ export function toOpeningPage(view: EditorView, pager: Pager): void {
   showCaret(view, pager, true)
 }
 
+/** The caret to the end of the text, and the page to the one that holds it: a section's last page. */
+export function toLastPage(view: EditorView, pager: Pager): void {
+  view.dispatch(view.state.tr.setSelection(TextSelection.atEnd(view.state.doc)))
+  pager.opening = true
+  showCaret(view, pager, true)
+  pager.opening = false
+}
+
 /**
  * Scrolls the page in its scroller so the caret stands clear of the head above and, with the phone
  * keyboard up, the writing bar below it. Only the scroll moves, so the writer can scroll it back.

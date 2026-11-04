@@ -8,7 +8,7 @@ import { isoDay } from '../../domain/words'
 import { download } from '../files/download'
 import { downloadEverything } from '../files/everything'
 import { Library } from '../library/Library'
-import { type Opened, Page } from '../page/Page'
+import { type OpenAt, type Opened, Page } from '../page/Page'
 import { raiseKeyboard } from '../page/useFocusOnOpen'
 import { waiting } from '../settings/PutAway'
 import { type Area, Settings } from '../settings/Settings'
@@ -135,13 +135,19 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
   // Another section of the open piece. The lock is the piece's, so it stays. The last chapter chosen
   // wins, should the writer choose again while a save runs.
   const chosen = useRef(0)
-  const openSection = async (draft: Piece, sectionId: string, writing: boolean): Promise<void> => {
+  /** Where the opening under way is going: a key held down asks again and again, and if each asking replaced the last, none would finish. */
+  const going = useRef('')
+  const openSection = async (draft: Piece, sectionId: string, writing: boolean, at: OpenAt): Promise<void> => {
+    const where = `${sectionId}:${at}`
+    if (going.current === where) return
+    going.current = where
     const turn = ++chosen.current
     await saveFirst()
     const next = await open(draft.id, sectionId).catch(() => undefined)
+    if (going.current === where) going.current = ''
     if (next === undefined || turn !== chosen.current) return
     const there = next ?? { piece: neverStored(draft), sectionId, content: '', readAt: ++reads }
-    setOpened({ ...there, at: 'opening', writing })
+    setOpened({ ...there, at, writing })
   }
 
   // A new chapter at the end of the book, read from what is stored once the section left is saved.
@@ -198,7 +204,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
             await refresh().catch(() => {})
             go('/')
           }}
-          onOpenSection={(sectionId, writing) => void openSection(opened.piece, sectionId, writing)}
+          onOpenSection={(sectionId, writing, at) => void openSection(opened.piece, sectionId, writing, at)}
           onNewChapter={() => void newChapter(opened.piece)}
           onChange={(piece) => {
             askToPersist()
