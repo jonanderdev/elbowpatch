@@ -10,13 +10,13 @@ The maintainer, writing every day on a phone and a desktop, who today uses a mix
 
 ## Flows
 1. Write on the page: open the app, land where you left off, and write with no save button. It worked when the words are there on the next launch, offline or not.
-2. Find a piece in the library: a journal, an essay or a book on the shelf, or start a new one. It worked when one tap opens it at your place.
+2. Find a piece in the library: a journal, an essay or a book, or start a new one. It worked when one tap opens it at your place.
 3. Look back and bring words back: walk through a piece as it was on "Tuesday evening", then bring back a chapter, a day, an essay or one passage. It worked when the old words return and nothing later is lost.
 4. Take everything with you: one click for a zip of Markdown with its full history, one piece as Markdown or PDF, and an import that never overwrites. It worked when the writing opens without this app.
 
 ## Key screens
 - The Page: one column, good type, pages that fill and turn, a running head and a folio. Empty, it is a title and a caret. Serves flow 1.
-- The Library: a shelf of Books, Journal and Essays, each with its word count and a few words from where you left off. Serves flow 2.
+- The Library: Books, Journal and Essays, as a list or a shelf, each with its word count and a few words from where you left off. Serves flow 2.
 - The Time Machine: the whole piece at one moment, a tape of moments under it, and bring back. Serves flow 3.
 
 ## Surface

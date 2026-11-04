@@ -38,7 +38,7 @@ Read docs/brief.md and MANIFESTO.md before changing anything. When in doubt, cho
 - Add nothing to the writing view without a reason.
 - No network call carries writing unless the writer connected a place.
 - Keep the bundle small, and justify every dependency.
-- Data loss is the worst bug: test snapshots, restore, import, export and sync edge cases.
+- Data loss is the worst bug: test moments, restore, import, export and sync edge cases.
 - Human language in everything the writer sees. No Git words.
 - Record decisions in `docs/decisions/`.
 - Keep commits small and the app runnable at every step.
