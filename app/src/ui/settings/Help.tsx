@@ -4,6 +4,8 @@ import { safariOutsideHomeScreen } from '../library/Notes'
 // Help (DESIGN.md, Settings): short answers, inside the app so it works offline.
 // shortcut: Going back and the Time Machine's keys wait for the Time Machine, so Help never describes what isn't there.
 const TIME_MACHINE = false
+// shortcut: the line on exported pages waits for PDF export, the only export with pages.
+const PDF = false
 
 const KEYS: [string, string][] = [
   ['Turn the page', 'Page Up / Page Down, or Alt + Left / Right'],
@@ -39,8 +41,8 @@ export function Help(): ReactElement {
       )}
       <Part heading="Page numbers">
         <p>
-          A phone's page holds fewer words than a desktop's, so a piece has more pages on a phone. Find your way by chapter or by date. Exported pages keep
-          fixed numbers.
+          A phone's page holds fewer words than a desktop's, so a piece has more pages on a phone. Find your way by chapter or by date.
+          {PDF && ' Exported pages keep fixed numbers.'}
         </p>
       </Part>
       {/* Where the library shows its Safari note, and only there. */}

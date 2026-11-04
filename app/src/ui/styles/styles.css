@@ -1582,6 +1582,7 @@ button {
 .help-keys dl div {
   display: flex;
   justify-content: space-between;
+  align-items: baseline;
   gap: 16px;
   padding: 9px 0;
 }
