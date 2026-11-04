@@ -17,10 +17,13 @@ import {
   renameSection,
   restore,
   savePages,
+  savePlace,
   setSubtitle,
   takeMoment,
   totalWords,
+  withChapter,
   withDay,
+  withDraft,
   write,
 } from './pieces'
 
@@ -450,5 +453,152 @@ describe('pieces', () => {
     await write(deps, piece, piece.sections[0]!.sectionId, '')
     await takeMoment(deps, piece.id)
     expect(await store.transaction((tx) => tx.versionsOf(piece.sections[0]!.sectionId))).toEqual([])
+  })
+})
+
+describe('a chapter added to a draft', () => {
+  /** A stored book of two chapters, with words, a place and page counts. */
+  async function storedBook() {
+    const s = setup()
+    const piece = newPiece(s, 'book', 'en')
+    const first = piece.sections[0]!.sectionId
+    await write(s.deps, piece, first, 'The ferry at seven.')
+    await renameSection(s.deps, piece, first, 'One')
+    const { piece: draft, sectionId: second } = withChapter(s, piece)
+    await write(s.deps, draft, second, 'Salt on the windows.')
+    await renameSection(s.deps, draft, second, 'Two')
+    await savePages(s.deps, piece.id, 'phone', first, 3)
+    await savePages(s.deps, piece.id, 'phone', second, 4)
+    await savePlace(s.deps, piece.id, { sectionId: second, paragraph: 0, offset: 4, snippet: 'Salt', page: 1, caret: true, at: 1 })
+    await takeMoment(s.deps, piece.id)
+    const stored = (await openPiece(s.deps, piece.id))!.piece
+    return { ...s, stored, first, second }
+  }
+  const sectionsOf = async (s: Awaited<ReturnType<typeof storedBook>>) => (await openPiece(s.deps, s.stored.id))!.piece.sections.map((c) => c.sectionId)
+
+  it('joins the end of the draft by default, and is not stored by that', async () => {
+    const s = await storedBook()
+    const { piece: draft, sectionId } = withChapter(s, s.stored)
+    expect(draft.sections.map((c) => c.sectionId)).toEqual([s.first, s.second, sectionId])
+    expect(draft.sections.at(-1)!.title).toBe('')
+    expect(await sectionsOf(s)).toEqual([s.first, s.second])
+  })
+
+  it('is stored by its first words, where the draft has it', async () => {
+    const s = await storedBook()
+    const { piece: draft, sectionId } = withChapter(s, s.stored, s.first)
+    await write(s.deps, draft, sectionId, 'In between.')
+    expect(await sectionsOf(s)).toEqual([s.first, sectionId, s.second])
+    const open = (await openPiece(s.deps, s.stored.id))!
+    expect(open.sections.map((c) => c.content)).toEqual(['The ferry at seven.', 'In between.', 'Salt on the windows.'])
+  })
+
+  it('is stored by its first title, where the draft has it, and a moment keeps it in the outline', async () => {
+    const s = await storedBook()
+    const { piece: draft, sectionId } = withChapter(s, s.stored, s.first)
+    await write(s.deps, draft, sectionId, '')
+    await renameSection(s.deps, draft, sectionId, 'Interlude')
+    expect(await sectionsOf(s)).toEqual([s.first, sectionId, s.second])
+
+    expect(await takeMoment(s.deps, s.stored.id)).toBe(1)
+    const open = (await openPiece(s.deps, s.stored.id))!
+    const outline = await s.store.transaction((tx) => tx.outline(open.piece.outlineId!))
+    expect(outline!.sections.map((c) => c.title)).toEqual(['One', 'Interlude', 'Two'])
+    expect(open.sections[1]).toMatchObject({ title: 'Interlude', content: '' })
+  })
+
+  it('left empty leaves nothing behind: no section, count, place, working copy or moment', async () => {
+    const s = await storedBook()
+    const before = await s.store.transaction((tx) => tx.piece(s.stored.id))
+    const { piece: draft, sectionId } = withChapter(s, s.stored)
+    s.clock.set(2_000_000)
+
+    // What a page does on the way out, with nothing written in it.
+    await write(s.deps, draft, sectionId, '')
+    await savePages(s.deps, s.stored.id, 'phone', sectionId, 1)
+    await savePlace(s.deps, s.stored.id, { sectionId, paragraph: 0, offset: 0, snippet: '', page: 0, caret: true, at: 2 })
+    expect(await takeMoment(s.deps, s.stored.id)).toBe(0)
+
+    expect(await s.store.transaction((tx) => tx.piece(s.stored.id))).toEqual(before)
+    expect(await s.store.transaction((tx) => tx.working(sectionId))).toBeUndefined()
+  })
+
+  it('keeps the words and the outline of the rest of the book through all of that', async () => {
+    const s = await storedBook()
+    const { piece: draft, sectionId } = withChapter(s, s.stored)
+    await write(s.deps, draft, sectionId, '')
+    await recover(s.deps)
+    const open = (await openPiece(s.deps, s.stored.id))!
+    expect(open.sections.map((c) => c.content)).toEqual(['The ferry at seven.', 'Salt on the windows.'])
+    expect(totalWords(open.piece)).toBe(8)
+  })
+
+  it('leaves the book pages unknown until it has been laid out', async () => {
+    const s = await storedBook()
+    expect(bookPages(s.stored, 'phone')).toBe(7)
+    const { piece: draft, sectionId } = withChapter(s, s.stored)
+    await write(s.deps, draft, sectionId, 'Words.')
+    const open = (await openPiece(s.deps, s.stored.id))!
+    expect(bookPages(open.piece, 'phone')).toBeUndefined()
+    await savePages(s.deps, s.stored.id, 'phone', sectionId, 1)
+    expect(bookPages((await openPiece(s.deps, s.stored.id))!.piece, 'phone')).toBe(8)
+  })
+
+  it('stored twice stays once, in the same place', async () => {
+    const s = await storedBook()
+    const { piece: draft, sectionId } = withChapter(s, s.stored, s.first)
+    await write(s.deps, draft, sectionId, 'Words.')
+    await write(s.deps, draft, sectionId, 'Words.')
+    await renameSection(s.deps, draft, sectionId, 'Title')
+    await renameSection(s.deps, draft, sectionId, 'Title')
+    expect(await sectionsOf(s)).toEqual([s.first, sectionId, s.second])
+  })
+
+  it('keeps its place among the stored chapters when a draft chapter before it was left empty', async () => {
+    const s = await storedBook()
+    const abandoned = withChapter(s, s.stored, s.first)
+    const { piece: draft, sectionId } = withChapter(s, abandoned.piece, abandoned.sectionId)
+    await write(s.deps, draft, sectionId, 'Words.')
+    expect(await sectionsOf(s)).toEqual([s.first, sectionId, s.second])
+  })
+
+  it('joins at the end when the book gained a chapter since the draft was read', async () => {
+    const s = await storedBook()
+    const a = withChapter(s, s.stored)
+    const b = withChapter(s, s.stored)
+    await write(s.deps, a.piece, a.sectionId, 'First in.')
+    await write(s.deps, b.piece, b.sectionId, 'Second in.')
+    expect(await sectionsOf(s)).toEqual([s.first, s.second, a.sectionId, b.sectionId])
+  })
+
+  it('reads into what is stored at its draft position, for Contents, and adds nothing once stored', async () => {
+    const s = await storedBook()
+    const { piece: draft, sectionId } = withChapter(s, s.stored, s.first)
+    expect(withDraft(s.stored, draft, sectionId).sections.map((c) => c.sectionId)).toEqual([s.first, sectionId, s.second])
+    await write(s.deps, draft, sectionId, 'Words.')
+    const stored = (await openPiece(s.deps, s.stored.id))!.piece
+    expect(withDraft(stored, draft, sectionId).sections).toEqual(stored.sections)
+  })
+
+  it("keeps journal days in date order, whatever the draft's order", async () => {
+    const s = setup()
+    const journal = newPiece(s, 'journal', 'en')
+    const later = withDay(s, journal, '2026-10-28')
+    await write(s.deps, later.piece, later.sectionId, 'Later.')
+    const early = withDay(s, later.piece, '2026-10-26')
+    const out = { ...early.piece, sections: [...early.piece.sections].reverse() }
+    await write(s.deps, out, early.sectionId, 'Earlier.')
+    const open = (await openPiece(s.deps, journal.id))!
+    expect(open.sections.map((d) => d.title)).toEqual(['2026-10-26', '2026-10-28'])
+  })
+
+  it('does not store an untouched journal day when the journal is renamed on it', async () => {
+    const s = setup()
+    const journal = newPiece(s, 'journal', 'en')
+    const first = withDay(s, journal, '2026-10-26')
+    await write(s.deps, first.piece, first.sectionId, 'Words.')
+    const today = withDay(s, first.piece, '2026-10-27')
+    await write(s.deps, today.piece, today.sectionId, '')
+    expect((await openPiece(s.deps, journal.id))!.sections.map((d) => d.title)).toEqual(['2026-10-26'])
   })
 })

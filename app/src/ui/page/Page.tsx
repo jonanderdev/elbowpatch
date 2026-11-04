@@ -15,7 +15,7 @@ import { useScrolled } from '../components/useScrolled'
 import { download } from '../files/download'
 import { markdownFile } from '../files/markdownFile'
 import { useSettings } from '../stores/settings'
-import { ContentsRail, ContentsSheet, RailToggle, RunningHeadControl } from './Contents'
+import { ContentsRail, ContentsSheet, NewChapter, RailToggle, RunningHeadControl } from './Contents'
 import { fillTitleFields, keptFor, type Opened, type TitleRefs, titleOf } from './fields'
 import { PageFoot, StatusLine } from './PageFoot'
 import { SectionTitle, TitlePage } from './Titles'
@@ -50,6 +50,8 @@ interface Props {
   onLibrary(): void
   /** Opens another section of this piece, once this one is saved. `writing`: the caret goes with the writer. */
   onOpenSection(sectionId: string, writing: boolean): void
+  /** Opens a new chapter at the end of the book, once this section is saved. */
+  onNewChapter(): void
   onChange(piece: Piece): void
 }
 
@@ -63,7 +65,20 @@ interface SelectionState {
  * The writing page: one section of a piece, paged (DESIGN.md, The page). The app makes a new page
  * for each section it opens. Each hook below owns one part; this component lays out the page.
  */
-export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, covered, counted, onLibrary, onOpenSection, onChange }: Props): ReactElement {
+export function Page({
+  deps,
+  opened,
+  writer,
+  onWriteHere,
+  flushRef,
+  closingRef,
+  covered,
+  counted,
+  onLibrary,
+  onOpenSection,
+  onNewChapter,
+  onChange,
+}: Props): ReactElement {
   const { piece, sectionId } = opened
   const readOnly = writer !== 'here'
   // A book or a journal opens on its title page: its name, then chapter 1 or the first day on the next page.
@@ -77,7 +92,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
   const keyboard = useKeyboard()
   const phone = usePhone()
   const book = piece.kind === 'book'
-  const live = useOutline(deps, piece, counted)
+  const live = useOutline(deps, piece, sectionId, counted)
   const rail = useRail()
   /** On a book's page, on desktop: Contents is the rail. Essays and journals have none yet. */
   const railed = book && !phone
@@ -368,6 +383,16 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     onOpenSection(chosen, writing)
   }
 
+  // A new chapter opens with the caret in its title: the keyboard comes up from this tap, or not at
+  // all on iOS. As when choosing a chapter, the words being left are safe in the journal first.
+  function addChapter(): void {
+    saving?.journal()
+    raiseKeyboard()
+    onNewChapter()
+  }
+  // Only the window that writes starts a chapter (0010). Whatever holds Contents places it.
+  const newChapter = readOnly ? null : <NewChapter onAdd={addChapter} />
+
   // Escape closes what is open, innermost first: a sheet, then the tools. One listener reads what
   // is open now from a ref: re-attached on each change, an Escape pressed right after one (Done,
   // then Escape) would reach the listener from before it.
@@ -458,7 +483,9 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
               rail.letGo()
               railToggle.current?.focus()
             }}
-          />
+          >
+            {newChapter}
+          </ContentsRail>
         ) : null}
         {page <= (titlePage ? 1 : 0) ? null : book && phone ? (
           <RunningHeadControl title={heading} open={sheet === 'contents'} onOpen={openContents} />
@@ -507,6 +534,8 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
               afterTitlePage={titlePage}
               onFocus={(el) => pager?.show(el.getBoundingClientRect().left)}
               onInput={(text) => {
+                // A new chapter can be stored by its title alone: the place follows the writer there.
+                moved.current = true
                 setHeading(text)
                 saving?.touch()
                 requestAnimationFrame(() => pager?.measure())
@@ -549,7 +578,9 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
           takeFocus={contentsFocus}
           onOpen={openChapter}
           onDone={closeSheet}
-        />
+        >
+          {newChapter}
+        </ContentsSheet>
       ) : null}
       {sheet === 'text' ? <TextSettings onDone={closeSheet} style={anchor} /> : null}
       {sheet === 'export' ? (

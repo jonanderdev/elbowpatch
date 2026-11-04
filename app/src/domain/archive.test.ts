@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { memoryStore } from '../adapters/memory-store'
 import { exportAll, FORMAT_VERSION, guessKind, importArchive, importMarkdown, readDay } from './archive'
-import { newPiece, openPiece, putAway, rename, savePages, takeMoment, totalWords, withDay, write } from './pieces'
+import { newPiece, openPiece, putAway, rename, renameSection, savePages, takeMoment, totalWords, withChapter, withDay, write } from './pieces'
 import type { Store } from './ports'
 
 function setup(start = Date.UTC(2026, 9, 1)) {
@@ -67,6 +67,34 @@ describe('export and import', () => {
     const away = (d: Awaited<ReturnType<typeof dump>>) =>
       d.map((x) => ({ ...x, piece: { ...x.piece, putAwayAt: x.piece.putAwayAt === undefined ? undefined : 'put away' } }))
     expect(away(await dump(b.store))).toEqual(away(await dump(a.store)))
+  })
+
+  it('a book of added chapters, one with only a title, comes back whole, in order, with its moments', async () => {
+    const deps = setup()
+    const book = newPiece(deps, 'book', 'en')
+    const first = book.sections[0]!.sectionId
+    await write(deps, book, first, 'The ferry.')
+    await renameSection(deps, book, first, 'One')
+    const outline = withChapter(deps, book)
+    await renameSection(deps, outline.piece, outline.sectionId, 'Only a title')
+    const words = withChapter(deps, outline.piece, first)
+    await write(deps, words.piece, words.sectionId, 'Between.')
+    await renameSection(deps, words.piece, words.sectionId, 'Between them')
+    await takeMoment(deps, book.id)
+
+    const files = await exportAll(deps)
+    const elsewhere = { ...setup(), store: memoryStore() }
+    expect(await importArchive(elsewhere, files)).toMatchObject({ ok: true, added: 1 })
+    expect(await dump(elsewhere.store)).toEqual(await dump(deps.store))
+
+    const open = (await openPiece(elsewhere, book.id))!
+    expect(open.sections.map((s) => [s.title, s.content])).toEqual([
+      ['One', 'The ferry.'],
+      ['Between them', 'Between.'],
+      ['Only a title', ''],
+    ])
+    const whole = files.find((f) => f.path === 'Untitled/Untitled.md')!
+    expect(whole.text).toBe('# One\n\nThe ferry.\n\n# Between them\n\nBetween.\n\n# Only a title\n')
   })
 
   it('writes readable files: the whole piece, each day with its year, the history, and an index', async () => {

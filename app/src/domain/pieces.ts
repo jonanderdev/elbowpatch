@@ -42,8 +42,10 @@ export function write(deps: Pick<Deps, 'store' | 'clock'>, draft: Piece, section
     const stored = await tx.piece(draft.id)
     const working = await tx.working(sectionId)
     if (stored && working?.content === content) return
+    // A section new in the draft, with nothing in it yet, is not stored: left empty, it was never here.
+    if (stored && content === '' && !stored.sections.some((s) => s.sectionId === sectionId)) return
     const piece = stored ?? draft
-    // A section new in the draft (today, in a journal) joins the piece with its first words.
+    // A section new in the draft (today, in a journal, a new chapter) joins the piece with its first words.
     const sections = joined(piece, draft, sectionId)
     const words = { ...piece.words, [sectionId]: countWords(content) }
     await tx.putPiece({ ...piece, sections, words, updatedAt: now })
@@ -91,6 +93,22 @@ export function withDay(deps: Pick<Deps, 'ids'>, piece: Piece, isoDay: string): 
   const sectionId = deps.ids.next()
   const sections = [...piece.sections, { sectionId, title: isoDay }].sort((a, b) => a.title.localeCompare(b.title))
   return { piece: { ...piece, sections }, sectionId }
+}
+
+/**
+ * A new chapter joins the draft, at the end of the book or right after the chapter given. It is
+ * stored by its first words or its first title, so one left empty is gone (as a journal's day is).
+ */
+export function withChapter(deps: Pick<Deps, 'ids'>, piece: Piece, after?: string): { piece: Piece; sectionId: string } {
+  const sectionId = deps.ids.next()
+  const found = piece.sections.findIndex((s) => s.sectionId === after)
+  const at = found < 0 ? piece.sections.length : found + 1
+  return { piece: { ...piece, sections: [...piece.sections.slice(0, at), { sectionId, title: '' }, ...piece.sections.slice(at)] }, sectionId }
+}
+
+/** The piece as stored, with the draft's open section where it will join: what Contents lists. */
+export function withDraft(stored: Piece, draft: Piece, sectionId: string): Piece {
+  return { ...stored, sections: joined(stored, draft, sectionId) }
 }
 
 export function totalWords(piece: Piece): number {
@@ -164,7 +182,8 @@ export function bookCount(piece: Piece, screen: Screen, open: OpenChapter & { wo
 export function savePages(deps: Pick<Deps, 'store'>, pieceId: string, screen: Screen, sectionId: string, count: number): Promise<void> {
   return deps.store.transaction(async (tx) => {
     const piece = await tx.piece(pieceId)
-    if (!piece || piece.pages?.[screen]?.[sectionId] === count) return
+    // A draft section is not kept yet: left empty, its count would stay behind.
+    if (!piece?.sections.some((s) => s.sectionId === sectionId) || piece.pages?.[screen]?.[sectionId] === count) return
     await tx.putPiece({ ...piece, pages: { ...piece.pages, [screen]: { ...piece.pages?.[screen], [sectionId]: count } } })
   })
 }
@@ -223,7 +242,8 @@ export function forgetPages(deps: Pick<Deps, 'store'>): Promise<void> {
 export function savePlace(deps: Pick<Deps, 'store'>, pieceId: string, place: Place): Promise<void> {
   return deps.store.transaction(async (tx) => {
     const piece = await tx.piece(pieceId)
-    if (piece) await tx.putPiece({ ...piece, place })
+    // A draft section is not kept yet: the writer's place stays where it was, in case it is left empty.
+    if (piece?.sections.some((s) => s.sectionId === place.sectionId)) await tx.putPiece({ ...piece, place })
   })
 }
 
@@ -348,13 +368,20 @@ export function latest(versions: Version[]): Version | undefined {
   return history(versions).at(-1)
 }
 
-/** The stored sections, with this one added from the draft if it is new; journal days in date order. */
+/**
+ * The stored sections, with this one added from the draft if it is new: journal days in date order,
+ * anything else where the draft has it, before the next section that is stored, else at the end.
+ */
 function joined(stored: Piece, draft: Piece, sectionId: string): Piece['sections'] {
-  if (stored.sections.some((s) => s.sectionId === sectionId)) return stored.sections
-  const added = draft.sections.find((s) => s.sectionId === sectionId)
-  if (!added) return stored.sections
-  const sections = [...stored.sections, added]
-  return stored.kind === 'journal' ? sections.sort((a, b) => a.title.localeCompare(b.title)) : sections
+  const known = (id: string): boolean => stored.sections.some((s) => s.sectionId === id)
+  if (known(sectionId)) return stored.sections
+  const at = draft.sections.findIndex((s) => s.sectionId === sectionId)
+  if (at < 0) return stored.sections
+  const added = draft.sections[at]!
+  if (stored.kind === 'journal') return [...stored.sections, added].sort((a, b) => a.title.localeCompare(b.title))
+  const next = draft.sections.slice(at + 1).find((s) => known(s.sectionId))
+  const before = next ? stored.sections.findIndex((s) => s.sectionId === next.sectionId) : stored.sections.length
+  return [...stored.sections.slice(0, before), added, ...stored.sections.slice(before)]
 }
 
 function sameSections(a: Piece['sections'], b: Piece['sections']): boolean {

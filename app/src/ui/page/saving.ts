@@ -93,8 +93,6 @@ export function createSaving(o: SavingOptions): Saving {
     try {
       await write(deps, piece, sectionId, held.markdown)
       stored.markdown = held.markdown
-      // A new piece is stored by its first words: its pages are kept from then on.
-      if (pages) await savePages(deps, piece.id, pages.screen, sectionId, pages.count)
       // A journal day's title is its date, never written here (its title is null).
       if (held.title !== null && held.title !== stored.title) {
         if (piece.kind === 'essay') await rename(deps, piece, held.title)
@@ -109,6 +107,8 @@ export function createSaving(o: SavingOptions): Saving {
         await setSubtitle(deps, piece, held.subtitle)
         stored.subtitle = held.subtitle
       }
+      // A new piece or chapter is stored by its first words or title: its pages are kept from then on.
+      if (pages) await savePages(deps, piece.id, pages.screen, sectionId, pages.count)
       // Clears only these words: newer ones kept meanwhile (the page hid) stay.
       unsaved.saved(sectionId, held.markdown, held.title)
       const found = await openPiece(deps, o.piece.id)
