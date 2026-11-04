@@ -110,7 +110,8 @@ async function reopenIn(page: Page, index: number) {
   await page.goto('./#/')
   await page.reload()
   await page.locator('.row', { hasText: 'harbour' }).click()
-  await expect(page.locator('.flow')).toBeVisible()
+  // Not `.flow` being visible: it is, laid out behind the library, before the book has opened.
+  await expect(page.locator('.page-screen[inert]')).toHaveCount(0)
 }
 
 const countText = (page: Page) => page.locator('.head-tools .count > [aria-hidden], .tools .count').first()

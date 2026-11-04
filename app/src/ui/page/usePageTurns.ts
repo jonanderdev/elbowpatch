@@ -34,13 +34,16 @@ interface Options {
 
 export function usePageTurns({ screen, viewport, bookTitle, editor, pager, covered, readOnly, onTurn, beyond, onCross }: Options): void {
   // Read when a turn happens.
-  const now = useRef({ readOnly, onTurn, beyond, onCross })
-  now.current = { readOnly, onTurn, beyond, onCross }
+  const now = useRef({ covered, readOnly, onTurn, beyond, onCross })
+  now.current = { covered, readOnly, onTurn, beyond, onCross }
 
+  // The listeners stay on behind the library, and the keys ask `now` whether it is there: effects run
+  // after paint, so listeners put on as it leaves would miss a key pressed on the page's first frames.
+  // Everything but the keys goes to the page itself, which is inert while covered.
   useEffect(() => {
     const el = screen.current
     const viewportEl = viewport.current
-    if (covered || !editor || !pager || !el || !viewportEl) return
+    if (!editor || !pager || !el || !viewportEl) return
 
     /**
      * A page on or back. It takes the caret along, to the end of the text on the new page, where
@@ -79,6 +82,7 @@ export function usePageTurns({ screen, viewport, bookTitle, editor, pager, cover
     }
 
     const onKey = (e: KeyboardEvent): void => {
+      if (now.current.covered) return
       // Alt + ← / → alone: with Shift, ⌘ or Ctrl too they move or select by word, as the system does.
       const alt = e.altKey && !e.shiftKey && !e.metaKey && !e.ctrlKey
       if (e.key === 'PageDown' || (alt && e.key === 'ArrowRight')) turn(1, e.shiftKey)
@@ -169,5 +173,10 @@ export function usePageTurns({ screen, viewport, bookTitle, editor, pager, cover
       el.removeEventListener('mousemove', onMouseMove)
       el.removeEventListener('click', onClick)
     }
-  }, [screen, viewport, bookTitle, editor, pager, covered])
+  }, [screen, viewport, bookTitle, editor, pager])
+
+  // The arrow goes with the pointer: the library takes the pointer from the page.
+  useEffect(() => {
+    if (covered && screen.current) screen.current.dataset.turn = ''
+  }, [screen, covered])
 }

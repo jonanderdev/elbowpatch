@@ -313,6 +313,29 @@ test('Page Down held down runs on through the chapters, however slow the store',
   await expect(title(page)).toHaveText('Three', { timeout: 15000 })
 })
 
+test('Page Down does nothing behind the library, and turns from the moment the library leaves', async ({ page }) => {
+  await importBook(page, THREE)
+  await page.goto('./#/')
+  await page.reload()
+  await expect(page.locator('.page-screen[inert]')).toBeAttached()
+  const before = await position(page)
+  await page.keyboard.press('PageDown')
+  expect(await position(page)).toEqual(before)
+
+  // Pressed as the page is uncovered, before anything after that change has had a chance to run.
+  await page.locator('.page-screen').evaluate((screen) => {
+    const uncovered = new MutationObserver(() => {
+      if (screen.hasAttribute('inert')) return
+      uncovered.disconnect()
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'PageDown', bubbles: true, cancelable: true }))
+    })
+    uncovered.observe(screen, { attributes: true, attributeFilter: ['inert'] })
+  })
+  await page.locator('.row', { hasText: 'harbour' }).click()
+  await expect(page.locator('.page-screen[inert]')).toHaveCount(0)
+  await expect.poll(async () => (await position(page)).at).toBe(before.at + 1)
+})
+
 test('turning back from a new chapter left empty leaves nothing behind; turned on to, one with a title opens', async ({ page }) => {
   await importBook(page, '# One\n\nFirst.\n\n# Two\n\nSecond.\n')
   await expect(page.locator('.body')).toHaveAttribute('contenteditable', 'true')
