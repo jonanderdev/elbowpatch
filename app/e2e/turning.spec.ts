@@ -312,3 +312,31 @@ test('Page Down held down runs on through the chapters, however slow the store',
   })
   await expect(title(page)).toHaveText('Three', { timeout: 15000 })
 })
+
+test('turning back from a new chapter left empty leaves nothing behind; turned on to, one with a title opens', async ({ page }) => {
+  await importBook(page, '# One\n\nFirst.\n\n# Two\n\nSecond.\n')
+  await expect(page.locator('.body')).toHaveAttribute('contenteditable', 'true')
+  const newChapter = async () => {
+    if (page.viewportSize()!.width < 700) {
+      await page.locator('.page-button').click()
+      await page.locator('.tools .count').click()
+    }
+    await page.getByRole('button', { name: '+ New chapter' }).click()
+    await expect(title(page)).toBeFocused()
+    await expect(title(page)).toHaveText('')
+  }
+
+  await newChapter()
+  await page.keyboard.press('PageUp')
+  await expect(title(page)).toHaveText('Two')
+  await page.keyboard.press('PageDown')
+  await page.waitForTimeout(300)
+  await expect(title(page)).toHaveText('Two')
+
+  await newChapter()
+  await page.keyboard.type('Three')
+  await page.keyboard.press('PageUp')
+  await expect(title(page)).toHaveText('Two')
+  await page.keyboard.press('PageDown')
+  await expect(title(page)).toHaveText('Three')
+})
