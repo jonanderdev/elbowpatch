@@ -355,3 +355,38 @@ test('the numbers agree after a split: the long chapter is counted again, and th
     await expect(page.locator('.contents-pages')).toHaveText(`${pages} pages`)
   }
 })
+
+test('after a split no number shows that rests on a count not known yet', async ({ page }) => {
+  // Everything waiting for the app to be idle waits for the test.
+  await page.addInitScript(() => {
+    const w = window as unknown as { held: (() => void)[] | null; requestIdleCallback(f: () => void): number }
+    w.held = []
+    w.requestIdleCallback = (f) => {
+      if (w.held) w.held.push(f)
+      else setTimeout(f, 0)
+      return 1
+    }
+  })
+  await importBook(page, LONG)
+  await press(page, 'Part 9.')
+  await expect(page.locator('.title')).toBeFocused()
+  if (!onDesktop(page)) {
+    await page.locator('.title').blur()
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.locator('.page-button').click()
+    await page.locator('.tools .count').click()
+  }
+  const pages = page.locator('.contents-row .contents-page')
+  await expect(page.locator('.contents-row')).toHaveCount(3)
+  // Chapter 1 starts on page 1; everything after it rests on the count the split took away.
+  await expect(pages).toHaveCount(1)
+  await expect(page.locator('.contents-pages')).toHaveCount(0)
+
+  await page.evaluate(() => {
+    const w = window as unknown as { held: (() => void)[] | null }
+    const held = w.held ?? []
+    w.held = null
+    for (const f of held) f()
+  })
+  await expect(pages).toHaveCount(3, { timeout: 15000 })
+})

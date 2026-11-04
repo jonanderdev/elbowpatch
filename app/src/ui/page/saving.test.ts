@@ -148,6 +148,21 @@ describe('a split through the page that holds the text', () => {
     expect(await b.texts()).toEqual([BEFORE, AFTER])
   })
 
+  it('words kept earlier that differ stay for Save a copy, and do not replay over it', async () => {
+    const b = await openBook()
+    const now = vi.spyOn(Date, 'now').mockReturnValue(999_000)
+    unsaved.keep({ piece: b.piece, pieceId: b.piece.id, sectionId: b.sectionId, name: 'x.md', markdown: 'Overtaken words.', title: null })
+    now.mockRestore()
+    await b.saving.split((w) => b.split(w))
+    expect(unsaved.get(b.sectionId)?.markdown).toBe('Overtaken words.')
+    await replayJournal(b.deps, {
+      hold: async () => ({ release() {}, lost: new Promise(() => {}) }),
+      take: async () => ({ release() {}, lost: new Promise(() => {}) }),
+    })
+    expect(await b.texts()).toEqual([BEFORE, AFTER])
+    expect(unsaved.get(b.sectionId)?.markdown).toBe('Overtaken words.')
+  })
+
   it('if the words cannot be stored, it does not run, and they go to the journal', async () => {
     const b = await openBook()
     b.page.held = { ...b.page.held, markdown: `${WHOLE} Not stored.` }

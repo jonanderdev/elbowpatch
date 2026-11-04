@@ -217,8 +217,8 @@ export function createSaving(o: SavingOptions): Saving {
       moment.cancel()
       try {
         const piece = await reshape(held.markdown)
-        // Whatever the journal held for this section is older than the split, or the same words.
-        unsaved.saved(o.sectionId)
+        // These words are stored. Different ones kept earlier stay for Save a copy: older than the split, they never replay.
+        unsaved.saved(o.sectionId, held.markdown, held.title)
         o.onStored(piece)
         // The closing moment. A crash before it is recovered from the working copies.
         void takeMoment(o.deps, o.piece.id).catch(() => {})
