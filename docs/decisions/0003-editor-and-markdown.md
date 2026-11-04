@@ -13,7 +13,8 @@ The page is paged, not scrolled (DESIGN.md, Behaviour).
 
 ### The editor
 - **ProseMirror** is the editing surface. Paging is ours.
-- The editor holds **one section**: the chapter, the day or the essay being written (0005). Other sections are laid out read-only when you turn to them.
+- The editor holds **one section**: the chapter, the day or the essay being written (0005).
+- *Updated 2026-11-04:* other sections were to be laid out read-only when you turn to them. Instead, turning past a chapter's end opens the chapter next to it: its opening page going on, its last page going back. It is the same path as choosing a chapter in Contents, so the chapter being left is saved first and the place follows the writer, and a window that is not writing can turn through the book too. The page holds one section, and opening the neighbour reuses all of that, with less to go wrong. The caret goes where any turn leaves it, inside the new chapter, and a selection stops at its chapter's end. The cost: the page is replaced, so this turn is always a cut, never a slide, with or without reduced motion. If that does not feel right on a phone, this is the decision to revisit. A journal's days do not turn this way yet.
 
 ### Paging
 - The section is laid out in **CSS columns, one column per page**, and the view slides by a page width. The browser keeps caret, selection and keyboard behaviour across pages.
