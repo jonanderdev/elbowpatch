@@ -1,10 +1,11 @@
 import { expect, type Page, test } from '@playwright/test'
 import { caretToEnd, saved, write } from './helpers'
 
-// Contents on a phone (#55). On desktop Contents is the rail, which comes later.
-test.beforeEach(({ page }) => {
-  test.skip(page.viewportSize()!.width >= 700, 'on desktop Contents is the rail')
-})
+// Contents: a sheet on a phone (#55), the rail on desktop (#57).
+const onDesktop = (page: Page) => page.viewportSize()!.width >= 700
+/** A flow that is the phone's alone: the running head, the sheet, the keyboard. */
+const phoneOnly = (page: Page) => test.skip(onDesktop(page), 'on desktop Contents is the rail')
+const desktopOnly = (page: Page) => test.skip(!onDesktop(page), 'the rail is on desktop')
 
 const PARAGRAPH =
   'The windows of the shop had been salted white by the first storm of November, and Ana scraped a small square clear each morning before she unlocked the door.'
@@ -37,7 +38,7 @@ async function writeHere(page: Page) {
   await caretToEnd(page)
 }
 
-const contents = (page: Page) => page.getByRole('dialog', { name: 'Contents' })
+const contents = (page: Page) => (onDesktop(page) ? page.getByRole('navigation', { name: 'Contents' }) : page.getByRole('dialog', { name: 'Contents' }))
 /** A chapter's row, by its title: its name for a screen reader also carries its start page. */
 const chapter = (page: Page, name: string) =>
   contents(page)
@@ -45,9 +46,12 @@ const chapter = (page: Page, name: string) =>
     .filter({ has: page.locator('.contents-title', { hasText: new RegExp(`^${name}$`) }) })
 const runningHead = (page: Page) => page.locator('.running-control')
 const rows = (page: Page) => contents(page).locator('.contents-row')
+/** The book's pages, as Contents says them. */
+const total = (page: Page) => contents(page).locator('.contents-pages')
 
-/** From a page with no running head: the page button, then the count. */
+/** On a phone, from a page with no running head: the page button, then the count. On desktop the rail is open. */
 async function contentsFromCount(page: Page) {
+  if (onDesktop(page)) return expect(contents(page)).toBeVisible()
   await page.locator('.page-button').click()
   await page.locator('.tools .count').click()
   await expect(contents(page)).toBeVisible()
@@ -85,10 +89,13 @@ test("an imported book's second chapter opens from Contents", async ({ page }) =
   await expect(page.locator('.title')).toHaveText('Two')
   await expect(page.locator('.body')).toHaveText('Second.')
   await expect(page.locator('.title')).toBeInViewport()
-  await expect(contents(page)).toHaveCount(0)
+  // The sheet closes behind it; the rail stays, on the chapter just opened.
+  if (onDesktop(page)) await expect(chapter(page, 'Two')).toHaveAttribute('aria-current', 'true')
+  else await expect(contents(page)).toHaveCount(0)
 })
 
 test('the running head carries ⌄ and opens Contents; pressed again, or pressed outside, it closes', async ({ page }) => {
+  phoneOnly(page)
   await importBook(page, THREE)
   await openChapter(page, 'Two')
   // A chapter's opening page has no running head.
@@ -114,6 +121,7 @@ test('the running head carries ⌄ and opens Contents; pressed again, or pressed
 })
 
 test('a chapter opens at its opening page, the one on screen too', async ({ page }) => {
+  phoneOnly(page)
   await importBook(page, THREE)
   await page.keyboard.press('PageDown')
   await page.keyboard.press('PageDown')
@@ -151,7 +159,7 @@ test('start pages and the total show only once they are known; nothing is guesse
   // Only chapter 1 has been laid out: chapter 2's start is known, chapter 3's is not, nor the total.
   await expect(pages).toHaveCount(2)
   await expect(pages.nth(0)).toHaveText('1')
-  await expect(contents(page).locator('.sheet-aside')).toHaveCount(0)
+  await expect(total(page)).toHaveCount(0)
   const second = Number(await pages.nth(1).textContent())
   expect(second).toBeGreaterThan(2)
 
@@ -163,10 +171,11 @@ test('start pages and the total show only once they are known; nothing is guesse
   const third = Number(await pages.nth(2).textContent())
   expect(third).toBeGreaterThan(second)
   // Chapter 3 is one page.
-  await expect(contents(page).locator('.sheet-aside')).toHaveText(`${third} pages`)
+  await expect(total(page)).toHaveText(`${third} pages`)
 })
 
 test('Contents works by keyboard, Escape gives the focus back, and a screen reader hears the current chapter', async ({ page }) => {
+  phoneOnly(page)
   await importBook(page, THREE)
   await page.keyboard.press('PageDown')
   await page.keyboard.press('PageDown')
@@ -194,6 +203,7 @@ test('Contents works by keyboard, Escape gives the focus back, and a screen read
 })
 
 test('a long Contents scrolls inside itself, and its foot stays in reach', async ({ page }) => {
+  phoneOnly(page)
   const many = Array.from({ length: 40 }, (_, i) => `# Chapter ${i + 1}\n\nWords.`).join('\n\n')
   await importBook(page, many)
   await contentsFromCount(page)
@@ -209,6 +219,7 @@ test('a long Contents scrolls inside itself, and its foot stays in reach', async
 })
 
 test('Contents opens with the keyboard up, and the writer stays in the text', async ({ page }) => {
+  phoneOnly(page)
   await importBook(page, THREE)
   await openChapter(page, 'Two')
   await writeHere(page)
@@ -331,6 +342,7 @@ test('a window that is not writing can still open chapters, and stays there on W
 })
 
 test('journals and essays are unchanged: no control on the running head, and the count opens nothing', async ({ page }) => {
+  phoneOnly(page)
   await page.goto('./')
   await page.locator('.start.essay').click()
   await expect(page.locator('.title')).toBeFocused()
@@ -349,4 +361,174 @@ test('journals and essays are unchanged: no control on the running head, and the
   await expect(page.locator('.book-title')).toBeFocused()
   await page.locator('.page-button').click()
   await expect(page.locator('.tools button.count')).toHaveCount(0)
+})
+
+const toggle = (page: Page) => page.locator('.head').getByRole('button', { name: 'Contents' })
+
+test('the rail says the size of the book, and lists what the sheet lists', async ({ page }) => {
+  desktopOnly(page)
+  await importBook(page, TWO)
+  const line = contents(page).locator('.rail-line')
+  await expect(line).toHaveText('2 chapters')
+  await openChapter(page, 'Two')
+  await expect(line).toHaveText(/^2 chapters · \d+ pages$/)
+  await expect(rows(page).locator('.contents-title')).toHaveText(['One', 'Two'])
+  await expect(rows(page).nth(0).locator('.contents-page')).toHaveText('1')
+})
+
+test('the rail folds and opens, is remembered on this device, and never moves the text', async ({ page }) => {
+  desktopOnly(page)
+  await importBook(page, THREE)
+  const column = async () => (await page.locator('.pager').boundingBox())!
+  const open = await column()
+  await expect(toggle(page)).toHaveAttribute('aria-expanded', 'true')
+
+  await toggle(page).click()
+  await expect(contents(page)).toBeHidden()
+  await expect(toggle(page)).toHaveAttribute('aria-expanded', 'false')
+  expect(await column()).toEqual(open)
+
+  await page.reload()
+  await expect(page.locator('.title')).toHaveText('One')
+  await expect(toggle(page)).toHaveAttribute('aria-expanded', 'false')
+  await expect(contents(page)).toBeHidden()
+
+  await toggle(page).click()
+  await expect(contents(page)).toBeVisible()
+  await chapter(page, 'Two').click()
+  await expect(page.locator('.title')).toHaveText('Two')
+  await expect(contents(page)).toBeVisible()
+  expect(await column()).toEqual(open)
+})
+
+test('folding the rail leaves the caret in the text', async ({ page }) => {
+  desktopOnly(page)
+  await importBook(page, TWO)
+  await writeHere(page)
+  await toggle(page).click()
+  await expect(page.locator('.body')).toBeFocused()
+})
+
+test('a click on the bare rail turns no page, and the count on desktop opens nothing', async ({ page }) => {
+  desktopOnly(page)
+  await importBook(page, THREE)
+  await page.keyboard.press('PageDown')
+  await page.keyboard.press('PageDown')
+  const here = page.locator('.head-tools .count')
+  const was = await here.textContent()
+  await page.mouse.click(100, 700)
+  await expect(page.locator('.page-screen')).not.toHaveAttribute('data-turn', /./)
+  await expect(here).toHaveText(was!)
+  await expect(page.locator('.head-tools button.count')).toHaveCount(0)
+})
+
+test('the chapter on screen, chosen in the rail, goes back to its opening page', async ({ page }) => {
+  desktopOnly(page)
+  await importBook(page, THREE)
+  await page.keyboard.press('PageDown')
+  await page.keyboard.press('PageDown')
+  await page.keyboard.press('PageDown')
+  await chapter(page, 'One').click()
+  await expect(page.locator('.title')).toBeInViewport()
+  // The second page of the section: a title page stands before chapter 1.
+  await expect(page.locator('.head-tools .count .visually-hidden')).toHaveText(/^Page 2 of /)
+})
+
+test('the rail works by keyboard, is named for a screen reader, and Escape leaves it', async ({ page }) => {
+  desktopOnly(page)
+  await importBook(page, TWO)
+  await toggle(page).focus()
+  await page.keyboard.press('Tab')
+  await expect(rows(page).nth(0)).toBeFocused()
+  await expect(rows(page).nth(0)).toHaveAttribute('aria-current', 'true')
+
+  await page.keyboard.press('Escape')
+  await expect(toggle(page)).toBeFocused()
+  await expect(contents(page)).toBeVisible()
+
+  await page.keyboard.press('Tab')
+  await page.keyboard.press('Tab')
+  await expect(rows(page).nth(1)).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(page.locator('.title')).toHaveText('Two')
+  await expect(page.locator('.page-screen > [aria-live]')).toHaveText('Two')
+  expect(await page.evaluate(() => document.activeElement === document.body)).toBe(false)
+
+  // Folded, the keyboard passes it by.
+  await toggle(page).focus()
+  await page.keyboard.press('Enter')
+  await expect(contents(page)).toBeHidden()
+  await page.keyboard.press('Tab')
+  await expect(page.locator('.contents-row:focus')).toHaveCount(0)
+})
+
+test('a window that is not writing lands on the chapter in the rail, not on nothing', async ({ page, context }) => {
+  desktopOnly(page)
+  await importBook(page, TWO)
+  const second = await context.newPage()
+  await second.goto(page.url())
+  await expect(second.getByRole('status').filter({ hasText: 'Open in another window' })).toBeVisible()
+  await rows(second).nth(1).focus()
+  await second.keyboard.press('Enter')
+  await expect(second.locator('.title')).toHaveText('Two')
+  await expect(rows(second).nth(1)).toBeFocused()
+})
+
+test('a long rail scrolls inside itself, and starts at the current chapter', async ({ page }) => {
+  desktopOnly(page)
+  const many = Array.from({ length: 40 }, (_, i) => `# Chapter ${i + 1}\n\nWords.`).join('\n\n')
+  await importBook(page, many)
+  const list = contents(page).locator('.contents-list')
+  expect(await list.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true)
+  await chapter(page, 'Chapter 40').scrollIntoViewIfNeeded()
+  await chapter(page, 'Chapter 40').click()
+  await expect(page.locator('.title')).toHaveText('Chapter 40')
+  await expect(chapter(page, 'Chapter 40')).toBeInViewport()
+})
+
+test('where the window has no room for it beside the text, the rail starts folded and opens over the text', async ({ page }) => {
+  desktopOnly(page)
+  await importBook(page, TWO)
+  await page.setViewportSize({ width: 1000, height: 800 })
+  await expect(contents(page)).toBeHidden()
+  await toggle(page).click()
+  await expect(contents(page)).toBeVisible()
+  await chapter(page, 'Two').click()
+  await expect(page.locator('.title')).toHaveText('Two')
+  await expect(contents(page)).toBeHidden()
+  // Wide again, it is as the writer left it.
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await expect(contents(page)).toBeVisible()
+})
+
+test('just wide enough for the rail, a chapter opens with the rail standing still', async ({ page }) => {
+  desktopOnly(page)
+  await importBook(page, TWO)
+  await page.setViewportSize({ width: 1220, height: 900 })
+  await expect(contents(page)).toBeVisible()
+  await page.evaluate(() => {
+    new MutationObserver(() => {
+      if (document.querySelector('.contents-rail[data-folded]')) document.body.dataset.railSlid = 'yes'
+    }).observe(document.body, { subtree: true, childList: true, attributes: true })
+  })
+  await chapter(page, 'Two').click()
+  await expect(page.locator('.title')).toHaveText('Two')
+  await chapter(page, 'One').click()
+  await expect(page.locator('.title')).toHaveText('One')
+  await expect(page.locator('body')).not.toHaveAttribute('data-rail-slid')
+})
+
+test('an essay and a journal have no rail and no toggle', async ({ page }) => {
+  desktopOnly(page)
+  await page.goto('./')
+  await page.locator('.start.essay').click()
+  await expect(page.locator('.title')).toBeFocused()
+  await expect(contents(page)).toHaveCount(0)
+  await expect(toggle(page)).toHaveCount(0)
+
+  await page.goto('./#/')
+  await write(page, 'Journal')
+  await expect(page.locator('.book-title')).toBeFocused()
+  await expect(contents(page)).toHaveCount(0)
+  await expect(toggle(page)).toHaveCount(0)
 })

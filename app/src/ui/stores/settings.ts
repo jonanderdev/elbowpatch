@@ -15,6 +15,8 @@ export interface Settings {
   firstRunDone: boolean
   /** The library as rows or as outlined objects on a shelf (DESIGN.md, The library). */
   libraryView: 'list' | 'shelf'
+  /** The rail folded away on a book's page (DESIGN.md, Layout). */
+  railFolded: boolean
 }
 
 const KEY = 'elbowpatch.settings'
@@ -27,6 +29,7 @@ const defaults: Settings = {
   indent: false,
   firstRunDone: false,
   libraryView: 'list',
+  railFolded: false,
 }
 
 let current: Settings = load()
