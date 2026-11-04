@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { memoryStore } from '../adapters/memory-store'
 import type { Piece } from './model'
 import {
+  bookCount,
   bookPages,
   contents,
   history,
@@ -28,6 +29,58 @@ function setup(start = 1_000_000) {
   const store = memoryStore()
   return { store, clock, ids, deps: { store, clock, ids } }
 }
+
+describe("a book's count", () => {
+  const book: Piece = {
+    id: 'p',
+    kind: 'book',
+    lang: 'en',
+    createdAt: 0,
+    updatedAt: 0,
+    title: 'The harbour',
+    sections: [
+      { sectionId: 'a', title: 'One' },
+      { sectionId: 'b', title: 'Two' },
+      { sectionId: 'c', title: 'Three' },
+    ],
+    outlineId: null,
+    words: { a: 100, b: 200, c: 300 },
+    pages: { phone: { a: 8, b: 8, c: 9 } },
+  }
+  const open = (sectionId: string, pages: number, words: number) => ({ sectionId, title: '', pages, words })
+
+  it("counts the title page as chapter 1's first page: chapter 1 opens on page 2", () => {
+    expect(bookCount(book, 'phone', open('a', 8, 100), 0).page).toBe(1)
+    expect(bookCount(book, 'phone', open('a', 8, 100), 1).page).toBe(2)
+  })
+
+  it("adds the chapters before it to the page in the chapter, and says the book's pages and words", () => {
+    expect(bookCount(book, 'phone', open('c', 9, 300), 1)).toEqual({ page: 18, pages: 25, words: 600 })
+  })
+
+  it('takes the open chapter as it stands on the page, newer than what is stored', () => {
+    expect(bookCount(book, 'phone', open('b', 10, 250), 9)).toEqual({ page: 18, pages: 27, words: 650 })
+  })
+
+  it('never guesses: past a chapter with no count there is no page and no total', () => {
+    const unknown = { ...book, pages: { phone: { a: 8, c: 9 } } }
+    expect(bookCount(unknown, 'phone', open('c', 9, 300), 1)).toEqual({ words: 600 })
+  })
+
+  it('still knows the page when only a later chapter has no count, but not the total', () => {
+    const unknown = { ...book, pages: { phone: { a: 8, b: 8 } } }
+    expect(bookCount(unknown, 'phone', open('b', 8, 200), 2)).toEqual({ page: 11, words: 600 })
+  })
+
+  it("keeps each screen's numbers apart", () => {
+    expect(bookCount(book, 'desktop', open('b', 5, 200), 0)).toEqual({ words: 600 })
+  })
+
+  it('counts a chapter with no words yet as none', () => {
+    const fresh = { ...book, words: { a: 100 } }
+    expect(bookCount(fresh, 'phone', open('a', 8, 120), 0).words).toBe(120)
+  })
+})
 
 describe('Contents', () => {
   const book = (pages?: Piece['pages']): Piece => ({

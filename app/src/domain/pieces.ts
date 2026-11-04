@@ -141,6 +141,25 @@ export function contents(piece: Piece, screen: Screen, open?: OpenChapter): { ch
   return { chapters, ...(start === undefined ? {} : { pages: start - 1 }) }
 }
 
+/** The book's numbers at a page of the open chapter. Each stands aside while it would rest on an unknown count. */
+export interface BookCount {
+  page?: number
+  pages?: number
+  words: number
+}
+
+/**
+ * The folio's and the tools' numbers: `page` is the page in the open chapter, from 0, so the book's first
+ * page is the title page, as in Contents. The chapter's start page is known once every chapter before it is
+ * laid out, the total once all of them are.
+ */
+export function bookCount(piece: Piece, screen: Screen, open: OpenChapter & { words: number }, page: number): BookCount {
+  const { chapters, pages } = contents(piece, screen, open)
+  const start = chapters.find((c) => c.sectionId === open.sectionId)?.startPage
+  const words = piece.sections.reduce((sum, s) => sum + (s.sectionId === open.sectionId ? open.words : (piece.words?.[s.sectionId] ?? 0)), 0)
+  return { ...(start === undefined ? {} : { page: start + page }), ...(pages === undefined ? {} : { pages }), words }
+}
+
 /** Keeps a section's page count on a screen's page. Not a change to the piece: its date stays. Safe to run twice. */
 export function savePages(deps: Pick<Deps, 'store'>, pieceId: string, screen: Screen, sectionId: string, count: number): Promise<void> {
   return deps.store.transaction(async (tx) => {
