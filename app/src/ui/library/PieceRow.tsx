@@ -31,6 +31,7 @@ export function PieceRow(props: {
   const input = useRef<HTMLInputElement>(null)
   const hold = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const held = useRef(false)
+  const renamed = useRef<string | null>(null)
 
   useEffect(() => {
     if (menuOpen) menu.current?.querySelector('button')?.focus()
@@ -40,6 +41,12 @@ export function PieceRow(props: {
     input.current?.focus()
     input.current?.select()
   }, [renaming])
+  // A new title can move the row, and a moved row loses focus: it takes it back once the list has settled.
+  useEffect(() => {
+    if (piece.title !== renamed.current) return
+    renamed.current = null
+    if (document.activeElement === document.body) row.current?.focus()
+  }, [piece.title])
   // The parent's onMenu as it is now, for the listeners below (attached while the menu is open).
   const onMenuNow = useRef(onMenu)
   onMenuNow.current = onMenu
@@ -66,7 +73,10 @@ export function PieceRow(props: {
     if (!input.current || !renaming) return
     const title = input.current.value.trim()
     setRenaming(false)
-    if (keep && title !== piece.title.trim()) props.onRename(title)
+    if (keep && title !== piece.title.trim()) {
+      renamed.current = title
+      props.onRename(title)
+    }
     requestAnimationFrame(() => row.current?.focus())
   }
 
