@@ -15,7 +15,7 @@ The launch screen (§) shows while the app:
 4. waits for the fonts (0011)
 5. lays out that piece and opens it at your place.
 
-The launch screen leaves once the first page is ready. Thinning runs afterwards, when idle. Persistent storage (`navigator.storage.persist()`) is requested after the first piece is written, not at launch, because some browsers ask the user.
+The launch screen leaves once the first page is ready, and not before it has been on screen a moment, counted from its first frame. *Added 2026-11-04:* a launch the service worker cannot answer can be slow, so the mark lives in `index.html` and asks the network for nothing. Thinning runs afterwards, when idle. Persistent storage (`navigator.storage.persist()`) is requested after the first piece is written, not at launch, because some browsers ask the user.
 
 ### A save never fails silently
 *Added 2026-10-27.* Safari on iOS can drop the database connection when the app goes to the background, and a full disk fails a save the same way.
