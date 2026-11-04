@@ -1,4 +1,4 @@
-import { type ReactElement, useEffect, useRef } from 'react'
+import { type ReactElement, type RefObject, useEffect, useRef } from 'react'
 import type { ContentsChapter } from '../../domain/pieces'
 import { number } from '../../domain/words'
 import { Icon } from '../components/Icon'
@@ -29,6 +29,18 @@ export function ContentsList({ chapters, current, onOpen }: ContentsListProps): 
   )
 }
 
+/** The current chapter brought into a long list's view. Returns its row. */
+function showCurrent(root: HTMLElement | null): HTMLElement | null {
+  const list = root?.querySelector<HTMLElement>('.contents-list')
+  const row = root?.querySelector<HTMLElement>('[aria-current="true"]')
+  if (!list || !row) return null
+  const gap = row.getBoundingClientRect().bottom - list.getBoundingClientRect().bottom
+  if (gap > 0) list.scrollTop += gap
+  return row
+}
+
+const pagesWord = (pages: number): string => `${number(pages)} ${pages === 1 ? 'page' : 'pages'}`
+
 interface ContentsSheetProps extends ContentsListProps {
   /** The book's pages, once every chapter's are known. */
   pages?: number
@@ -43,19 +55,15 @@ export function ContentsSheet({ chapters, current, pages, takeFocus, onOpen, onD
   // Once, as it opens: a long list starts at the current chapter.
   const opening = useRef(takeFocus)
   useEffect(() => {
-    const list = ref.current?.querySelector<HTMLElement>('.contents-list')
-    const row = ref.current?.querySelector<HTMLElement>('[aria-current="true"]')
-    if (!list || !row) return
-    const gap = row.getBoundingClientRect().bottom - list.getBoundingClientRect().bottom
-    if (gap > 0) list.scrollTop += gap
-    if (opening.current) row.focus({ preventScroll: true })
+    const row = showCurrent(ref.current)
+    if (opening.current) row?.focus({ preventScroll: true })
   }, [])
   return (
     // A press in the sheet leaves the focus where it is: in the text, the keyboard stays up.
     <div ref={ref} className="sheet surface contents" role="dialog" aria-label="Contents" onMouseDown={(e) => e.preventDefault()}>
       <div className="sheet-title">
         <span>Contents</span>
-        {pages === undefined ? null : <span className="sheet-aside">{`${number(pages)} ${pages === 1 ? 'page' : 'pages'}`}</span>}
+        {pages === undefined ? null : <span className="sheet-aside contents-pages">{pagesWord(pages)}</span>}
       </div>
       <ContentsList chapters={chapters} current={current} onOpen={onOpen} />
       <div className="contents-foot">
@@ -64,6 +72,79 @@ export function ContentsSheet({ chapters, current, pages, takeFocus, onOpen, onD
         </button>
       </div>
     </div>
+  )
+}
+
+interface ContentsRailProps extends ContentsListProps {
+  open: boolean
+  /** The book's pages, once every chapter's are known. */
+  pages?: number
+  /** Escape, from inside it. */
+  onLeave(): void
+}
+
+const RAIL_ID = 'contents-rail'
+
+/**
+ * Contents on desktop: the rail, which folds away and never moves the text (DESIGN.md, Layout). Folded,
+ * it stays out of the way of the keyboard and of a screen reader.
+ */
+export function ContentsRail({ chapters, current, pages, open, onOpen, onLeave }: ContentsRailProps): ReactElement {
+  const ref = useRef<HTMLElement>(null)
+  // A new page opens for each chapter, so a long list starts at the current one; and again on opening.
+  useEffect(() => {
+    if (open) showCurrent(ref.current)
+  }, [open])
+  return (
+    <nav
+      ref={ref}
+      id={RAIL_ID}
+      className="rail contents-rail"
+      aria-label="Contents"
+      data-folded={open ? undefined : ''}
+      // A press in the rail leaves the focus where it is: a chapter chosen while writing keeps the caret going.
+      onMouseDown={(e) => e.preventDefault()}
+      onKeyDown={(e) => {
+        if (e.key !== 'Escape') return
+        e.preventDefault()
+        onLeave()
+      }}
+    >
+      <p className="rail-line">
+        {`${number(chapters.length)} ${chapters.length === 1 ? 'chapter' : 'chapters'}`}
+        {pages === undefined ? null : (
+          <>
+            {' · '}
+            <span className="contents-pages">{pagesWord(pages)}</span>
+          </>
+        )}
+      </p>
+      <ContentsList chapters={chapters} current={current} onOpen={onOpen} />
+    </nav>
+  )
+}
+
+interface RailToggleProps {
+  open: boolean
+  onToggle(): void
+  buttonRef: RefObject<HTMLButtonElement | null>
+}
+
+/** Folds the rail away and opens it again, from the path. Pressed, it leaves the focus in the text. */
+export function RailToggle({ open, onToggle, buttonRef }: RailToggleProps): ReactElement {
+  return (
+    <button
+      ref={buttonRef}
+      type="button"
+      className="icon-button quiet rail-toggle"
+      aria-label="Contents"
+      aria-expanded={open}
+      aria-controls={RAIL_ID}
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={onToggle}
+    >
+      <Icon name="rail" />
+    </button>
   )
 }
 

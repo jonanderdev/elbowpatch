@@ -1,4 +1,4 @@
-import { type RefObject, useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import type { Editor } from '../../page/editor'
 import type { Opened, TitleRefs } from './fields'
 import type { Saving } from './saving'
@@ -33,8 +33,8 @@ interface Options {
   readOnly: boolean
   titlePage: boolean
   titleEditable: boolean
-  /** Takes the focus when a chapter opens with no caret, so a keyboard is not left on nothing. */
-  pageButton: RefObject<HTMLButtonElement | null>
+  /** What takes the focus when a chapter opens with no caret, so a keyboard is not left on nothing. */
+  noCaret(): HTMLElement | null
 }
 
 /**
@@ -48,7 +48,7 @@ interface Options {
  * Going to the library keeps a moment. Returns `leaving()`, for the Library button to call first:
  * it remembers whether the writer was writing, since the library takes the focus away.
  */
-export function useFocusOnOpen({ opened, editor, saving, titles, covered, readOnly, titlePage, titleEditable, pageButton }: Options): { leaving(): void } {
+export function useFocusOnOpen({ opened, editor, saving, titles, covered, readOnly, titlePage, titleEditable, noCaret }: Options): { leaving(): void } {
   const firstCover = useRef(true)
   const writingWhenCovered = useRef(false)
   // The caret was placed for this opening (the page is remounted per section, so once per mount).
@@ -70,7 +70,7 @@ export function useFocusOnOpen({ opened, editor, saving, titles, covered, readOn
     if (opened.at && !placed.current) {
       placed.current = true
       if (!readOnly && (opened.writing || desktop)) editor.focus()
-      else pageButton.current?.focus()
+      else noCaret()?.focus()
       return
     }
     if (readOnly) return
