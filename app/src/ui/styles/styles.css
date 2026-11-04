@@ -1605,6 +1605,9 @@ button {
 .about-rows div {
   padding: 9px 12px;
 }
+.about-rows dd {
+  line-height: 1.4;
+}
 .about-rows dt,
 .about-rows a {
   color: var(--title);
