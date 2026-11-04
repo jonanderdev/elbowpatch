@@ -27,12 +27,14 @@ export async function replayJournal(deps: Deps, lock: WriterLock): Promise<void>
     try {
       // The journal's piece is only a draft: write() keeps what is stored and adds a section it lacks.
       await write(deps, u.piece, u.sectionId, u.markdown)
-      // A title only if it changed here and nothing renamed the piece since.
-      if (!stored.piece || stored.piece.updatedAt <= u.at) {
-        if (u.title !== null) {
-          if (u.piece.kind === 'essay') await rename(deps, u.piece, u.title)
-          else await renameSection(deps, u.piece, u.sectionId, u.title)
-        }
+      // A title only if it changed here and nothing renamed the piece since. A chapter still a draft
+      // has no other title, and may be stored by this one alone.
+      const quiet = !stored.piece || stored.piece.updatedAt <= u.at
+      if (u.title !== null && (quiet || titleIn(stored.piece, u.sectionId) === undefined)) {
+        if (u.piece.kind === 'essay') await rename(deps, u.piece, u.title)
+        else await renameSection(deps, u.piece, u.sectionId, u.title)
+      }
+      if (quiet) {
         if (u.bookTitle) await rename(deps, u.piece, u.bookTitle)
         if (u.subtitle != null) await setSubtitle(deps, u.piece, u.subtitle)
       }

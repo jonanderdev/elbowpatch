@@ -62,7 +62,19 @@ interface SelectionState {
  * The writing page: one section of a piece, paged (DESIGN.md, The page). The app makes a new page
  * for each section it opens. Each hook below owns one part; this component lays out the page.
  */
-export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, covered, onLibrary, onOpenSection, onNewChapter, onChange }: Props): ReactElement {
+export function Page({
+  deps,
+  opened,
+  writer,
+  onWriteHere,
+  flushRef,
+  closingRef,
+  covered,
+  onLibrary,
+  onOpenSection,
+  onNewChapter,
+  onChange,
+}: Props): ReactElement {
   const { piece, sectionId } = opened
   const readOnly = writer !== 'here'
   // A book or a journal opens on its title page: its name, then chapter 1 or the first day on the next page.

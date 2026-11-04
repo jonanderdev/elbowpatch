@@ -164,7 +164,7 @@ export function savePages(deps: Pick<Deps, 'store'>, pieceId: string, screen: Sc
   return deps.store.transaction(async (tx) => {
     const piece = await tx.piece(pieceId)
     // A draft section is not kept yet: left empty, its count would stay behind.
-    if (!piece || !piece.sections.some((s) => s.sectionId === sectionId) || piece.pages?.[screen]?.[sectionId] === count) return
+    if (!piece?.sections.some((s) => s.sectionId === sectionId) || piece.pages?.[screen]?.[sectionId] === count) return
     await tx.putPiece({ ...piece, pages: { ...piece.pages, [screen]: { ...piece.pages?.[screen], [sectionId]: count } } })
   })
 }
