@@ -11,6 +11,7 @@ import keep from './icons/keep.svg'
 import keyboard from './icons/keyboard.svg'
 import moon from './icons/moon.svg'
 import quote from './icons/quote.svg'
+import rail from './icons/rail.svg'
 import redo from './icons/redo.svg'
 import section from './icons/section.svg'
 import settings from './icons/settings.svg'
@@ -32,6 +33,7 @@ export type IconName =
   | 'keyboard'
   | 'moon'
   | 'quote'
+  | 'rail'
   | 'redo'
   | 'section'
   | 'settings'
@@ -53,6 +55,7 @@ const icons: Record<IconName, string> = {
   keyboard,
   moon,
   quote,
+  rail,
   redo,
   section,
   settings,

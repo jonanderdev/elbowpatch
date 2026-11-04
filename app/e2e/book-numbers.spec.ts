@@ -84,7 +84,7 @@ async function counts(page: Page): Promise<number[]> {
   return found
 }
 
-/** Reopens the book in one of its chapters: on desktop no other way there exists yet. */
+/** Reopens the book in one of its chapters, as a launch does. */
 async function reopenIn(page: Page, index: number) {
   await page.evaluate(
     (index) =>
@@ -130,6 +130,14 @@ async function textSize(page: Page, size: 'Small' | 'Large') {
   await page.getByRole('radio', { name: size }).click()
   await page.getByRole('dialog', { name: 'Text settings' }).getByRole('button', { name: 'Done' }).click()
   if (await page.getByRole('button', { name: 'Close tools' }).isVisible()) await page.getByRole('button', { name: 'Close tools' }).click()
+}
+
+/** Contents, open: the sheet on a phone, from the count; the rail, already open, on desktop. */
+async function contents(page: Page) {
+  if (page.viewportSize()!.width >= 700) return page.getByRole('navigation', { name: 'Contents' })
+  await page.locator('.page-button').click()
+  await page.locator('.tools .count').click()
+  return page.getByRole('dialog', { name: 'Contents' })
 }
 
 const sum = (ns: number[]) => ns.reduce((a, b) => a + b, 0)
@@ -188,15 +196,32 @@ test('the folio, the tools and the library read as one book; the title page is p
 })
 
 test('Contents agrees with the folio and the tools', async ({ page }) => {
-  test.skip(page.viewportSize()!.width >= 700, 'on desktop Contents is the rail')
   await importBook(page, BOOK)
   const [one, two, three] = await counts(page)
   await reopenIn(page, 2)
-  await page.locator('.page-button').click()
-  await page.locator('.tools .count').click()
-  const sheet = page.getByRole('dialog', { name: 'Contents' })
-  await expect(sheet.locator('.sheet-aside')).toHaveText(`${one! + two! + three!} pages`)
-  await expect(sheet.locator('.contents-page')).toHaveText(['1', String(one! + 1), String(one! + two! + 1)])
+  const list = await contents(page)
+  await expect(list.locator('.contents-pages')).toHaveText(`${one! + two! + three!} pages`)
+  await expect(list.locator('.contents-page')).toHaveText(['1', String(one! + 1), String(one! + two! + 1)])
+})
+
+test('open Contents fills in as the chapters are measured, and empties and fills again at new text settings', async ({ page }) => {
+  await holdIdle(page)
+  await importBook(page, BOOK)
+  await reopenIn(page, 0)
+  const list = await contents(page)
+  await expect(list.locator('.contents-pages')).toHaveCount(0)
+  await expect(list.locator('.contents-page')).toHaveCount(2)
+
+  await letIdleRun(page)
+  const small = await counts(page)
+  await expect(list.locator('.contents-pages')).toHaveText(`${sum(small)} pages`)
+  await expect(list.locator('.contents-page')).toHaveCount(3)
+
+  // The rail stays open beside the text; on a phone the sheet goes with the tools, and comes back.
+  await textSize(page, 'Large')
+  await expect.poll(async () => sum(await counts(page))).toBeGreaterThan(sum(small))
+  const again = await contents(page)
+  await expect(again.locator('.contents-pages')).toHaveText(`${sum(await counts(page))} pages`)
 })
 
 test('no number shows while an earlier chapter is not counted, and each comes back once it is', async ({ page }) => {
@@ -270,6 +295,7 @@ test('measuring waits for the writer to pause', async ({ page }) => {
   await holdIdle(page)
   await importBook(page, SHORT)
   await reopenIn(page, 0)
+  await expect(page.locator('.body')).toHaveAttribute('contenteditable', 'true')
   await caretToEnd(page)
   await page.keyboard.type('x')
   await letIdleRun(page)
