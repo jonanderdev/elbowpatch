@@ -10,11 +10,9 @@ import { Help, HomeScreen } from './Help'
 import { goesIn, PutAway, waiting } from './PutAway'
 
 // Settings (DESIGN.md, Settings): opened from the library only. The areas
-// here are the ones that work today: Export & import, Put away and Help.
-// shortcut: Writing, Appearance, Time Machine, Backup & sync and About & privacy arrive as they are built.
+// here are the ones that work today: Export & import, Put away, About & privacy and Help.
+// shortcut: Writing, Appearance, Time Machine and Backup & sync arrive as they are built.
 
-// About opens from the library's colophon, so it goes back to the library.
-// shortcut: About is empty until its view is built (Figma, About & privacy).
 export type Area = 'list' | 'export' | 'put-away' | 'help' | 'home-screen' | 'about'
 
 const TITLES: Record<Area, string> = {
@@ -23,7 +21,7 @@ const TITLES: Record<Area, string> = {
   'put-away': 'Put away',
   help: 'Help',
   'home-screen': 'On your Home Screen',
-  about: 'About',
+  about: 'About & privacy',
 }
 
 interface Props {
@@ -47,14 +45,13 @@ export function Settings(props: Props): ReactElement {
     scroller.current?.scrollTo(0, 0)
     heading.current?.focus()
   }, [props.area])
-  const toLibrary = props.area === 'list' || props.area === 'about'
   const back =
     props.area === 'home-screen' ? { word: 'Help', onClick: () => props.go('/settings/help') } : { word: 'Settings', onClick: () => props.go('/settings') }
   return (
     <main ref={scroller} className="settings">
       <div className="settings-head" data-scrolled={scrolled || undefined}>
         {/* § goes home; an area inside Settings adds the way back to it (DESIGN.md, The path). */}
-        <Path onHome={() => props.go('/')} crumbs={toLibrary ? [] : [back]} />
+        <Path onHome={() => props.go('/')} crumbs={props.area === 'list' ? [] : [back]} />
       </div>
       <div className="settings-inner">
         <h1 ref={heading} tabIndex={-1} className="settings-title">

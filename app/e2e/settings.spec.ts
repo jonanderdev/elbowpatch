@@ -189,6 +189,18 @@ test('Help opens from Settings, and says only what this screen can use', async (
   await expect(page.getByRole('heading', { name: 'Export & import', level: 1 })).toBeVisible()
 })
 
+test("the library's About opens About & privacy, one step inside Settings", async ({ page }) => {
+  await page.goto('./#/')
+  await page.getByRole('link', { name: 'About', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'About & privacy', level: 1 })).toBeFocused()
+  expect(await page.locator('.settings').evaluate((view) => view.scrollTop)).toBe(0)
+  await page.getByRole('button', { name: 'Settings' }).click()
+  await expect(page.getByRole('heading', { name: 'Settings', level: 1 })).toBeVisible()
+  await page.goBack()
+  await page.getByRole('button', { name: 'Library' }).click()
+  await expect(page.getByRole('link', { name: 'About', exact: true })).toBeVisible()
+})
+
 test('in Safari on an iPhone, Show me how lands on the Home Screen steps', async ({ browser }) => {
   const iphone = await browser.newContext({
     userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
