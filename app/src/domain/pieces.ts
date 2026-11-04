@@ -1,4 +1,4 @@
-import { countWords, parse } from './markdown'
+import { type Block, countWords, joinHalves, parse, type Seam } from './markdown'
 import type { Kind, Outline, OutlineSection, Piece, Place, Screen, Version, Working } from './model'
 import type { Clock, Ids, Store, Tx } from './ports'
 
@@ -351,7 +351,7 @@ export function startChapterAt(deps: Deps, pieceId: string, start: ChapterStart)
       ...piece,
       sections: [...piece.sections.slice(0, at + 1), { sectionId: newSectionId, title }, ...piece.sections.slice(at + 1)],
       words: { ...piece.words, [sectionId]: countWords(before), [newSectionId]: countWords(after) },
-      pages: withoutCount(piece.pages, sectionId),
+      pages: withoutCounts(piece.pages, [sectionId]),
       place: { sectionId: newSectionId, paragraph: 0, offset: 0, snippet: openingWords(after), page: 1, caret: true, at: now },
       updatedAt: now,
     }
@@ -360,19 +360,88 @@ export function startChapterAt(deps: Deps, pieceId: string, start: ChapterStart)
   })
 }
 
-/** The shortened section's count no longer holds on any screen: it is unknown until it is laid out again. */
-function withoutCount(pages: Piece['pages'], sectionId: string): Piece['pages'] {
+/** What undo puts back together. Only the session that split a chapter knows this. */
+export interface ChapterRejoin {
+  /** The chapter going back. */
+  sectionId: string
+  /** The chapter it was split from. */
+  into: string
+  /** Its text as the page holds it: the rejoin runs only if this is what is stored. */
+  whole: string
+  seam: Seam
+}
+
+/** The chapter the text went back to, as it now stands. */
+export interface Rejoined {
+  piece: Piece
+  sectionId: string
+  content: string
+}
+
+/**
+ * The reverse of a split, in one transaction: a moment first, so the chapter stays in history as it
+ * stood, then its text back onto the end of the chapter before it, and the section out of the current
+ * outline. Its versions stay, and earlier outlines still list it. Safe to run twice. Refused, with
+ * nothing changed, unless `whole` is what is stored and `into` stands right before it.
+ */
+export function rejoinChapter(deps: Deps, pieceId: string, rejoin: ChapterRejoin): Promise<Rejoined> {
+  return deps.store.transaction(async (tx) => {
+    const { sectionId, into, whole, seam } = rejoin
+    const found = await tx.piece(pieceId)
+    if (found?.kind !== 'book') throw new Error('Only a book has chapters.')
+    const at = found.sections.findIndex((s) => s.sectionId === sectionId)
+    if (at < 0) return { piece: found, sectionId: into, content: (await current(tx, into)).content }
+    if (found.sections[at - 1]?.sectionId !== into) throw new Error('The chapter it came from is not before it.')
+    if ((await current(tx, sectionId)).content !== whole) throw new Error('The words are not stored yet.')
+
+    await momentIn(tx, deps, pieceId)
+    const piece = (await tx.piece(pieceId))!
+    const now = deps.clock.now()
+    const before = (await current(tx, into)).content
+    const content = joinHalves(before, whole, seam, piece.sections[at]!.title)
+    const working = await tx.working(into)
+    const base = working?.baseVersionId ?? latest(await tx.versionsOf(into))?.id ?? null
+    await tx.putWorking({ sectionId: into, pieceId, content, baseVersionId: base, updatedAt: now })
+    // The chapter's copy stays, stamped now: words kept for it earlier are older, and never replay it into the book.
+    const left = await tx.working(sectionId)
+    if (left) await tx.putWorking({ ...left, updatedAt: now })
+    const { [sectionId]: _, ...words } = piece.words ?? {}
+    const next: Piece = {
+      ...piece,
+      sections: piece.sections.filter((s) => s.sectionId !== sectionId),
+      words: { ...words, [into]: countWords(content) },
+      pages: withoutCounts(piece.pages, [sectionId, into]),
+      place: { sectionId: into, ...joinIn(before, content), page: 1, caret: true, at: now },
+      updatedAt: now,
+    }
+    await tx.putPiece(next)
+    return { piece: next, sectionId: into, content }
+  })
+}
+
+/** Where the two texts join: the end of what was there before. */
+function joinIn(before: string, content: string): Pick<Place, 'paragraph' | 'offset' | 'snippet'> {
+  const blocks = parse(before)
+  const paragraph = Math.max(blocks.length - 1, 0)
+  const last = blocks.at(-1)
+  const there = parse(content)[paragraph]
+  return { paragraph, offset: last ? wordsOf(last).length : 0, snippet: there ? wordsOf(there).replaceAll('\n', '').slice(0, 160) : '' }
+}
+
+/** A changed section's count no longer holds on any screen: it is unknown until it is laid out again. */
+function withoutCounts(pages: Piece['pages'], sectionIds: string[]): Piece['pages'] {
   if (!pages) return pages
   const left = (counts: Record<string, number> | undefined): Record<string, number> =>
-    Object.fromEntries(Object.entries(counts ?? {}).filter(([id]) => id !== sectionId))
+    Object.fromEntries(Object.entries(counts ?? {}).filter(([id]) => !sectionIds.includes(id)))
   return { ...pages, phone: left(pages.phone), desktop: left(pages.desktop) }
 }
+
+const wordsOf = (block: Block): string => (block.type === 'raw' ? block.text : block.spans.map((s) => s.text).join(''))
 
 /** A place's snippet: the first paragraph's words, as the page shows them. */
 function openingWords(markdown: string): string {
   const first = parse(markdown)[0]
-  if (!first) return ''
-  return (first.type === 'raw' ? first.text : first.spans.map((s) => s.text).join('')).slice(0, 160)
+  return first ? wordsOf(first).slice(0, 160) : ''
 }
 
 /** On launch: text left in working copies by a crash enters history first (0005, 0010). */

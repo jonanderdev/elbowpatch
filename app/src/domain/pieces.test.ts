@@ -13,6 +13,7 @@ import {
   openPiece,
   putAway,
   recover,
+  rejoinChapter,
   rename,
   renameSection,
   restore,
@@ -27,6 +28,7 @@ import {
   withDraft,
   write,
 } from './pieces'
+import type { Tx } from './ports'
 
 function setup(start = 1_000_000) {
   let t = start
@@ -751,5 +753,141 @@ describe('a chapter started at a point', () => {
     await write(b.deps, draft, sectionId, 'Half and half.')
     await startChapterAt(b.deps, b.id, { sectionId, whole: 'Half and half.', before: 'Half', after: ' and half.', title: '', newSectionId: 'new' })
     expect((await openPiece(b.deps, b.id))!.sections.map((c) => c.sectionId)).toEqual([b.first, sectionId, 'new', b.last])
+  })
+
+  describe('rejoining', () => {
+    const SEAM = { front: 'apart', raw: false, escaped: false } as const
+    const back = (b: Book, over: Partial<Parameters<typeof rejoinChapter>[2]> = {}) =>
+      rejoinChapter(b.deps, b.id, { sectionId: 'new', into: b.first, whole: AFTER, seam: SEAM, ...over })
+    const split = async (b: Book) => {
+      await startChapterAt(b.deps, b.id, at(b))
+      await takeMoment(b.deps, b.id)
+    }
+
+    it('gives back the original text and outline, and the versions written in between remain', async () => {
+      const b = await storedBook()
+      await split(b)
+      const typed = `${AFTER} Typed.`
+      await write(b.deps, (await openPiece(b.deps, b.id))!.piece, 'new', typed)
+      await takeMoment(b.deps, b.id)
+      await write(b.deps, (await openPiece(b.deps, b.id))!.piece, 'new', AFTER)
+      const { piece, sectionId, content } = await back(b)
+      await takeMoment(b.deps, b.id)
+
+      expect(sectionId).toBe(b.first)
+      expect(content).toBe(WHOLE)
+      expect(await texts(b)).toEqual([WHOLE, 'The end.'])
+      expect(piece.sections.map((c) => c.sectionId)).toEqual([b.first, b.last])
+      expect((await outlineOf(b))!.sections.map((c) => c.sectionId)).toEqual([b.first, b.last])
+      const kept = history(await b.store.transaction((tx) => tx.versionsOf('new'))).map((v) => v.content)
+      expect(kept).toEqual([AFTER, typed, AFTER])
+      const outlines = (await everything(b)).outlines.map((o) => o.sections.map((c) => c.sectionId))
+      expect(outlines).toContainEqual([b.first, 'new', b.last])
+    })
+
+    it('the moment before it keeps the chapter as it stood, title and all', async () => {
+      const b = await storedBook()
+      await startChapterAt(b.deps, b.id, at(b))
+      await renameSection(b.deps, (await openPiece(b.deps, b.id))!.piece, 'new', 'Salt')
+      await back(b)
+      const outlines = (await everything(b)).outlines.map((o) => o.sections.map((c) => c.title))
+      expect(outlines).toContainEqual(['One', 'Salt', 'Last'])
+      expect((await b.store.transaction((tx) => tx.versionsOf('new'))).map((v) => v.content)).toEqual([AFTER])
+    })
+
+    it('running it twice changes nothing more', async () => {
+      const b = await storedBook()
+      await split(b)
+      const first = await back(b)
+      const once = await everything(b)
+      const second = await back(b)
+      expect(await everything(b)).toEqual(once)
+      expect(second.content).toBe(first.content)
+      expect(second.sectionId).toBe(b.first)
+    })
+
+    it('a failed one leaves everything untouched', async () => {
+      const b = await storedBook()
+      await split(b)
+      const before = await everything(b)
+      const broken = {
+        ...b.deps,
+        store: {
+          transaction: <T>(fn: (tx: Tx) => Promise<T>) =>
+            b.store.transaction((tx) => fn({ ...tx, putPiece: () => Promise.reject(new Error('The disk is full.')) })),
+        },
+      }
+      await expect(rejoinChapter(broken, b.id, { sectionId: 'new', into: b.first, whole: AFTER, seam: SEAM })).rejects.toThrow()
+      expect(await everything(b)).toEqual(before)
+      expect(await texts(b)).toEqual([BEFORE, AFTER, 'The end.'])
+    })
+
+    it('is refused unless the words are what is stored, and the chapter it came from stands before it', async () => {
+      const b = await storedBook()
+      await split(b)
+      const before = await everything(b)
+      await expect(back(b, { whole: 'Not stored yet.' })).rejects.toThrow()
+      await expect(back(b, { into: b.last })).rejects.toThrow()
+      expect(await everything(b)).toEqual(before)
+    })
+
+    it('a title taken from a # line returns as that line', async () => {
+      const b = await storedBook()
+      await startChapterAt(b.deps, b.id, at(b, { title: 'The harbour' }))
+      const { content } = await back(b, { seam: { ...SEAM, back: 'apart' } })
+      expect(content).toBe(`${BEFORE}\n\n\\# The harbour\n\n${AFTER}`)
+      expect(await texts(b)).toEqual([content, 'The end.'])
+    })
+
+    it('a chapter written in since the split takes what is there now onto what is there now', async () => {
+      const b = await storedBook()
+      await split(b)
+      const piece = (await openPiece(b.deps, b.id))!.piece
+      await write(b.deps, piece, b.first, `${BEFORE} More.`)
+      const { content } = await back(b)
+      expect(content).toBe(`${BEFORE} More.\n\n${AFTER}`)
+    })
+
+    it('word counts follow, and both chapters lose their page counts on both screens', async () => {
+      const b = await storedBook()
+      await split(b)
+      for (const screen of ['phone', 'desktop'] as const) {
+        await savePages(b.deps, b.id, screen, b.first, 2)
+        await savePages(b.deps, b.id, screen, 'new', 3)
+      }
+      const { piece } = await back(b)
+      expect(piece.words).toEqual({ [b.first]: 11, [b.last]: 2 })
+      expect(totalWords(piece)).toBe(13)
+      for (const screen of ['phone', 'desktop'] as const) {
+        expect(piece.pages?.[screen]).toEqual({ [b.last]: 1 })
+        expect(bookPages(piece, screen)).toBeUndefined()
+      }
+    })
+
+    it('the place is the caret at the join', async () => {
+      const b = await storedBook()
+      await split(b)
+      const { piece } = await back(b, { seam: { ...SEAM, front: 'inside' } })
+      expect(piece.place).toMatchObject({ sectionId: b.first, paragraph: 0, caret: true })
+      expect(piece.place?.offset).toBe(BEFORE.length)
+    })
+
+    it('recovering straight after keeps every word once, and the chapter out', async () => {
+      const b = await storedBook()
+      await split(b)
+      await back(b)
+      await recover(b.deps)
+      expect(await texts(b)).toEqual([WHOLE, 'The end.'])
+      expect((await outlineOf(b))!.sections.map((c) => c.sectionId)).toEqual([b.first, b.last])
+    })
+
+    it('a save from the page that held the words, should one come, does not stand as newer than the rejoin', async () => {
+      const b = await storedBook()
+      await split(b)
+      b.clock.set(2_000_000)
+      await back(b)
+      const copy = await b.store.transaction((tx) => tx.working('new'))
+      expect(copy?.updatedAt).toBe(2_000_000)
+    })
   })
 })

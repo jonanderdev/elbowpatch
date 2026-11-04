@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { memoryStore } from '../../adapters/memory-store'
 import type { Piece, Place } from '../../domain/model'
-import { newPiece, openPiece, renameSection, startChapterAt, takeMoment, write } from '../../domain/pieces'
+import { newPiece, openPiece, rejoinChapter, renameSection, startChapterAt, takeMoment, write } from '../../domain/pieces'
 import { replayJournal } from '../app/replay'
 import { unsaved } from '../stores/unsaved'
 import { createSaving, type Held } from './saving'
@@ -193,6 +193,19 @@ describe('a split through the page that holds the text', () => {
     expect(await b.texts()).toEqual([`${WHOLE} More.`])
   })
 
+  it('a second one asked for while the first waits does not run', async () => {
+    const b = await openBook()
+    b.page.held = { ...b.page.held, markdown: `${WHOLE} Just typed.` }
+    let ran = 0
+    const once = (w: string): Promise<Piece> => {
+      ran++
+      return b.split(w, `${AFTER} Just typed.`)
+    }
+    const both = await Promise.all([b.saving.split(once), b.saving.split(once)])
+    expect(ran).toBe(1)
+    expect(both.filter(Boolean)).toHaveLength(1)
+  })
+
   it('never runs in a window that is not writing, or on a page that has closed', async () => {
     const b = await openBook()
     b.page.readOnly = true
@@ -201,5 +214,77 @@ describe('a split through the page that holds the text', () => {
     await b.saving.close()
     expect(await b.saving.split((w) => b.split(w))).toBe(false)
     expect(await b.texts()).toEqual([WHOLE])
+  })
+})
+
+describe('a rejoin through the page of the chapter going back', () => {
+  /** A book just split, open on the new chapter's page. */
+  async function openSplit() {
+    const b = await openBook()
+    const piece = await b.split(WHOLE)
+    const page = { held: { markdown: AFTER, title: '', bookTitle: null, subtitle: null } as Held }
+    const saving = createSaving({
+      deps: b.deps,
+      piece,
+      sectionId: 'new',
+      stored: { markdown: AFTER, title: '', bookTitle: '', subtitle: '' },
+      read: () => page.held,
+      readOnly: () => false,
+      place: () => undefined,
+      pages: () => ({ screen: 'phone', count: 9 }),
+      onStored: () => {},
+      onFailed: () => {},
+    })
+    const rejoin = async (whole: string): Promise<Piece> =>
+      (await rejoinChapter(b.deps, b.piece.id, { sectionId: 'new', into: b.sectionId, whole, seam: { front: 'inside', raw: false, escaped: false } })).piece
+    return { ...b, page, saving, rejoin }
+  }
+  const replay = (b: Awaited<ReturnType<typeof openSplit>>) =>
+    replayJournal(b.deps, {
+      hold: async () => ({ release() {}, lost: new Promise(() => {}) }),
+      take: async () => ({ release() {}, lost: new Promise(() => {}) }),
+    })
+
+  it('stores words typed just before it, and takes them along', async () => {
+    const b = await openSplit()
+    b.page.held = { ...b.page.held, markdown: `${AFTER} Typed.` }
+    expect(await b.saving.split(b.rejoin)).toBe(true)
+    expect(await b.texts()).toEqual([`${WHOLE} Typed.`])
+  })
+
+  it('the page closing behind it writes nothing, so the words are not doubled and the chapter stays out', async () => {
+    const b = await openSplit()
+    await b.saving.split(b.rejoin)
+    await b.saving.close()
+    const { piece, sections } = (await openPiece(b.deps, b.piece.id))!
+    expect(sections.map((c) => c.content)).toEqual([WHOLE])
+    expect(piece.sections.map((c) => c.sectionId)).toEqual([b.sectionId])
+    expect(piece.pages?.phone?.new).toBeUndefined()
+  })
+
+  it('words kept earlier, for either chapter, do not replay over it or put the chapter back', async () => {
+    const b = await openSplit()
+    const now = vi.spyOn(Date, 'now').mockReturnValue(999_000)
+    unsaved.keep({ piece: b.piece, pieceId: b.piece.id, sectionId: b.sectionId, name: 'x.md', markdown: 'Overtaken words.', title: null })
+    const draft = { ...b.piece, sections: [...b.piece.sections, { sectionId: 'new', title: '' }] }
+    unsaved.keep({ piece: draft, pieceId: b.piece.id, sectionId: 'new', name: 'x.md', markdown: 'Overtaken too.', title: null })
+    now.mockRestore()
+    await b.saving.split(b.rejoin)
+    await replay(b)
+    expect(await b.texts()).toEqual([WHOLE])
+    expect(unsaved.get(b.sectionId)?.markdown).toBe('Overtaken words.')
+  })
+
+  it('if it fails, everything stays, and the chapter goes on saving', async () => {
+    const b = await openSplit()
+    const done = await b.saving.split(async () => {
+      throw new Error('The disk is full.')
+    })
+    expect(done).toBe(false)
+    expect(await b.texts()).toEqual([BEFORE, AFTER])
+    b.page.held = { ...b.page.held, markdown: `${AFTER} More.` }
+    b.saving.touch()
+    await b.saving.flush()
+    expect(await b.texts()).toEqual([BEFORE, `${AFTER} More.`])
   })
 })

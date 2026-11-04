@@ -152,7 +152,12 @@ describe('the halves back together', () => {
   })
 
   it('a # line comes back as an escaped line, where it stood', () => {
-    for (const text of ['Before.\n\n\\# The harbour\n\nAfter.', 'Before.\n\n\\# The harbour\nIn winter.', 'Before.\n\\# The harbour', 'A\n\\# The harbour\nB']) {
+    for (const text of [
+      'Before.\n\n\\# The harbour\n\nAfter.',
+      'Before.\n\n\\# The harbour\nIn winter.',
+      'Before.\n\\# The harbour',
+      'A\n\\# The harbour\nB',
+    ]) {
       const { doc, pos } = posOf(text, '# The')
       expect(back(halvesAtLine(doc, pos)), text).toBe(text)
     }
