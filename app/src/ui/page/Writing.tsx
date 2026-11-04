@@ -130,6 +130,9 @@ export function FieldBar({ field, barRef }: { field: HTMLElement; barRef: RefObj
   return <KeyboardBar onUndo={() => stepField(field, 'undo')} onRedo={() => stepField(field, 'redo')} onHide={() => field.blur()} barRef={barRef} />
 }
 
+/** The tallest the visible height has been at this width. Outlives a page: a chapter can open with the keyboard up. */
+let tallest = { width: 0, height: 0 }
+
 /**
  * Whether the on-screen keyboard is up. The keyboard may shrink the window itself (a phone's browser, and
  * Android with `interactive-widget=resizes-content`) or only the part of it on view (iPhone, installed), so
@@ -144,7 +147,6 @@ export function useKeyboard(): boolean {
     const vv = window.visualViewport
     if (!vv) return
     const root = document.documentElement
-    let tallest = { width: 0, height: 0 }
     let wasUp = false
     // Installed on iPhone, iOS slides the view up to show the caret behind the keyboard; the screen
     // already ends above it, so it is slid back. A scroll inside the page never moves the view. Only
