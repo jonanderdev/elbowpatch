@@ -1492,13 +1492,17 @@ button.count[aria-expanded='true'] {
 .contents-foot {
   flex: none;
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   margin: 18px 10px 0;
   padding-top: 12px;
   border-top: 1px solid var(--surface-line);
 }
 .contents-foot .text-link {
   margin: -4px 0;
+}
+/* Done keeps its side when + New chapter is absent. */
+.contents-foot .text-link:last-child {
+  margin-left: auto;
 }
 
 /* The library's foot is not reserved: the + floats over the last rows. */
@@ -2237,6 +2241,17 @@ button.count[aria-expanded='true'] {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  /* Under the chapters, on the rail's line; it stays in reach while a long list scrolls. */
+  .contents-rail .new-chapter {
+    flex: none;
+    align-self: flex-start;
+    margin-top: 8px;
+    font-size: 15px;
+    line-height: normal;
+  }
+  .contents-rail .new-chapter-mark {
+    margin-right: 0.25em;
   }
   /* Write's menu drops under it, right-aligned to it, never over it. */
   .write-menu-anchor {

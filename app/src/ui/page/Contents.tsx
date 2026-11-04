@@ -1,4 +1,4 @@
-import { type ReactElement, type RefObject, useEffect, useRef } from 'react'
+import { type ReactElement, type ReactNode, type RefObject, useEffect, useRef } from 'react'
 import type { ContentsChapter } from '../../domain/pieces'
 import { number } from '../../domain/words'
 import { Icon } from '../components/Icon'
@@ -29,6 +29,15 @@ export function ContentsList({ chapters, current, onOpen }: ContentsListProps): 
   )
 }
 
+/** *+ New chapter*: a text link for whatever holds Contents to place, the sheet's foot or under the rail's chapters. */
+export function NewChapter({ onAdd }: { onAdd(): void }): ReactElement {
+  return (
+    <button type="button" className="text-link strong new-chapter" onClick={onAdd}>
+      <span className="new-chapter-mark">+</span> New chapter
+    </button>
+  )
+}
+
 /** The current chapter brought into a long list's view. Returns its row. */
 function showCurrent(root: HTMLElement | null): HTMLElement | null {
   const list = root?.querySelector<HTMLElement>('.contents-list')
@@ -47,10 +56,12 @@ interface ContentsSheetProps extends ContentsListProps {
   /** Opened by keyboard: the focus moves to the current chapter. Otherwise it stays, so the phone keyboard stays up. */
   takeFocus: boolean
   onDone(): void
+  /** What stands in the foot beside Done: *+ New chapter*, in a window that is writing. */
+  children?: ReactNode
 }
 
 /** Contents on a phone: a sheet dropped under the head, whose list scrolls inside it. */
-export function ContentsSheet({ chapters, current, pages, takeFocus, onOpen, onDone }: ContentsSheetProps): ReactElement {
+export function ContentsSheet({ chapters, current, pages, takeFocus, onOpen, onDone, children }: ContentsSheetProps): ReactElement {
   const ref = useRef<HTMLDivElement>(null)
   // Once, as it opens: a long list starts at the current chapter.
   const opening = useRef(takeFocus)
@@ -67,6 +78,7 @@ export function ContentsSheet({ chapters, current, pages, takeFocus, onOpen, onD
       </div>
       <ContentsList chapters={chapters} current={current} onOpen={onOpen} />
       <div className="contents-foot">
+        {children}
         <button type="button" className="text-link" onClick={onDone}>
           Done
         </button>
@@ -81,6 +93,8 @@ interface ContentsRailProps extends ContentsListProps {
   pages?: number
   /** Escape, from inside it. */
   onLeave(): void
+  /** What stands under the chapters: *+ New chapter*, in a window that is writing. */
+  children?: ReactNode
 }
 
 const RAIL_ID = 'contents-rail'
@@ -89,7 +103,7 @@ const RAIL_ID = 'contents-rail'
  * Contents on desktop: the rail, which folds away and never moves the text (DESIGN.md, Layout). Folded,
  * it stays out of the way of the keyboard and of a screen reader.
  */
-export function ContentsRail({ chapters, current, pages, open, onOpen, onLeave }: ContentsRailProps): ReactElement {
+export function ContentsRail({ chapters, current, pages, open, onOpen, onLeave, children }: ContentsRailProps): ReactElement {
   const ref = useRef<HTMLElement>(null)
   // A new page opens for each chapter, so a long list starts at the current one; and again on opening.
   useEffect(() => {
@@ -120,6 +134,7 @@ export function ContentsRail({ chapters, current, pages, open, onOpen, onLeave }
         )}
       </p>
       <ContentsList chapters={chapters} current={current} onOpen={onOpen} />
+      {children}
     </nav>
   )
 }
