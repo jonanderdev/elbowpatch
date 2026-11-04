@@ -175,3 +175,33 @@ test('no storage warning; a quiet export reminder after 30 days without a copy',
   await expect(page.getByText(/^Everything is in Elbowpatch .*\.zip\.$/)).toBeVisible()
   await expect(reminder).toHaveCount(0)
 })
+
+test('Help opens from Settings, and says only what this screen can use', async ({ page }) => {
+  await page.goto('./#/settings')
+  await page.getByRole('button', { name: /^Help/ }).click()
+  await expect(page.getByRole('heading', { name: 'Help', level: 1 })).toBeFocused()
+  await expect(page.getByText('In this browser, on this device.')).toBeVisible()
+  // The keys are for a keyboard: desktop only.
+  const phone = (page.viewportSize()?.width ?? 0) < 700
+  await expect(page.getByText('Turn the page')).toBeVisible({ visible: !phone })
+  await expect(page.getByText('On an iPhone or iPad')).toHaveCount(0)
+  await page.getByRole('link', { name: 'Export & import' }).click()
+  await expect(page.getByRole('heading', { name: 'Export & import', level: 1 })).toBeVisible()
+})
+
+test('in Safari on an iPhone, Show me how lands on the Home Screen steps', async ({ browser }) => {
+  const iphone = await browser.newContext({
+    userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+    viewport: { width: 390, height: 844 },
+  })
+  const phone = await iphone.newPage()
+  await phone.goto('./#/')
+  await expect(phone.getByText('Write from your Home Screen and your words stay.')).toBeVisible()
+  await phone.getByRole('link', { name: 'Show me how' }).click()
+  await expect(phone.getByRole('heading', { name: 'On your Home Screen', level: 1 })).toBeVisible()
+  await expect(phone.getByRole('listitem')).toHaveCount(4)
+  await phone.getByRole('button', { name: 'Help' }).click()
+  await expect(phone.getByText('On an iPhone or iPad')).toBeVisible()
+  await expect(phone.getByText('Turn the page')).toBeHidden()
+  await iphone.close()
+})
