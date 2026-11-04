@@ -150,15 +150,24 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
     setOpened({ ...there, at, writing })
   }
 
-  // A new chapter at the end of the book, read from what is stored once the section left is saved.
-  // It is a draft: it joins the piece with its first words or title, so one left empty is gone.
-  const newChapter = async (draft: Piece): Promise<void> => {
+  // A new chapter at the end of the book or right after a chapter, read from what is stored once the
+  // section left is saved. It is a draft: it joins the piece with its first words or title, so one
+  // left empty is gone.
+  const newChapter = async (draft: Piece, after?: string): Promise<void> => {
     const turn = ++chosen.current
     await saveFirst()
     const next = await open(draft.id).catch(() => undefined)
     if (next === undefined || turn !== chosen.current) return
-    const { piece, sectionId } = withChapter(deps, next?.piece ?? neverStored(draft))
+    const { piece, sectionId } = withChapter(deps, next?.piece ?? neverStored(draft), after)
     setOpened({ piece, sectionId, content: '', fresh: true, readAt: ++reads })
+  }
+
+  // A chapter started in the text is already stored, and everything it opens with is at hand: reading
+  // it back could fail, and leave the writer on a page that no longer writes.
+  const chapterStarted = (piece: Piece, sectionId: string, content: string): void => {
+    ++chosen.current
+    going.current = ''
+    setOpened({ piece, sectionId, content, updatedAt: piece.updatedAt, fresh: true, readAt: ++reads })
   }
 
   const startNew = (kind: Kind) => {
@@ -205,7 +214,8 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
             go('/')
           }}
           onOpenSection={(sectionId, writing, at) => void openSection(opened.piece, sectionId, writing, at)}
-          onNewChapter={() => void newChapter(opened.piece)}
+          onNewChapter={(after) => void newChapter(opened.piece, after)}
+          onChapterStarted={chapterStarted}
           onChange={(piece) => {
             askToPersist()
             setPieces((all) => {

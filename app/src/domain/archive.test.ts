@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { memoryStore } from '../adapters/memory-store'
 import { exportAll, FORMAT_VERSION, guessKind, importArchive, importMarkdown, readDay } from './archive'
-import { newPiece, openPiece, putAway, rename, renameSection, savePages, takeMoment, withChapter, withDay, write } from './pieces'
+import { newPiece, openPiece, putAway, rename, renameSection, savePages, startChapterAt, takeMoment, withChapter, withDay, write } from './pieces'
 import type { Store } from './ports'
 
 function setup(start = Date.UTC(2026, 9, 1)) {
@@ -95,6 +95,56 @@ describe('export and import', () => {
     ])
     const whole = files.find((f) => f.path === 'Untitled/Untitled.md')!
     expect(whole.text).toBe('# One\n\nThe ferry.\n\n# Between them\n\nBetween.\n\n# Only a title\n')
+  })
+
+  it('a book of split and added chapters comes back whole, and as one file has one heading per chapter, in order', async () => {
+    const deps = setup()
+    const book = newPiece(deps, 'book', 'en')
+    const first = book.sections[0]!.sectionId
+    const whole = 'The ferry.\n\nSalt on the rail.\n\nThe harbour in winter.'
+    await write(deps, book, first, whole)
+    await renameSection(deps, book, first, 'One')
+    await takeMoment(deps, book.id)
+    await startChapterAt(deps, book.id, {
+      sectionId: first,
+      whole,
+      before: 'The ferry.',
+      after: 'Salt on the rail.\n\nThe harbour in winter.',
+      title: '',
+      newSectionId: 'cut',
+    })
+    await takeMoment(deps, book.id)
+    const rest = 'Salt on the rail.\n\nThe harbour in winter.'
+    await startChapterAt(deps, book.id, {
+      sectionId: 'cut',
+      whole: rest,
+      before: 'Salt on the rail.',
+      after: 'The harbour in winter.',
+      title: 'Winter',
+      newSectionId: 'line',
+    })
+    await takeMoment(deps, book.id)
+    const added = withChapter(deps, (await openPiece(deps, book.id))!.piece, first)
+    await write(deps, added.piece, added.sectionId, 'Added.')
+    await renameSection(deps, added.piece, added.sectionId, 'Added')
+    await takeMoment(deps, book.id)
+
+    const files = await exportAll(deps)
+    const elsewhere = { ...setup(), store: memoryStore() }
+    expect(await importArchive(elsewhere, files)).toMatchObject({ ok: true, added: 1 })
+    expect(await dump(elsewhere.store)).toEqual(await dump(deps.store))
+
+    const open = (await openPiece(elsewhere, book.id))!
+    expect(open.sections.map((s) => [s.title, s.content])).toEqual([
+      ['One', 'The ferry.'],
+      ['Added', 'Added.'],
+      ['', 'Salt on the rail.'],
+      ['Winter', 'The harbour in winter.'],
+    ])
+    const text = files.find((f) => f.path === 'Untitled/Untitled.md')!.text
+    expect(text).toBe('# One\n\nThe ferry.\n\n# Added\n\nAdded.\n\n# Untitled\n\nSalt on the rail.\n\n# Winter\n\nThe harbour in winter.\n')
+    const read = await importMarkdown(elsewhere, 'again.md', text as string, 'book', 'en')
+    expect(read.sections.map((s) => s.title)).toEqual(['One', 'Added', 'Untitled', 'Winter'])
   })
 
   it('writes readable files: the whole piece, each day with its year, the history, and an index', async () => {
