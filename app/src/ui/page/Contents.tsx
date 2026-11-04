@@ -1,4 +1,4 @@
-import { type ReactElement, useEffect, useRef } from 'react'
+import { type ReactElement, type ReactNode, useEffect, useRef } from 'react'
 import type { ContentsChapter } from '../../domain/pieces'
 import { number } from '../../domain/words'
 import { Icon } from '../components/Icon'
@@ -29,16 +29,27 @@ export function ContentsList({ chapters, current, onOpen }: ContentsListProps): 
   )
 }
 
+/** *+ New chapter*: a text link for whatever holds Contents to place, the sheet's foot or under the rail's chapters. */
+export function NewChapter({ onAdd }: { onAdd(): void }): ReactElement {
+  return (
+    <button type="button" className="text-link strong" onClick={onAdd}>
+      + New chapter
+    </button>
+  )
+}
+
 interface ContentsSheetProps extends ContentsListProps {
   /** The book's pages, once every chapter's are known. */
   pages?: number
   /** Opened by keyboard: the focus moves to the current chapter. Otherwise it stays, so the phone keyboard stays up. */
   takeFocus: boolean
   onDone(): void
+  /** What stands in the foot beside Done: *+ New chapter*, in a window that is writing. */
+  children?: ReactNode
 }
 
 /** Contents on a phone: a sheet dropped under the head, whose list scrolls inside it. */
-export function ContentsSheet({ chapters, current, pages, takeFocus, onOpen, onDone }: ContentsSheetProps): ReactElement {
+export function ContentsSheet({ chapters, current, pages, takeFocus, onOpen, onDone, children }: ContentsSheetProps): ReactElement {
   const ref = useRef<HTMLDivElement>(null)
   // Once, as it opens: a long list starts at the current chapter.
   const opening = useRef(takeFocus)
@@ -59,6 +70,7 @@ export function ContentsSheet({ chapters, current, pages, takeFocus, onOpen, onD
       </div>
       <ContentsList chapters={chapters} current={current} onOpen={onOpen} />
       <div className="contents-foot">
+        {children}
         <button type="button" className="text-link" onClick={onDone}>
           Done
         </button>

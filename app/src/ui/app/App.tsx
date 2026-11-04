@@ -1,7 +1,7 @@
 import { type ReactElement, useCallback, useEffect, useRef, useState } from 'react'
 import { pieceAsMarkdown } from '../../domain/export'
 import type { Kind, Piece } from '../../domain/model'
-import { type Deps, library, newPiece, openPiece, putAway, recover, rename, restore, withDay } from '../../domain/pieces'
+import { type Deps, library, newPiece, openPiece, putAway, recover, rename, restore, withChapter, withDay } from '../../domain/pieces'
 import type { WriterLock } from '../../domain/ports'
 import { forgetPutAway, thin } from '../../domain/thinning'
 import { isoDay } from '../../domain/words'
@@ -137,6 +137,17 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
     if (next && turn === chosen.current) setOpened({ ...next, at: 'opening', writing })
   }
 
+  // A new chapter at the end of the book, read from what is stored once the section left is saved.
+  // It is a draft: it joins the piece with its first words or title, so one left empty is gone.
+  const newChapter = async (pieceId: string): Promise<void> => {
+    const turn = ++chosen.current
+    await saveFirst()
+    const next = await open(pieceId).catch(() => null)
+    if (!next || turn !== chosen.current) return
+    const { piece, sectionId } = withChapter(deps, next.piece)
+    setOpened({ piece, sectionId, content: '', fresh: true, readAt: ++reads })
+  }
+
   const startNew = (kind: Kind) => {
     raiseKeyboard()
     let piece = newPiece(deps, kind, navigator.language || 'en')
@@ -181,6 +192,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
             go('/')
           }}
           onOpenSection={(sectionId, writing) => void openSection(opened.piece.id, sectionId, writing)}
+          onNewChapter={() => void newChapter(opened.piece.id)}
           onChange={(piece) => {
             askToPersist()
             setPieces((all) => {
