@@ -70,7 +70,7 @@ These rules decide execution, never the look. The direction and `DESIGN.md` deci
 
 **Principle:** colour carries meaning, and the meaning stays the same everywhere.
 
-- [hard] Body text has a contrast ratio of at least 4.5:1 against its background. Large text (24px, or 18.66px bold, and up) and the visible parts of controls and icons have at least 3:1.
+- [hard] Body text has a contrast ratio of at least 4.5:1 against its background. Large text (24px, or 18.66px bold, and up) and the visible parts of controls and icons have at least 3:1. Disabled controls are exempt, as in WCAG 1.4.3, when `DESIGN.md` names them.
 - [hard] Colour is never the only signal. An error, a selected item or a required field also changes shape, weight, an icon or text.
 - [soft] Every colour on the screen is a token in `DESIGN.md`. Pick three at random: each maps to a named token.
 - [soft] The accent colour marks action or state, and is not also used for decoration on the same screen.
