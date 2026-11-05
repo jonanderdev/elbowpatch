@@ -4,8 +4,8 @@ import { type Deps, type Rejoined, rejoinChapter } from '../../domain/pieces'
 import type { Editor } from '../../page/editor'
 import { forgetSplit, type Split, splitOf } from '../../page/undoMemory'
 import { unsaved } from '../stores/unsaved'
+import { reshapeHeld } from './reshapeHeld'
 import type { Saving } from './saving'
-import { raiseKeyboard } from './useFocusOnOpen'
 
 interface Options {
   deps: Deps
@@ -33,11 +33,8 @@ export function useRejoin({ deps, pieceId, sectionId, writes, chapterBefore, edi
     if (!editor || !saving) return
     running.current = true
     const inText = editor.view.hasFocus()
-    // From here to the end the text cannot change, so what is stored stays what goes back.
-    editor.hold(true)
-    if (keyboard) raiseKeyboard()
     let back: Rejoined | undefined
-    const done = await saving.split(async (whole) => {
+    const done = await reshapeHeld(editor, saving, keyboard, async (whole) => {
       // Read here, past the wait: a closing save that failed keeps its words as it ends.
       back = await rejoinChapter(deps, pieceId, { sectionId, into: split.into, whole, seam: split.seam, keptAt: unsaved.get(split.into)?.at })
       return back.piece
@@ -48,7 +45,6 @@ export function useRejoin({ deps, pieceId, sectionId, writes, chapterBefore, edi
       return
     }
     // The text stays as it is, and the writer stays in it.
-    editor.hold(false)
     running.current = false
     if (inText) editor.focus()
   }

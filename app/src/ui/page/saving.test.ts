@@ -64,7 +64,7 @@ describe('a split through the page that holds the text', () => {
     b.page.held = { ...b.page.held, markdown: `${WHOLE} Just typed.` }
     b.saving.touch()
     const whole: string[] = []
-    const done = await b.saving.split(async (w) => {
+    const done = await b.saving.reshape(async (w) => {
       whole.push(w)
       return b.split(w, `${AFTER} Just typed.`)
     })
@@ -76,20 +76,20 @@ describe('a split through the page that holds the text', () => {
   it('stores text the page holds that was never touched, such as an imported chapter written differently', async () => {
     const b = await openBook()
     b.page.held = { ...b.page.held, markdown: `${WHOLE}!` }
-    expect(await b.saving.split((w) => b.split(w))).toBe(true)
+    expect(await b.saving.reshape((w) => b.split(w))).toBe(true)
     expect((await b.texts()).join('')).toBe(BEFORE + AFTER)
   })
 
   it('takes the closing moment after it', async () => {
     const b = await openBook()
-    await b.saving.split((w) => b.split(w))
+    await b.saving.reshape((w) => b.split(w))
     const versions = await b.store.transaction((tx) => tx.versionsOf('new'))
     expect(versions.map((v) => v.content)).toEqual([AFTER])
   })
 
   it('the page closing after it, still holding the whole text, writes nothing back', async () => {
     const b = await openBook()
-    await b.saving.split((w) => b.split(w))
+    await b.saving.reshape((w) => b.split(w))
     b.saving.touch()
     b.saving.journal()
     await b.saving.flush()
@@ -100,7 +100,7 @@ describe('a split through the page that holds the text', () => {
 
   it('keeps no stale page count: the closing page has laid out the whole text', async () => {
     const b = await openBook()
-    await b.saving.split((w) => b.split(w))
+    await b.saving.reshape((w) => b.split(w))
     b.saving.touch()
     await b.saving.close()
     expect((await openPiece(b.deps, b.piece.id))!.piece.pages?.phone?.[b.sectionId]).toBeUndefined()
@@ -108,7 +108,7 @@ describe('a split through the page that holds the text', () => {
 
   it('the page hiding while it runs keeps nothing in the journal to bring the words back', async () => {
     const b = await openBook()
-    await b.saving.split(async (w) => {
+    await b.saving.reshape(async (w) => {
       b.saving.journal()
       const piece = await b.split(w)
       b.saving.journal()
@@ -122,7 +122,7 @@ describe('a split through the page that holds the text', () => {
     const place = { sectionId: b.sectionId, paragraph: 0, offset: 0, snippet: '', page: 1, caret: true, at: 1 }
     b.page.place = place
     const moment = b.saving.flush()
-    await b.saving.split((w) => b.split(w))
+    await b.saving.reshape((w) => b.split(w))
     await moment
     expect((await openPiece(b.deps, b.piece.id))!.piece.place?.sectionId).toBe('new')
   })
@@ -131,7 +131,7 @@ describe('a split through the page that holds the text', () => {
     const b = await openBook()
     vi.useFakeTimers()
     b.saving.touch()
-    const done = b.saving.split((w) => b.split(w))
+    const done = b.saving.reshape((w) => b.split(w))
     await vi.advanceTimersByTimeAsync(10_000)
     await done
     vi.useRealTimers()
@@ -140,7 +140,7 @@ describe('a split through the page that holds the text', () => {
 
   it('an older journal entry for the chapter does not bring the moved words back, even from the same instant', async () => {
     const b = await openBook()
-    await b.saving.split((w) => b.split(w))
+    await b.saving.reshape((w) => b.split(w))
     // Kept at the very time the split was stored (the test's clock).
     const now = vi.spyOn(Date, 'now').mockReturnValue(1_000_000)
     unsaved.keep({ piece: b.piece, pieceId: b.piece.id, sectionId: b.sectionId, name: 'x.md', markdown: WHOLE, title: null })
@@ -157,7 +157,7 @@ describe('a split through the page that holds the text', () => {
     const now = vi.spyOn(Date, 'now').mockReturnValue(999_000)
     unsaved.keep({ piece: b.piece, pieceId: b.piece.id, sectionId: b.sectionId, name: 'x.md', markdown: 'Overtaken words.', title: null })
     now.mockRestore()
-    await b.saving.split((w) => b.split(w))
+    await b.saving.reshape((w) => b.split(w))
     expect(unsaved.get(b.sectionId)?.markdown).toBe('Overtaken words.')
     await replayJournal(b.deps, {
       hold: async () => ({ release() {}, lost: new Promise(() => {}) }),
@@ -173,7 +173,7 @@ describe('a split through the page that holds the text', () => {
     b.saving.touch()
     b.store.failNext(new Error('The disk is full.'))
     let ran = false
-    const done = await b.saving.split(async (w) => {
+    const done = await b.saving.reshape(async (w) => {
       ran = true
       return b.split(w)
     })
@@ -186,7 +186,7 @@ describe('a split through the page that holds the text', () => {
 
   it('if the split itself fails, everything stays, and saving goes on', async () => {
     const b = await openBook()
-    const done = await b.saving.split(async () => {
+    const done = await b.saving.reshape(async () => {
       throw new Error('The disk is full.')
     })
     expect(done).toBe(false)
@@ -205,7 +205,7 @@ describe('a split through the page that holds the text', () => {
       ran++
       return b.split(w, `${AFTER} Just typed.`)
     }
-    const both = await Promise.all([b.saving.split(once), b.saving.split(once)])
+    const both = await Promise.all([b.saving.reshape(once), b.saving.reshape(once)])
     expect(ran).toBe(1)
     expect(both.filter(Boolean)).toHaveLength(1)
   })
@@ -213,10 +213,10 @@ describe('a split through the page that holds the text', () => {
   it('never runs in a window that is not writing, or on a page that has closed', async () => {
     const b = await openBook()
     b.page.readOnly = true
-    expect(await b.saving.split((w) => b.split(w))).toBe(false)
+    expect(await b.saving.reshape((w) => b.split(w))).toBe(false)
     b.page.readOnly = false
     await b.saving.close()
-    expect(await b.saving.split((w) => b.split(w))).toBe(false)
+    expect(await b.saving.reshape((w) => b.split(w))).toBe(false)
     expect(await b.texts()).toEqual([WHOLE])
   })
 })
@@ -260,13 +260,13 @@ describe('a rejoin through the page of the chapter going back', () => {
   it('stores words typed just before it, and takes them along', async () => {
     const b = await openSplit()
     b.page.held = { ...b.page.held, markdown: `${AFTER} Typed.` }
-    expect(await b.saving.split(b.rejoin)).toBe(true)
+    expect(await b.saving.reshape(b.rejoin)).toBe(true)
     expect(await b.texts()).toEqual([`${WHOLE} Typed.`])
   })
 
   it('the page closing behind it writes nothing, so the words are not doubled and the chapter stays out', async () => {
     const b = await openSplit()
-    await b.saving.split(b.rejoin)
+    await b.saving.reshape(b.rejoin)
     await b.saving.close()
     const { piece, sections } = (await openPiece(b.deps, b.piece.id))!
     expect(sections.map((c) => c.content)).toEqual([WHOLE])
@@ -281,7 +281,7 @@ describe('a rejoin through the page of the chapter going back', () => {
     const draft = { ...b.piece, sections: [...b.piece.sections, { sectionId: 'new', title: '' }] }
     unsaved.keep({ piece: draft, pieceId: b.piece.id, sectionId: 'new', name: 'x.md', markdown: 'Overtaken too.', title: null })
     now.mockRestore()
-    await b.saving.split(b.rejoin)
+    await b.saving.reshape(b.rejoin)
     await replay(b)
     expect(await b.texts()).toEqual([WHOLE])
     expect(unsaved.get(b.sectionId)?.markdown).toBe('Overtaken words.')
@@ -289,7 +289,7 @@ describe('a rejoin through the page of the chapter going back', () => {
 
   it('if it fails, everything stays, and the chapter goes on saving', async () => {
     const b = await openSplit()
-    const done = await b.saving.split(async () => {
+    const done = await b.saving.reshape(async () => {
       throw new Error('The disk is full.')
     })
     expect(done).toBe(false)
@@ -377,7 +377,7 @@ describe('reshaping behind a page still closing', () => {
     const closing = left.saving.close()
     const here = b.pageOn('new', AFTER, () => closing)
 
-    const done = here.saving.split(b.rejoin(AFTER))
+    const done = here.saving.reshape(b.rejoin(AFTER))
     await vi.advanceTimersByTimeAsync(2000)
     expect(await done).toBe(false)
 
@@ -396,7 +396,7 @@ describe('reshaping behind a page still closing', () => {
     const closing = left.saving.close()
     const here = b.pageOn('new', AFTER, () => closing)
 
-    const done = here.saving.split(b.rejoin(AFTER))
+    const done = here.saving.reshape(b.rejoin(AFTER))
     setTimeout(go, 10)
     expect(await done).toBe(true)
     expect(await b.texts()).toEqual([`${BEFORE} Typed.\n\n${AFTER}`])
@@ -412,7 +412,7 @@ describe('reshaping behind a page still closing', () => {
     const closing = left.saving.close()
     const back = b.pageOn(b.first, `${BEFORE} Typed.`, () => closing)
 
-    const done = back.saving.split(async (whole) =>
+    const done = back.saving.reshape(async (whole) =>
       startChapterAt(b.deps, b.piece.id, { sectionId: b.first, whole, before: BEFORE, after: ' Typed.', title: '', newSectionId: 'later' }),
     )
     await vi.advanceTimersByTimeAsync(2000)
@@ -433,7 +433,7 @@ describe('reshaping behind a page still closing', () => {
     const closing = left.saving.close()
     const here = b.pageOn('new', AFTER, () => closing)
 
-    expect(await here.saving.split(b.rejoin(AFTER))).toBe(false)
+    expect(await here.saving.reshape(b.rejoin(AFTER))).toBe(false)
     expect(await b.texts()).toEqual([BEFORE, AFTER])
 
     const { sections, piece } = (await openPiece(b.deps, b.piece.id))!

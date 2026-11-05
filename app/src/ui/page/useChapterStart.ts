@@ -5,8 +5,8 @@ import type { Editor } from '../../page/editor'
 import { type Halves, halvesAt, halvesAtLine, lineGone, withoutLine } from '../../page/split'
 import { rememberSplit } from '../../page/undoMemory'
 import { caretToFieldEnd, fillField } from './fields'
+import { reshapeHeld } from './reshapeHeld'
 import type { Saving } from './saving'
-import { raiseKeyboard } from './useFocusOnOpen'
 
 interface Options {
   deps: Deps
@@ -44,12 +44,10 @@ export function useChapterStart({ deps, pieceId, sectionId, writes, editor, savi
   async function split(halves: Halves): Promise<void> {
     if (!editor || !saving || splitting.current) return
     splitting.current = true
-    // From here to the end the text cannot change, so the halves stay true to it.
-    editor.hold(true)
-    if (keyboard) raiseKeyboard()
     const newSectionId = deps.ids.next()
     let piece: Piece | undefined
-    const done = await saving.split(async (whole) => {
+    // The text cannot change from here, so the halves stay true to it.
+    const done = await reshapeHeld(editor, saving, keyboard, async (whole) => {
       piece = await startChapterAt(deps, pieceId, { sectionId, whole, ...halves, newSectionId })
       return piece
     })
@@ -59,7 +57,6 @@ export function useChapterStart({ deps, pieceId, sectionId, writes, editor, savi
       return
     }
     // The text stays as it is, and the writer stays in it.
-    editor.hold(false)
     splitting.current = false
     editor.focus()
   }
