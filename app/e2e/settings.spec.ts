@@ -194,12 +194,25 @@ test("the library's About opens About & privacy, one step inside Settings", asyn
   await page.goto('./#/')
   await page.getByRole('link', { name: 'About', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'About & privacy', level: 1 })).toBeFocused()
-  expect(await page.locator('.settings').evaluate((view) => view.scrollTop)).toBe(0)
   await page.getByRole('button', { name: 'Settings' }).click()
   await expect(page.getByRole('heading', { name: 'Settings', level: 1 })).toBeVisible()
   await page.goBack()
   await page.getByRole('button', { name: 'Library' }).click()
   await expect(page.getByRole('link', { name: 'About', exact: true })).toBeVisible()
+})
+
+test('About & privacy opens at its top, however far down the list was', async ({ page }) => {
+  // A window so short that the list itself scrolls: Settings stays open from one area to the next.
+  await page.setViewportSize({ width: page.viewportSize()?.width ?? 0, height: 240 })
+  await page.goto('./#/settings')
+  const view = page.locator('.settings')
+  await view.evaluate((settings) => settings.scrollTo(0, settings.scrollHeight))
+  const row = page.getByRole('button', { name: /^About & privacy/ })
+  await row.scrollIntoViewIfNeeded()
+  expect(await view.evaluate((settings) => settings.scrollTop)).toBeGreaterThan(0)
+  await row.click()
+  await expect(page.getByRole('heading', { name: 'About & privacy', level: 1 })).toBeFocused()
+  expect(await view.evaluate((settings) => settings.scrollTop)).toBe(0)
 })
 
 test('About & privacy says what it promises, and only what is true here', async ({ page }) => {
