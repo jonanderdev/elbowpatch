@@ -623,7 +623,7 @@ export function Page({
         onTextSettings={() => openSheet('text')}
         onExport={() => openSheet('export')}
         onContents={book ? openContents : undefined}
-        contents={sheet === 'contents'}
+        contentsOpen={sheet === 'contents'}
       />
 
       {sheet === 'contents' && phone ? (

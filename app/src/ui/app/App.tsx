@@ -160,7 +160,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
   }
 
   // A new chapter at the end of the book or right after a chapter, read from what is stored once the
-  // section left is saved. It is a draft: it joins the piece with its first words or title, so one
+  // section left is saved. It is not stored yet: it joins the piece with its first words or title, so one
   // left empty is gone.
   const newChapter = async (draft: Piece, after?: string): Promise<void> => {
     const turn = ++chosen.current

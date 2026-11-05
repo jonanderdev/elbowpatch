@@ -26,7 +26,7 @@ import {
   totalWords,
   withChapter,
   withDay,
-  withDraft,
+  withOpenSection,
   write,
 } from './pieces'
 import type { Tx } from './ports'
@@ -518,7 +518,7 @@ describe('pieces', () => {
   })
 })
 
-describe('a chapter added to a draft', () => {
+describe('a chapter not stored yet', () => {
   /** A stored book of two chapters, with words, a place and page counts. */
   async function storedBook() {
     const s = setup()
@@ -616,7 +616,7 @@ describe('a chapter added to a draft', () => {
     expect(await sectionsOf(s)).toEqual([s.first, sectionId, s.second])
   })
 
-  it('keeps its place among the stored chapters when a draft chapter before it was left empty', async () => {
+  it('keeps its place among the stored chapters when one before it was left empty', async () => {
     const s = await storedBook()
     const abandoned = withChapter(s, s.stored, s.first)
     const { piece: draft, sectionId } = withChapter(s, abandoned.piece, abandoned.sectionId)
@@ -636,10 +636,10 @@ describe('a chapter added to a draft', () => {
   it('reads into what is stored at its draft position, for Contents, and adds nothing once stored', async () => {
     const s = await storedBook()
     const { piece: draft, sectionId } = withChapter(s, s.stored, s.first)
-    expect(withDraft(s.stored, draft, sectionId).sections.map((c) => c.sectionId)).toEqual([s.first, sectionId, s.second])
+    expect(withOpenSection(s.stored, draft, sectionId).sections.map((c) => c.sectionId)).toEqual([s.first, sectionId, s.second])
     await write(s.deps, draft, sectionId, 'Words.')
     const stored = (await openPiece(s.deps, s.stored.id))!.piece
-    expect(withDraft(stored, draft, sectionId).sections).toEqual(stored.sections)
+    expect(withOpenSection(stored, draft, sectionId).sections).toEqual(stored.sections)
   })
 
   it("keeps journal days in date order, whatever the draft's order", async () => {

@@ -7,7 +7,7 @@ import { replayJournal } from './replay'
 
 const lock = { hold: async () => ({ release() {} }) } as unknown as WriterLock
 
-describe('a draft chapter kept in the unsaved journal', () => {
+describe('a chapter not stored yet, kept in the unsaved journal', () => {
   it('comes back by its title alone, even when the book was written in after it', async () => {
     let t = 1000
     let n = 0

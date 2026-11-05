@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Piece } from '../../domain/model'
-import { type Deps, storedPiece, withDraft } from '../../domain/pieces'
+import { type Deps, storedPiece, withOpenSection } from '../../domain/pieces'
 
 export interface LiveOutline {
-  /** The piece as last stored (its chapters, their titles and their page counts), with the open chapter if it is still a draft. */
+  /** The piece as last stored (its chapters, their titles and their page counts), with the open chapter if it is not stored yet. */
   outline: Piece
   /** A save reported the piece. */
   stored(piece: Piece): void
@@ -27,5 +27,5 @@ export function useOutline(deps: Deps, piece: Piece, sectionId: string, counted:
   // Counts kept or forgotten from outside the page.
   // biome-ignore lint/correctness/useExhaustiveDependencies: `counted` is the trigger.
   useEffect(reread, [reread, counted])
-  return { outline: withDraft(last, piece, sectionId), stored, reread }
+  return { outline: withOpenSection(last, piece, sectionId), stored, reread }
 }

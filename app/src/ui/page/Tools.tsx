@@ -11,7 +11,7 @@ export function ToolsBar(props: {
   /** A book's count opens Contents, from a page with no running head. */
   onContents?(from: HTMLElement): void
   /** Contents is open. */
-  contents?: boolean
+  contentsOpen?: boolean
   onClose(): void
   onTextSettings(): void
   onExport(): void
@@ -39,7 +39,7 @@ export function ToolsBar(props: {
           className="count"
           aria-label={`${said}. Open Contents`}
           aria-haspopup="dialog"
-          aria-expanded={!!props.contents}
+          aria-expanded={!!props.contentsOpen}
           onClick={(e) => onContents(e.currentTarget)}
         >
           {shown}

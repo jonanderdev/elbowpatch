@@ -17,7 +17,7 @@ async function book() {
   return { deps, stored, first }
 }
 
-describe('the book as one Markdown file, from a chapter still a draft', () => {
+describe('the book as one Markdown file, from a chapter not stored yet', () => {
   it('leaves out a chapter with nothing in it', async () => {
     const { deps, stored } = await book()
     const { piece, sectionId } = withChapter(deps, stored)

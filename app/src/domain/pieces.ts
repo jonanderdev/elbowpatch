@@ -111,8 +111,8 @@ export function neverStored(draft: Piece): Piece {
   return { ...draft, sections: draft.sections.slice(0, 1) }
 }
 
-/** The piece as stored, with the draft's open section where it will join: what Contents lists. */
-export function withDraft(stored: Piece, draft: Piece, sectionId: string): Piece {
+/** The piece as stored, with the page's open section where it will join: what Contents lists. */
+export function withOpenSection(stored: Piece, draft: Piece, sectionId: string): Piece {
   return { ...stored, sections: joined(stored, draft, sectionId) }
 }
 
@@ -199,7 +199,7 @@ export function placePage(piece: Piece, screen: Screen): number | undefined {
 export function savePages(deps: Pick<Deps, 'store'>, pieceId: string, screen: Screen, sectionId: string, count: number): Promise<void> {
   return deps.store.transaction(async (tx) => {
     const piece = await tx.piece(pieceId)
-    // A draft section is not kept yet: left empty, its count would stay behind.
+    // A section not stored yet: left empty, its count would stay behind.
     if (!piece?.sections.some((s) => s.sectionId === sectionId) || piece.pages?.[screen]?.[sectionId] === count) return
     await tx.putPiece({ ...piece, pages: { ...piece.pages, [screen]: { ...piece.pages?.[screen], [sectionId]: count } } })
   })
@@ -269,7 +269,7 @@ export function withoutPage(place: Place): Place {
 export function savePlace(deps: Pick<Deps, 'store'>, pieceId: string, place: Place): Promise<void> {
   return deps.store.transaction(async (tx) => {
     const piece = await tx.piece(pieceId)
-    // A draft section is not kept yet: the writer's place stays where it was, in case it is left empty.
+    // A section not stored yet: the writer's place stays where it was, in case it is left empty.
     if (piece?.sections.some((s) => s.sectionId === place.sectionId)) await tx.putPiece({ ...piece, place })
   })
 }
@@ -370,9 +370,7 @@ export function startChapterAt(deps: Deps, pieceId: string, start: ChapterStart)
     await momentIn(tx, deps, pieceId)
     const piece = (await tx.piece(pieceId))!
     const now = deps.clock.now()
-    const working = await tx.working(sectionId)
-    const base = working?.baseVersionId ?? latest(await tx.versionsOf(sectionId))?.id ?? null
-    await tx.putWorking({ sectionId, pieceId, content: before, baseVersionId: base, updatedAt: now })
+    await tx.putWorking({ sectionId, pieceId, content: before, baseVersionId: await baseOf(tx, sectionId), updatedAt: now })
     await tx.putWorking({ sectionId: newSectionId, pieceId, content: after, baseVersionId: null, updatedAt: now })
     const next: Piece = {
       ...piece,
@@ -431,9 +429,7 @@ export function rejoinChapter(deps: Deps, pieceId: string, rejoin: ChapterRejoin
     const now = deps.clock.now()
     const before = (await current(tx, into)).content
     const content = joinHalves(before, whole, seam, piece.sections[at]!.title)
-    const working = await tx.working(into)
-    const base = working?.baseVersionId ?? latest(await tx.versionsOf(into))?.id ?? null
-    await tx.putWorking({ sectionId: into, pieceId, content, baseVersionId: base, updatedAt: now })
+    await tx.putWorking({ sectionId: into, pieceId, content, baseVersionId: await baseOf(tx, into), updatedAt: now })
     // The chapter's copy stays, stamped now: words kept for it earlier are older, and never replay it into the book.
     const left = await tx.working(sectionId)
     if (left) await tx.putWorking({ ...left, updatedAt: now })
@@ -450,6 +446,11 @@ export function rejoinChapter(deps: Deps, pieceId: string, rejoin: ChapterRejoin
     await tx.putPiece(next)
     return { piece: next, sectionId: into, content }
   })
+}
+
+/** The version a section's working copy grew from: its own, else the section's latest. */
+async function baseOf(tx: Tx, sectionId: string): Promise<string | null> {
+  return (await tx.working(sectionId))?.baseVersionId ?? latest(await tx.versionsOf(sectionId))?.id ?? null
 }
 
 /** Where the two texts join: the end of what was there before. */
