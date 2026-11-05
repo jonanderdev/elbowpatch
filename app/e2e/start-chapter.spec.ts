@@ -54,9 +54,34 @@ async function keyboardUp(page: Page) {
 const section = (page: Page) => page.locator('.writing-bar').getByRole('button', { name: 'New chapter' })
 const inMenu = (page: Page) => page.locator('.selection-menu').getByRole('button', { name: 'Start chapter here' })
 
+/** A key takes the page to the caret, as a writer's would: the menu shows only for words on the page in view. */
+async function toPageOf(page: Page, words: string) {
+  await caretBefore(page, words)
+  await page.keyboard.press('ArrowRight')
+  await expect
+    .poll(() =>
+      page.evaluate((words) => {
+        const walker = document.createTreeWalker(document.querySelector('.body')!, NodeFilter.SHOW_TEXT)
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+          const at = node.textContent!.indexOf(words)
+          if (at < 0) continue
+          const range = document.createRange()
+          range.setStart(node, at)
+          range.setEnd(node, at + 1)
+          const box = range.getBoundingClientRect()
+          const shown = document.querySelector('.pager')!.getBoundingClientRect()
+          return box.left >= shown.left && box.right <= shown.right
+        }
+        return false
+      }, words),
+    )
+    .toBe(true)
+}
+
 /** § wherever this screen has it: the writing bar on a phone, the selection menu on desktop. */
 async function press(page: Page, words: string) {
   if (onDesktop(page)) {
+    await toPageOf(page, words)
     await caretBefore(page, words, words.length)
     await inMenu(page).click()
     return
