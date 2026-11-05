@@ -7,6 +7,7 @@ import { scrollToCaret, showCaret, toOpeningPage } from '../../page/caret'
 import { type Editor, selectionBox } from '../../page/editor'
 import { screenOf } from '../../page/pager'
 import { placeOf } from '../../page/place'
+import { keepUndo, takeUndo } from '../../page/undoMemory'
 import { settled } from '../app/settled'
 import { ExportSheet } from '../components/ExportSheet'
 import { Path } from '../components/Path'
@@ -29,6 +30,7 @@ import { useOutline } from './useOutline'
 import { usePager } from './usePager'
 import { usePageTurns } from './usePageTurns'
 import { useRail } from './useRail'
+import { useRejoin } from './useRejoin'
 import { useSaving } from './useSaving'
 import { FieldBar, SelectionMenu, useKeyboard, WritingBar } from './Writing'
 
@@ -55,6 +57,8 @@ interface Props {
   onNewChapter(after?: string): void
   /** A chapter started in this section's text is stored: it opens, with `content` as its text. */
   onChapterStarted(piece: Piece, sectionId: string, content: string): void
+  /** Undo put this chapter back: the chapter before it opens at the join, with `content` as its text. */
+  onChapterRejoined(piece: Piece, sectionId: string, content: string): void
   onChange(piece: Piece): void
 }
 
@@ -81,6 +85,7 @@ export function Page({
   onOpenSection,
   onNewChapter,
   onChapterStarted,
+  onChapterRejoined,
   onChange,
 }: Props): ReactElement {
   const { piece, sectionId } = opened
@@ -91,6 +96,8 @@ export function Page({
   const titleEditable = piece.kind !== 'journal' && !readOnly
   // Words kept for this section, newer than what is stored, start the page.
   const [content] = useState(() => keptFor(opened)?.markdown ?? opened.content)
+  // The section's undo history, from when its page last closed.
+  const [resume] = useState(() => takeUndo(sectionId, content))
 
   const settings = useSettings()
   const keyboard = useKeyboard()
@@ -209,7 +216,7 @@ export function Page({
   const shown = numbers(page, count)
 
   const caretKeys = useCaretKeys(pager, flow)
-  const editor = useEditor(mount, content, piece.lang, {
+  const editor = useEditor(mount, content, piece.lang, resume, {
     editable: () => !readOnly,
     onChange(markdown) {
       moved.current = true
@@ -229,6 +236,11 @@ export function Page({
       if (!focused) void saving?.flush()
     },
     onChapterLine: (at) => chapter.line(at),
+    onUndoPast: () => undoPast(),
+    onClose(state) {
+      // A page split or rejoined holds text that is no longer the section's: its history goes with it.
+      if (!saving?.sealed()) keepUndo(sectionId, state)
+    },
     onSelection(view, tr) {
       const e = editorNow.current
       if (e) setSelection({ rect: selectionBox(view), active: e.active() })
@@ -428,6 +440,18 @@ export function Page({
     onStarted: onChapterStarted,
   })
   const chapterHere = book && !readOnly ? chapter.here : undefined
+  const undoPast = useRejoin({
+    deps,
+    pieceId: piece.id,
+    sectionId,
+    writes: book && !readOnly,
+    chapterBefore: () => chapterBeyond(-1),
+    editor,
+    saving,
+    keyboard,
+    closingRef,
+    onRejoined: onChapterRejoined,
+  })
 
   // Escape closes what is open, innermost first: a sheet, then the tools. One listener reads what
   // is open now from a ref: re-attached on each change, an Escape pressed right after one (Done,
@@ -577,6 +601,7 @@ export function Page({
                 requestAnimationFrame(() => pager?.measure())
               }}
               onDone={toText}
+              onUndoPast={undoPast}
             />
             <div ref={mount} />
           </div>
@@ -587,7 +612,7 @@ export function Page({
       {editor && !readOnly && writing && keyboard && selection ? (
         <WritingBar editor={editor} active={selection.active} barRef={writingBar} onChapter={chapterHere} />
       ) : null}
-      {!readOnly && keyboard && field ? <FieldBar field={field} barRef={writingBar} /> : null}
+      {!readOnly && keyboard && field ? <FieldBar field={field} barRef={writingBar} onUndoPast={undoPast} /> : null}
       {editor && !readOnly && !keyboard && selection?.rect ? (
         <SelectionMenu editor={editor} rect={selection.rect} active={selection.active} onKeep={() => void keepMoment()} onChapter={chapterHere} />
       ) : null}

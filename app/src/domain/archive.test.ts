@@ -1,7 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import { memoryStore } from '../adapters/memory-store'
 import { exportAll, FORMAT_VERSION, guessKind, importArchive, importMarkdown, readDay } from './archive'
-import { newPiece, openPiece, putAway, rename, renameSection, savePages, startChapterAt, takeMoment, totalWords, withChapter, withDay, write } from './pieces'
+import {
+  newPiece,
+  openPiece,
+  putAway,
+  rejoinChapter,
+  rename,
+  renameSection,
+  savePages,
+  startChapterAt,
+  takeMoment,
+  totalWords,
+  withChapter,
+  withDay,
+  write,
+} from './pieces'
 import type { Store } from './ports'
 
 function setup(start = Date.UTC(2026, 9, 1)) {
@@ -145,6 +159,23 @@ describe('export and import', () => {
     expect(text).toBe('# One\n\nThe ferry.\n\n# Added\n\nAdded.\n\n# Untitled\n\nSalt on the rail.\n\n# Winter\n\nThe harbour in winter.\n')
     const read = await importMarkdown(elsewhere, 'again.md', text as string, 'book', 'en')
     expect(read.sections.map((s) => s.title)).toEqual(['One', 'Added', 'Untitled', 'Winter'])
+  })
+
+  it('a chapter rejoined stays out of the book, and its versions come along', async () => {
+    const deps = setup()
+    const book = newPiece(deps, 'book', 'en')
+    const first = book.sections[0]!.sectionId
+    await write(deps, book, first, 'One.\n\nTwo.')
+    await takeMoment(deps, book.id)
+    await startChapterAt(deps, book.id, { sectionId: first, whole: 'One.\n\nTwo.', before: 'One.', after: 'Two.', title: '', newSectionId: 'cut' })
+    await takeMoment(deps, book.id)
+    await rejoinChapter(deps, book.id, { sectionId: 'cut', into: first, whole: 'Two.', seam: { front: 'apart', raw: false, escaped: false } })
+    await takeMoment(deps, book.id)
+
+    const elsewhere = { ...setup(), store: memoryStore() }
+    expect(await importArchive(elsewhere, await exportAll(deps))).toMatchObject({ ok: true, added: 1 })
+    expect((await openPiece(elsewhere, book.id))!.sections.map((s) => s.content)).toEqual(['One.\n\nTwo.'])
+    expect((await elsewhere.store.transaction((tx) => tx.versionsOf('cut'))).map((v) => v.content)).toEqual(['Two.'])
   })
 
   it('writes readable files: the whole piece, each day with its year, the history, and an index', async () => {

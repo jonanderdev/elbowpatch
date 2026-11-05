@@ -53,7 +53,7 @@ export interface Saving {
   /** The page closes: one last save on what it holds now, then nothing more. */
   close(): Promise<void>
   /**
-   * Reshapes the section (a chapter starting in it): `reshape` runs on the text the page holds, once
+   * Reshapes the section (a chapter starting in it, or going back): `reshape` runs on the text the page holds, once
    * that is stored. From then on this page writes nothing, for the text it holds is no longer the
    * section's. False, with everything as it was, when the words could not be stored or `reshape` failed.
    */
@@ -209,7 +209,8 @@ export function createSaving(o: SavingOptions): Saving {
         new Promise<boolean>((r) => setTimeout(() => r(false), SPLIT_WAIT)),
       ])
       const held = o.read()
-      if (!stored || closed || o.readOnly() || changed(held)) return false
+      // `sealed`: another reshaping got here first, while this one waited.
+      if (!stored || closed || sealed || o.readOnly() || changed(held)) return false
       // No await between the check above and this: nothing can be typed or saved in between.
       sealed = true
       clearTimeout(retry)

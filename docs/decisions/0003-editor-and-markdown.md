@@ -42,6 +42,9 @@ The page is paged, not scrolled (DESIGN.md, Behaviour).
 
 ### Undo
 - One undo history per section, grouped by pauses in typing. It survives page turns and switching to another chapter and back, and lasts until reload. A line becoming a chapter is one step.
+- *Updated 2026-11-05:* undo crosses a split. The page is made anew for each section, so a section's history waits in memory while its page is closed, and comes back only onto the very text it ended on. A chapter born of a split remembers that for the session, with how the two halves met. Undo steps back through what was typed in it, in the text or in its title, and past its first step rejoins it: the text goes back onto the end of the chapter before it, where the halves meet the paragraph is one paragraph and a mark one mark, a title taken from a `# ` line returns as an escaped `\# ` line, the section leaves the current outline, and the chapter before it opens with the caret at the join. A moment comes before and after, so its versions stay and earlier outlines still list it. A title the writer gave the chapter since returns as such a line too, so no word goes.
+- Undo rejoins only a chapter holding the text the split gave it, right after the chapter it came from. With a chapter added between them, or words left that undo cannot reach, it stays a chapter.
+- A split ends the history of the chapter it shortens: its steps hold the whole text, and replayed on either half they would double the words. A rejoin ends both chapters' histories in the same way, and cannot be redone. After a reload a split chapter is simply a chapter.
 - Anything older than the session is the Time Machine's job.
 
 ## Consequences

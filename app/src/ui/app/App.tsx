@@ -183,6 +183,13 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
     setOpened({ piece, sectionId, content, updatedAt: piece.updatedAt, fresh: true, readAt: ++reads })
   }
 
+  // Undo put a chapter back: the chapter before it is stored and at hand, as above, and opens at the join.
+  const chapterRejoined = (piece: Piece, sectionId: string, content: string): void => {
+    ++chosen.current
+    going.current = ''
+    setOpened({ piece, sectionId, content, updatedAt: piece.updatedAt, at: 'join', writing: true, readAt: ++reads })
+  }
+
   const startNew = (kind: Kind) => {
     raiseKeyboard()
     let piece = newPiece(deps, kind, navigator.language || 'en')
@@ -230,6 +237,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
           onOpenSection={(sectionId, writing, at) => void openSection(opened.piece, sectionId, writing, at)}
           onNewChapter={(after) => void newChapter(opened.piece, after)}
           onChapterStarted={chapterStarted}
+          onChapterRejoined={chapterRejoined}
           onChange={(piece) => {
             askToPersist()
             setPieces((all) => {

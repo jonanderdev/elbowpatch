@@ -32,8 +32,14 @@ async function caretBefore(page: Page, words: string, length = 0) {
       for (let node = walker.nextNode(); node; node = walker.nextNode()) {
         const at = node.textContent!.indexOf(words)
         if (at < 0) continue
+        // The editor reads a selection when the browser reports it: a press before that finds the old one.
+        // Its listener came first, so by this one it has read it. No report means nothing moved.
+        const reported = new Promise<void>((done) => {
+          document.addEventListener('selectionchange', () => done(), { once: true })
+          setTimeout(done, 1000)
+        })
         getSelection()!.setBaseAndExtent(node, at, node, at + length)
-        return
+        return reported
       }
       throw new Error(`No "${words}" in the text.`)
     },
@@ -389,4 +395,260 @@ test('after a split no number shows that rests on a count not known yet', async 
     for (const f of held) f()
   })
   await expect(pages).toHaveCount(3, { timeout: 15000 })
+})
+
+// Undo across chapters (#61).
+const undoKey = 'ControlOrMeta+z'
+
+/** Undo wherever the writer is: the bar with the keyboard up, the keys otherwise. */
+async function undo(page: Page) {
+  if (onDesktop(page)) await page.keyboard.press(undoKey)
+  else await page.locator('.writing-bar').getByRole('button', { name: 'Undo' }).click()
+}
+
+/** The chapter's opening page, chosen in Contents. */
+async function choose(page: Page, title: string) {
+  if (!onDesktop(page)) {
+    await page.locator('.title').blur()
+    await page.locator('.body').blur()
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.locator('.page-button').click()
+    await page.locator('.tools .count').click()
+  }
+  await page.locator('.contents-row', { hasText: title }).click()
+  await expect(page.locator('.title')).toHaveText(title === 'Untitled' ? '' : title)
+}
+
+/** Which position the caret is at in its paragraph, and that paragraph's words. */
+const caret = (page: Page) =>
+  page.evaluate(() => {
+    const s = getSelection()!
+    const range = document.createRange()
+    const block = s.anchorNode!.parentElement!.closest('p, blockquote')!
+    range.selectNodeContents(block)
+    range.setEnd(s.anchorNode!, s.anchorOffset)
+    return { before: range.toString(), text: block.textContent }
+  })
+
+test('one undo straight after § rejoins the text as it was, the caret at the join', async ({ page }) => {
+  await importBook(page, ONE)
+  await press(page, 'Salt on the')
+  await expect(page.locator('.title')).toBeFocused()
+  await expect.poll(() => texts(page)).toEqual(['The ferry at seven.', 'Salt on the *windows and* the rail.', 'The end.'])
+  await undo(page)
+  await expect(page.locator('.title')).toHaveText('One')
+  await expect(page.locator('.body')).toContainText('The ferry at seven.Salt on the windows and the rail.')
+  await expect(page.locator('.body')).toBeFocused()
+  await expect.poll(() => texts(page)).toEqual(['The ferry at seven.\n\nSalt on the *windows and* the rail.', 'The end.'])
+  expect((await caret(page)).before).toBe('The ferry at seven.')
+})
+
+test('a cut inside a mark comes back as one mark', async ({ page }) => {
+  await importBook(page, ONE)
+  await press(page, 'and')
+  await expect(page.locator('.title')).toBeFocused()
+  await undo(page)
+  await expect(page.locator('.title')).toHaveText('One')
+  await expect(page.locator('.body em')).toHaveText('windows and')
+  await expect.poll(() => texts(page)).toEqual(['The ferry at seven.\n\nSalt on the *windows and* the rail.', 'The end.'])
+  expect(await caret(page)).toEqual({ before: 'Salt on the windows ', text: 'Salt on the windows and the rail.' })
+})
+
+test('a title taken from a # line returns as that line', async ({ page }) => {
+  await importBook(page, '# One\n\nThe ferry.\n\nThe harbour\n\nSalt.\n\n# Two\n\nThe end.\n')
+  if (!onDesktop(page)) await keyboardUp(page)
+  await caretBefore(page, 'The harbour')
+  await page.keyboard.type('# ')
+  await expect(page.locator('.title')).toHaveText('The harbour')
+  await expect(page.locator('.title')).toBeFocused()
+  await undo(page)
+  await expect(page.locator('.title')).toHaveText('One')
+  await expect(page.locator('.body')).toContainText('# The harbour')
+  await expect.poll(() => texts(page)).toEqual(['The ferry.\n\n\\# The harbour\n\nSalt.', 'The end.'])
+})
+
+test('after typing in the new chapter, undo steps through the typing, then rejoins', async ({ page }) => {
+  await importBook(page, ONE)
+  await press(page, 'Salt on the')
+  await expect(page.locator('.title')).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(page.locator('.body')).toBeFocused()
+  await page.keyboard.type('Typed. ')
+  await expect(page.locator('.body')).toContainText('Typed. Salt on the')
+  await undo(page)
+  await expect(page.locator('.body')).toHaveText('Salt on the windows and the rail.')
+  await expect(page.locator('.title')).toHaveText('')
+  await undo(page)
+  await expect(page.locator('.title')).toHaveText('One')
+  await expect.poll(() => texts(page)).toEqual(['The ferry at seven.\n\nSalt on the *windows and* the rail.', 'The end.'])
+  const { versions, outlines } = await stored(page)
+  expect(versions).toContain('The ferry at seven.')
+  expect(outlines).toContainEqual(['One', '', 'Two'])
+})
+
+test('a title typed in a split chapter is stepped back first, in the title', async ({ page }) => {
+  await importBook(page, ONE)
+  await press(page, 'Salt on the')
+  await expect(page.locator('.title')).toBeFocused()
+  await page.keyboard.type('Salt')
+  await expect.poll(async () => (await stored(page)).chapters.map((c) => c.title)).toEqual(['One', 'Salt', 'Two'])
+  await undo(page)
+  await expect(page.locator('.title')).toHaveText('')
+  await undo(page)
+  await expect(page.locator('.title')).toHaveText('One')
+  await expect.poll(() => texts(page)).toEqual(['The ferry at seven.\n\nSalt on the *windows and* the rail.', 'The end.'])
+})
+
+test('a title given in the title, undone past from the text, comes back as a line: no word is lost', async ({ page }) => {
+  await importBook(page, ONE)
+  await press(page, 'Salt on the')
+  await expect(page.locator('.title')).toBeFocused()
+  await page.keyboard.type('Salt')
+  await page.keyboard.press('Enter')
+  await expect(page.locator('.body')).toBeFocused()
+  await undo(page)
+  await expect(page.locator('.title')).toHaveText('One')
+  await expect.poll(() => texts(page)).toEqual(['The ferry at seven.\n\n\\# Salt\n\nSalt on the *windows and* the rail.', 'The end.'])
+})
+
+test('change chapter and come back: undo still works there', async ({ page }) => {
+  await importBook(page, ONE)
+  if (!onDesktop(page)) await keyboardUp(page)
+  await caretBefore(page, 'The ferry')
+  await page.keyboard.type('Kept. ')
+  await saved(page, 'Kept. The ferry')
+  await choose(page, 'Two')
+  await expect(page.locator('.body')).toHaveText('The end.')
+  await choose(page, 'One')
+  await expect(page.locator('.body')).toContainText('Kept. The ferry')
+  if (!onDesktop(page)) await keyboardUp(page)
+  await page.locator('.body').focus()
+  await undo(page)
+  await expect(page.locator('.body')).not.toContainText('Kept.')
+  await expect.poll(async () => (await texts(page))[0]).toBe('The ferry at seven.\n\nSalt on the *windows and* the rail.')
+})
+
+test('leaving a split chapter and coming back, undo still rejoins it', async ({ page }) => {
+  await importBook(page, ONE)
+  await press(page, 'Salt on the')
+  await expect(page.locator('.title')).toBeFocused()
+  await expect.poll(() => texts(page)).toHaveLength(3)
+  await choose(page, 'Two')
+  await choose(page, 'Untitled')
+  if (!onDesktop(page)) await keyboardUp(page)
+  await page.locator('.body').focus()
+  await undo(page)
+  await expect(page.locator('.title')).toHaveText('One')
+  await expect.poll(() => texts(page)).toEqual(['The ferry at seven.\n\nSalt on the *windows and* the rail.', 'The end.'])
+})
+
+test('undo in the chapter left behind by a split never doubles the moved words', async ({ page }) => {
+  await importBook(page, ONE)
+  if (!onDesktop(page)) await keyboardUp(page)
+  await caretBefore(page, 'The ferry')
+  await page.keyboard.type('Earlier. ')
+  await saved(page, 'Earlier. The ferry')
+  if (!onDesktop(page)) {
+    await caretBefore(page, 'Salt on the')
+    await section(page).click()
+  } else {
+    await caretBefore(page, 'Salt on the', 11)
+    await inMenu(page).click()
+  }
+  await expect(page.locator('.title')).toBeFocused()
+  await expect.poll(() => texts(page)).toHaveLength(3)
+  await choose(page, 'One')
+  if (!onDesktop(page)) await keyboardUp(page)
+  await page.locator('.body').focus()
+  await undo(page)
+  await expect(page.locator('.body')).toHaveText('Earlier. The ferry at seven.')
+  await expect.poll(() => texts(page)).toEqual(['Earlier. The ferry at seven.', 'Salt on the *windows and* the rail.', 'The end.'])
+})
+
+test('after a reload a chapter is no longer rejoined by undo, and nothing is lost', async ({ page }) => {
+  await importBook(page, ONE)
+  await press(page, 'Salt on the')
+  await expect(page.locator('.title')).toBeFocused()
+  await expect.poll(() => texts(page)).toHaveLength(3)
+  // The keyboard goes with the page: the app starts again at the screen's whole height.
+  if (!onDesktop(page)) await page.setViewportSize({ width: 390, height: 844 })
+  await page.reload()
+  await expect(page.locator('.body')).toHaveText('Salt on the windows and the rail.')
+  if (!onDesktop(page)) await keyboardUp(page)
+  await page.locator('.body').focus()
+  await undo(page)
+  await expect(page.locator('.body')).toHaveText('Salt on the windows and the rail.')
+  expect(await texts(page)).toEqual(['The ferry at seven.', 'Salt on the *windows and* the rail.', 'The end.'])
+})
+
+test('if a rejoin cannot be stored, everything stays as it was', async ({ page }) => {
+  await importBook(page, ONE)
+  await press(page, 'Salt on the')
+  await expect(page.locator('.title')).toBeFocused()
+  await expect.poll(() => texts(page)).toHaveLength(3)
+  await page.evaluate(() => {
+    ;(window as unknown as { __put: unknown }).__put = IDBObjectStore.prototype.put
+    IDBObjectStore.prototype.put = () => {
+      throw new DOMException('The disk is full.', 'QuotaExceededError')
+    }
+  })
+  await undo(page)
+  await expect(page.getByRole('alert')).toContainText("Can't save right now")
+  await expect(page.locator('.body')).toHaveText('Salt on the windows and the rail.')
+  await page.evaluate(() => {
+    IDBObjectStore.prototype.put = (window as unknown as { __put: typeof IDBObjectStore.prototype.put }).__put
+  })
+  expect(await texts(page)).toEqual(['The ferry at seven.', 'Salt on the *windows and* the rail.', 'The end.'])
+})
+
+test('the numbers follow a rejoin: the chapter is counted again, and the other is gone', async ({ page }) => {
+  await importBook(page, LONG)
+  await expect.poll(async () => (await stored(page)).counts.every((n) => n !== undefined)).toBe(true)
+  const { counts: was } = await stored(page)
+  await press(page, 'Part 9.')
+  await expect(page.locator('.title')).toBeFocused()
+  await expect.poll(async () => (await stored(page)).counts.filter((n) => n !== undefined).length, { timeout: 15000 }).toBe(3)
+  await undo(page)
+  await expect(page.locator('.title')).toHaveText('One')
+  await expect.poll(async () => (await stored(page)).counts, { timeout: 15000 }).toEqual(was)
+  if (onDesktop(page)) await expect(page.locator('.rail-line')).toContainText('2 chapters')
+})
+
+test('a long chapter opens on the page of the join, and says the chapter, not a turn', async ({ page }) => {
+  await importBook(page, LONG)
+  await press(page, 'Part 9.')
+  await expect(page.locator('.title')).toBeFocused()
+  await expect.poll(() => texts(page)).toHaveLength(3)
+  await undo(page)
+  await expect(page.locator('.title')).toHaveText('One')
+  await expect(page.locator('.body')).toBeFocused()
+  await expect(page.locator('[aria-live="polite"].visually-hidden')).toHaveText('One')
+  expect((await caret(page)).before.startsWith('Part 8.')).toBe(true)
+  const seen = await page.evaluate(() => {
+    const range = getSelection()!.getRangeAt(0).cloneRange()
+    const box = range.getClientRects()[0] ?? (getSelection()!.anchorNode as Element).getBoundingClientRect()
+    const pager = document.querySelector('.pager')!.getBoundingClientRect()
+    return box.left >= pager.left && box.left <= pager.right
+  })
+  expect(seen).toBe(true)
+})
+
+test('two splits undo in turn, back to the text as it was', async ({ page }) => {
+  await importBook(page, '# One\n\nFirst part.\n\nSecond part.\n\nThird part.\n\n# Two\n\nThe end.\n')
+  await press(page, 'Second part.')
+  await expect(page.locator('.body')).toContainText('Third part.')
+  await expect(page.locator('.title')).toBeFocused()
+  await expect.poll(() => texts(page)).toHaveLength(3)
+  await page.locator('.title').press('Enter')
+  await expect(page.locator('.body')).toBeFocused()
+  await press(page, 'Third part.')
+  await expect(page.locator('.body')).toHaveText('Third part.')
+  await expect(page.locator('.title')).toBeFocused()
+  await expect.poll(() => texts(page)).toEqual(['First part.', 'Second part.', 'Third part.', 'The end.'])
+  await undo(page)
+  await expect.poll(() => texts(page)).toEqual(['First part.', 'Second part.\n\nThird part.', 'The end.'])
+  await expect(page.locator('.body')).toBeFocused()
+  await undo(page)
+  await expect(page.locator('.title')).toHaveText('One')
+  await expect.poll(() => texts(page)).toEqual(['First part.\n\nSecond part.\n\nThird part.', 'The end.'])
 })

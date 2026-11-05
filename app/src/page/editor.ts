@@ -23,6 +23,10 @@ export interface EditorOptions {
   onKey?(view: EditorView, event: KeyboardEvent): boolean
   /** `# ` was typed at the start of a line, at this position. It is in the text by now, as typed. */
   onChapterLine?(at: number): void
+  /** Undo with no step left in this section. True when the page did something with it. */
+  onUndoPast?(): boolean
+  /** The section's history from when its page last closed, on the text this page opens with. */
+  resume?: EditorState
 }
 
 export interface Editor {
@@ -40,27 +44,27 @@ export interface Editor {
 
 export function createEditor(mount: HTMLElement, options: EditorOptions): Editor {
   let held = false
-  const state = EditorState.create({
-    doc: toDoc(parse(options.content)),
-    plugins: [
-      inputRules({ rules: markdownRules() }),
-      keymap({
-        Backspace: undoInputRule,
-        'Mod-z': undo,
-        'Shift-Mod-z': redo,
-        'Mod-b': toggleMark(schema.marks.strong),
-        'Mod-i': toggleMark(schema.marks.em),
-        'Shift-Enter': chainCommands(exitCode, insertBreak),
-        // Return only ever makes a new paragraph, and a pull quote ends with it.
-        Enter: chainCommands(leaveQuote, baseKeymap.Enter!),
-      }),
-      keymap(baseKeymap),
-      history({ newGroupDelay: 1000 }),
-      placeholder(),
-      nightFocus(),
-      new Plugin({ filterTransaction: (tr) => !held || !tr.docChanged }),
-    ],
-  })
+  const stepBack: Command = (state, dispatch, view) => undo(state, dispatch, view) || (options.onUndoPast?.() ?? false)
+  const plugins = [
+    inputRules({ rules: markdownRules() }),
+    keymap({
+      Backspace: undoInputRule,
+      'Mod-z': stepBack,
+      'Shift-Mod-z': redo,
+      'Mod-b': toggleMark(schema.marks.strong),
+      'Mod-i': toggleMark(schema.marks.em),
+      'Shift-Enter': chainCommands(exitCode, insertBreak),
+      // Return only ever makes a new paragraph, and a pull quote ends with it.
+      Enter: chainCommands(leaveQuote, baseKeymap.Enter!),
+    }),
+    keymap(baseKeymap),
+    history({ newGroupDelay: 1000 }),
+    placeholder(),
+    nightFocus(),
+    new Plugin({ filterTransaction: (tr) => !held || !tr.docChanged }),
+  ]
+  // The history is the one plugin state that carries over: everything else belongs to this page.
+  const state = options.resume?.reconfigure({ plugins }) ?? EditorState.create({ doc: toDoc(parse(options.content)), plugins })
 
   // The mount is the text itself, so the pager can lay it out in columns as one box.
   const view = new EditorView(
@@ -108,7 +112,7 @@ export function createEditor(mount: HTMLElement, options: EditorOptions): Editor
         bold: toggleMark(schema.marks.strong),
         italic: toggleMark(schema.marks.em),
         quote: toggleQuote,
-        undo,
+        undo: stepBack,
         redo,
       }
       commands[command](view.state, view.dispatch, view)

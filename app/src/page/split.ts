@@ -2,8 +2,8 @@
 // point and written by the Markdown serialiser, so marks open across the point close on each side
 // and Markdown outside the v1 marks stays as written.
 
-import type { Node } from 'prosemirror-model'
-import { type Block, BREAK, serialize } from '../domain/markdown'
+import type { Node, ResolvedPos } from 'prosemirror-model'
+import { type Block, BREAK, type Meeting, type Seam, serialize } from '../domain/markdown'
 import { schema, toBlocks } from './schema'
 
 export interface Halves {
@@ -13,11 +13,16 @@ export interface Halves {
   after: string
   /** The rest of a `# ` line; empty otherwise. */
   title: string
+  /** How they met, so undo can put them back. */
+  seam: Seam
 }
 
 /** The halves of the text at a caret, or at the start of a selection. */
 export function halvesAt(doc: Node, pos: number): Halves {
-  return { before: written(doc.cut(0, pos)), after: moved(doc.cut(pos)), title: '' }
+  const $pos = doc.resolve(pos)
+  const { text, escaped } = moved(doc.cut(pos))
+  const raw = $pos.parent.type === schema.nodes.raw
+  return { before: written(doc.cut(0, pos)), after: text, title: '', seam: { front: meetingAt($pos), raw, escaped } }
 }
 
 /** The halves at a `# ` line, `pos` just before its `#`: the rest of that line is the title. */
@@ -26,7 +31,24 @@ export function halvesAtLine(doc: Node, pos: number): Halves {
   const end = lineEnd($pos.parent, $pos.parentOffset) + $pos.start()
   // Past the line's break, if it has one: that goes with it.
   const next = doc.nodeAt(end)?.type === schema.nodes.hard_break ? end + 1 : end
-  return { before: written(doc.cut(0, pos)), after: moved(doc.cut(next)), title: doc.textBetween(pos + 2, end).trim() }
+  const { text, escaped } = moved(doc.cut(next))
+  return {
+    before: written(doc.cut(0, pos)),
+    after: text,
+    title: doc.textBetween(pos + 2, end).trim(),
+    seam: { front: $pos.parentOffset === 0 ? 'apart' : 'line', back: next > end && next < $pos.end() ? 'line' : 'apart', raw: false, escaped },
+  }
+}
+
+/** Whether a point is inside its block, and at a line break. One at the block's end is only space. */
+function meetingAt($pos: ResolvedPos): Meeting {
+  const { parent, parentOffset: at } = $pos
+  const size = parent.content.size
+  if (at === 0 || at === size) return 'apart'
+  const breakAfter = parent.type === schema.nodes.raw ? parent.textContent[at] === BREAK : $pos.nodeAfter?.type === schema.nodes.hard_break
+  const breakBefore = parent.type === schema.nodes.raw ? parent.textContent[at - 1] === BREAK : $pos.nodeBefore?.type === schema.nodes.hard_break
+  if (breakAfter && at + 1 === size) return 'apart'
+  return breakAfter || breakBefore ? 'line' : 'inside'
 }
 
 function lineEnd(block: Node, from: number): number {
@@ -40,9 +62,10 @@ function lineEnd(block: Node, from: number): number {
 const written = (half: Node): string => serialize(withoutEdgeBreaks(toBlocks(half))).replace(/^\n+|\n+$/g, '')
 
 /** A half that moves. Kept as written, a line starting `# ` would read as one more chapter in an exported book. */
-function moved(half: Node): string {
+function moved(half: Node): { text: string; escaped: boolean } {
   const text = written(half)
-  return text.startsWith('# ') ? `\\${text}` : text
+  const escaped = text.startsWith('# ')
+  return { text: escaped ? `\\${text}` : text, escaped }
 }
 
 /** A line break at the point is only space, and Markdown cannot hold one at a block's edge. */
