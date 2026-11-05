@@ -1459,7 +1459,8 @@ button.count[aria-expanded='true'] {
   display: flex;
   align-items: baseline;
   gap: 16px;
-  padding: 9px 10px;
+  /* 44px for a thumb, from one line of 21px. */
+  padding: 11.5px 10px;
   border-radius: 10px;
   text-align: left;
   font-size: 15px;
