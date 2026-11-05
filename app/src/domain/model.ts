@@ -43,7 +43,7 @@ export interface Place {
   snippet: string
   /** The page in its section, from 1, for orientation only. Not known after a rejoin or a change to the text settings. */
   page?: number
-  /** Whose page that is: pages break differently on each. None means the section's opening page, the same on both. */
+  /** Whose page that is: pages break differently on each. Without it, only page 1 is known, a section's opening page on both. */
   screen?: Screen
   /** True when the caret was there; otherwise it is the first line on screen. */
   caret: boolean

@@ -81,8 +81,28 @@ describe("the page of the writer's place", () => {
     expect(placePage(book, 'phone')).toBeUndefined()
   })
 
+  it('is not known from a place that does not say whose page it was, past a chapter\'s opening page', () => {
+    const { screen: _, ...unsaid } = place
+    expect(placePage({ ...book, place: unsaid }, 'phone')).toBeUndefined()
+    expect(placePage({ ...book, place: { ...unsaid, page: 1 } }, 'phone')).toBe(9)
+  })
+
   it('in an essay or a journal is the page as it was kept: there is no book to count', () => {
     expect(placePage({ ...book, kind: 'essay', place }, 'desktop')).toBe(3)
+  })
+
+  it('drops at new text settings from a place that does not say whose page it was, keeping an opening page', async () => {
+    const s = setup()
+    const piece = newPiece(s, 'book', 'en')
+    const sectionId = piece.sections[0]!.sectionId
+    await write(s.deps, piece, sectionId, 'Words.')
+    const { screen: _, ...unsaid } = place
+    await savePlace(s.deps, piece.id, { ...unsaid, sectionId })
+    await forgetPages(s.deps)
+    expect((await openPiece(s.deps, piece.id))!.piece.place?.page).toBeUndefined()
+    await savePlace(s.deps, piece.id, { ...unsaid, sectionId, page: 1 })
+    await forgetPages(s.deps)
+    expect((await openPiece(s.deps, piece.id))!.piece.place?.page).toBe(1)
   })
 
   it('stands aside with the counts when the text settings change, since its page moved with them', async () => {

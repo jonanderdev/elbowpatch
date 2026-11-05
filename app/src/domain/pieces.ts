@@ -190,7 +190,7 @@ export function bookCount(piece: Piece, screen: Screen, open: OpenChapter & { wo
 export function placePage(piece: Piece, screen: Screen): number | undefined {
   const { place } = piece
   if (piece.kind !== 'book' || !place || place.page === undefined) return place?.page
-  if (place.screen && place.screen !== screen) return undefined
+  if (place.screen ? place.screen !== screen : place.page !== 1) return undefined
   const start = contents(piece, screen).chapters.find((c) => c.sectionId === place.sectionId)?.startPage
   return start === undefined ? undefined : start + place.page - 1
 }
@@ -253,15 +253,15 @@ export async function measureNext(
 export function forgetPages(deps: Pick<Deps, 'store'>): Promise<void> {
   return deps.store.transaction(async (tx) => {
     for (const { pages, ...piece } of await tx.pieces()) {
-      const stale = piece.kind === 'book' && piece.place?.screen !== undefined
-      if (pages || stale) await tx.putPiece(stale ? { ...piece, place: withoutPage(piece.place!) } : piece)
+      const place = piece.kind === 'book' && piece.place ? withoutPage(piece.place) : piece.place
+      if (pages || place !== piece.place) await tx.putPiece(place ? { ...piece, place } : piece)
     }
   })
 }
 
-/** The place itself holds on any page; the number it was on a screen's page does not. */
+/** The place itself holds on any page; the number it was on a screen's page does not. A chapter's opening page is page 1 on every one. */
 export function withoutPage(place: Place): Place {
-  if (!place.screen) return place
+  if (place.page === undefined || (!place.screen && place.page === 1)) return place
   const { page: _, screen: __, ...left } = place
   return left
 }

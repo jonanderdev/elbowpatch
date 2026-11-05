@@ -199,7 +199,7 @@ export function Page({
       moved.current = false
       return place
     },
-    pages: () => (pager && screen.current ? { screen: screenOf(screen.current.clientWidth), count: pager.count } : null),
+    pages: () => (pager && laidOut && screen.current ? { screen: screenOf(screen.current.clientWidth), count: pager.count } : null),
     onStored: (stored) => {
       live.stored(stored)
       onChange(stored)
