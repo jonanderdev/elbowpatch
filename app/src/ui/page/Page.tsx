@@ -226,7 +226,7 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
       cancelAnimationFrame(frame)
     }
   }, [editor])
-  useOpenAtPlace(editor, pager, opened)
+  useOpenAtPlace(editor, pager, opened, covered)
   usePageTurns({
     screen,
     viewport,
