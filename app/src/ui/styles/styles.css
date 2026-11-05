@@ -1443,6 +1443,13 @@ button.count[aria-expanded='true'] {
   flex: none;
   padding: 0 10px 10px;
 }
+.contents-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.contents .sheet-aside {
+  flex: none;
+}
 .contents-list {
   min-height: 0;
   display: flex;

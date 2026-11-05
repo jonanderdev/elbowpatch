@@ -42,6 +42,8 @@ export function NewChapter({ onAdd }: { onAdd(): void }): ReactElement {
 const pagesWord = (pages: number): string => `${number(pages)} ${pages === 1 ? 'page' : 'pages'}`
 
 interface ContentsSheetProps extends ContentsListProps {
+  /** The book's name: a phone shows it nowhere else past the title page. */
+  name: string
   /** The book's pages, once every chapter's are known. */
   pages?: number
   /** Opened by keyboard: the focus moves to the current chapter. Otherwise it stays, so the phone keyboard stays up. */
@@ -52,7 +54,7 @@ interface ContentsSheetProps extends ContentsListProps {
 }
 
 /** Contents on a phone: a sheet dropped under the head, whose list scrolls inside it. */
-export function ContentsSheet({ chapters, current, pages, takeFocus, onOpen, onDone, children }: ContentsSheetProps): ReactElement {
+export function ContentsSheet({ name, chapters, current, pages, takeFocus, onOpen, onDone, children }: ContentsSheetProps): ReactElement {
   const ref = useRef<HTMLDivElement>(null)
   // Once, as it opens: a long list starts at the current chapter.
   const opening = useRef(takeFocus)
@@ -64,7 +66,7 @@ export function ContentsSheet({ chapters, current, pages, takeFocus, onOpen, onD
     // A press in the sheet leaves the focus where it is: in the text, the keyboard stays up.
     <div ref={ref} className="sheet surface contents" role="dialog" aria-label="Contents" onMouseDown={(e) => e.preventDefault()}>
       <div className="sheet-title">
-        <span>Contents</span>
+        <span className="contents-name">{name.trim() || 'Untitled'}</span>
         {pages === undefined ? null : <span className="sheet-aside contents-pages">{pagesWord(pages)}</span>}
       </div>
       <ContentsList chapters={chapters} current={current} onOpen={onOpen} />

@@ -11,6 +11,9 @@ const PARAGRAPH =
   'The windows of the shop had been salted white by the first storm of November, and Ana scraped a small square clear each morning before she unlocked the door.'
 const long = (paragraphs: number) => Array.from({ length: paragraphs }, (_, i) => `${i + 1}. ${PARAGRAPH}`).join('\n\n')
 
+/** The name an imported book takes from its file. */
+const BOOK = 'harbour'
+
 const TWO = '# One\n\nFirst chapter.\n\n# Two\n\nSecond.\n'
 /** Long enough that each chapter has later pages, and with them a running head. */
 const THREE = `# One\n\n${long(12)}\n\n# Two\n\n${long(12)}\n\n# Three\n\nThe end.\n`
@@ -104,8 +107,12 @@ test('the running head carries ⌄ and opens Contents; pressed again, or pressed
   phoneOnly(page)
   await importBook(page, THREE)
   await openChapter(page, 'Two')
-  // A chapter's opening page has no running head.
-  await expect(runningHead(page)).toHaveCount(0)
+  // A chapter's opening page carries its title: the head names the book, and still opens Contents.
+  await expect(runningHead(page)).toContainText(BOOK)
+  await runningHead(page).click()
+  await expect(contents(page).locator('.contents-name')).toHaveText(BOOK)
+  await runningHead(page).click()
+  await expect(contents(page)).toHaveCount(0)
   await page.keyboard.press('PageDown')
   await expect(runningHead(page)).toContainText('Two')
   await expect(runningHead(page).locator('.icon')).toBeVisible()
@@ -136,9 +143,13 @@ test('a chapter opens at its opening page, the one on screen too', async ({ page
   await chapter(page, 'One').click()
   await expect(contents(page)).toHaveCount(0)
   await expect(page.locator('.title')).toBeInViewport()
-  await expect(runningHead(page)).toHaveCount(0)
+  await expect(runningHead(page)).toContainText(BOOK)
   // The second page of the section: a title page stands before chapter 1.
   await expect(page.locator('.page-button')).toHaveAttribute('aria-label', /^Page 2 of /)
+  // The title page shows the book's name already, large: it has no running head.
+  await page.keyboard.press('PageUp')
+  await expect(page.locator('.page-button')).toHaveAttribute('aria-label', /^Page 1 of /)
+  await expect(runningHead(page)).toHaveCount(0)
 })
 
 test('Contents lists each chapter, says Untitled for one with no title, and marks the current one', async ({ page }) => {
@@ -428,11 +439,12 @@ test('a click on the bare rail turns no page, and the count on desktop opens not
   await importBook(page, THREE)
   await page.keyboard.press('PageDown')
   await page.keyboard.press('PageDown')
-  const here = page.locator('.head-tools .count')
-  const was = await here.textContent()
+  // The page, not the whole count: the book's total fills in by itself.
+  const here = page.locator('.page-button')
+  await expect(here).toHaveAttribute('aria-label', /^Page 3 of /)
   await page.mouse.click(100, 700)
   await expect(page.locator('.page-screen')).not.toHaveAttribute('data-turn', /./)
-  await expect(here).toHaveText(was!)
+  await expect(here).toHaveAttribute('aria-label', /^Page 3 of /)
   await expect(page.locator('.head-tools button.count')).toHaveCount(0)
 })
 

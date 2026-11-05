@@ -9,6 +9,12 @@ const PARAGRAPH =
   'The windows of the shop had been salted white by the first storm of November, and Ana scraped a small square clear each morning before she unlocked the door.'
 const long = (paragraphs: number) => Array.from({ length: paragraphs }, (_, i) => `${i + 1}. ${PARAGRAPH}`).join('\n\n')
 
+/** A chapter's opening page has no running head; on a phone its head names the book, the way to Contents. */
+async function onOpeningPage(page: Page) {
+  if (onDesktop(page)) await expect(head(page)).toHaveCount(0)
+  else await expect(head(page)).toContainText('harbour')
+}
+
 async function importBook(page: Page, markdown: string) {
   await page.goto('./#/settings/export')
   await page.locator('input[type=file]').evaluate((el: HTMLInputElement, text) => {
@@ -129,7 +135,7 @@ test('it adds a chapter at the end: the caret in its title, Return on to the tex
   await expect(page.locator('.title')).toHaveAttribute('data-empty', '')
   await expect(page.locator('.body [data-placeholder="Begin anywhere."]')).toBeVisible()
   await expect(page.locator('.title')).toBeInViewport()
-  await expect(head(page)).toHaveCount(0)
+  await onOpeningPage(page)
 
   await page.keyboard.type('Three')
   await page.keyboard.press('Enter')
@@ -230,7 +236,7 @@ test('the running head shows from the second page of a new chapter, and not on i
   await expect(head(page)).toContainText('Three')
   if (!onDesktop(page)) await head(page).click()
   await contents(page).locator('.contents-row', { hasText: 'Three' }).click()
-  await expect(head(page)).toHaveCount(0)
+  await onOpeningPage(page)
   await expect(page.locator('.title')).toBeInViewport()
 })
 

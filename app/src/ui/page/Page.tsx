@@ -505,6 +505,9 @@ export function Page({
     view.focus()
   }
 
+  const openingAt = titlePage ? 1 : 0
+  const openingPage = page === openingAt
+
   return (
     <div
       ref={screen}
@@ -543,11 +546,12 @@ export function Page({
             {newChapter}
           </ContentsRail>
         ) : null}
-        {page <= (titlePage ? 1 : 0) ? null : book && phone ? (
-          <RunningHeadControl title={heading} open={sheet === 'contents'} onOpen={openContents} />
-        ) : (
+        {book && phone && !(titlePage && page === 0) ? (
+          // A chapter's opening page carries its title already: its head names the book, and Contents stays in reach.
+          <RunningHeadControl title={openingPage ? name : heading} open={sheet === 'contents'} onOpen={openContents} />
+        ) : page > openingAt ? (
           <div className="running-head">{heading}</div>
-        )}
+        ) : null}
         <HeadTools
           page={shown.page}
           count={shown.pages}
@@ -633,6 +637,7 @@ export function Page({
       {sheet === 'contents' && phone ? (
         <ContentsSheet
           {...contents(live.outline, 'phone', laidOut ? { sectionId, title: heading, pages: count } : undefined)}
+          name={name}
           current={sectionId}
           takeFocus={contentsFocus}
           onOpen={openChapter}
