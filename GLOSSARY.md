@@ -112,7 +112,7 @@ Making a new essay from the section being looked at, starting its own history at
 _Avoid_: Branch, fork, duplicate
 
 **Draft**:
-A piece made by keeping a copy, named like "Chapter 3, draft 2".
+A piece made by keeping a copy, named for what it came from, like "Salt on the windows, draft 2".
 _Avoid_: Branch, alternate version
 
 ## The library
