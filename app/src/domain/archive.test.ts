@@ -169,7 +169,7 @@ describe('export and import', () => {
     await takeMoment(deps, book.id)
     await startChapterAt(deps, book.id, { sectionId: first, whole: 'One.\n\nTwo.', before: 'One.', after: 'Two.', title: '', newSectionId: 'cut' })
     await takeMoment(deps, book.id)
-    await rejoinChapter(deps, book.id, { sectionId: 'cut', into: first, whole: 'Two.', seam: { front: 'apart', raw: false, escaped: false } })
+    await rejoinChapter(deps, book.id, { sectionId: 'cut', into: first, whole: 'Two.', seam: { front: 'apart', ending: '', raw: false, escaped: false } })
     await takeMoment(deps, book.id)
 
     const elsewhere = { ...setup(), store: memoryStore() }

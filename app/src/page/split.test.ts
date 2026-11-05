@@ -146,9 +146,29 @@ describe('the halves back together', () => {
   })
 
   it('two halves of one mark are one mark again, not two strung together', () => {
-    expect(joinHalves('Salt on the *windows *', '*and* the rail.', { front: 'inside', raw: false, escaped: false }, '')).toBe(
+    expect(joinHalves('Salt on the *windows *', '*and* the rail.', { front: 'inside', ending: 'Salt on the *windows *', raw: false, escaped: false }, '')).toBe(
       'Salt on the *windows and* the rail.',
     )
+  })
+
+  it('new words on the end of the earlier chapter stand apart from what comes back, every word kept', () => {
+    const h = cutBefore('The ferry at seven.', 'at seven')
+    expect(joinHalves(`${h.before}\n\nNew para`, h.after, h.seam, '')).toBe('The ferry \n\nNew para\n\nat seven.')
+    expect(joinHalves(`${h.before}more`, h.after, h.seam, '')).toBe('The ferry more\n\nat seven.')
+  })
+
+  it('so do they in Markdown kept as written, and at a line break', () => {
+    const text = 'Two **stars and no end'
+    const raw = halvesAt(docOf(text), 5)
+    expect(joinHalves(`${raw.before}\n\nNew para`, raw.after, raw.seam, '')).toBe(`${raw.before}\n\nNew para\n\n${raw.after}`)
+    const { doc, pos } = posOf('Before.\n\\# The harbour', '# The')
+    const line = halvesAtLine(doc, pos)
+    expect(joinHalves('Before.\n\nNew para', line.after, line.seam, line.title)).toBe('Before.\n\nNew para\n\n\\# The harbour')
+  })
+
+  it('the earlier chapter changed further back still meets what comes back', () => {
+    const h = cutBefore('First.\n\nThe ferry at seven.', 'at seven')
+    expect(joinHalves(h.before.replace('First.', 'Earlier.'), h.after, h.seam, '')).toBe('Earlier.\n\nThe ferry at seven.')
   })
 
   it('a # line comes back as an escaped line, where it stood', () => {
@@ -174,11 +194,11 @@ describe('the halves back together', () => {
   })
 
   it('when the halves are no longer of a kind, they stand apart with every word', () => {
-    expect(joinHalves('One', '> two', { front: 'inside', raw: false, escaped: false }, '')).toBe('One\n\n> two')
+    expect(joinHalves('One', '> two', { front: 'inside', ending: 'One', raw: false, escaped: false }, '')).toBe('One\n\n> two')
   })
 
   it('an empty half leaves the other as it is', () => {
-    expect(joinHalves('', 'Two.', { front: 'inside', raw: false, escaped: false }, '')).toBe('Two.')
-    expect(joinHalves('One.', '', { front: 'inside', raw: false, escaped: false }, '')).toBe('One.')
+    expect(joinHalves('', 'Two.', { front: 'inside', ending: '', raw: false, escaped: false }, '')).toBe('Two.')
+    expect(joinHalves('One.', '', { front: 'inside', ending: 'One.', raw: false, escaped: false }, '')).toBe('One.')
   })
 })

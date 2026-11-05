@@ -43,6 +43,8 @@ export type Meeting = 'apart' | 'inside' | 'line'
 export interface Seam {
   /** How what stayed met what followed it. */
   front: Meeting
+  /** The last block of what stayed, as the split left it: only that block meets what comes back. */
+  ending: string
   /** The title came from a `# ` line: how that line met what moved. */
   back?: Meeting
   /** The point was inside Markdown kept as written, which only its own characters can put back. */
@@ -53,13 +55,21 @@ export interface Seam {
 
 /**
  * The two halves of a split as one text again, with the title between them if it has one. Blocks that
- * met inside a paragraph are one block again: their spans meet, so a mark cut in two is one mark.
+ * met inside a paragraph are one block again: their spans meet, so a mark cut in two is one mark. If the
+ * earlier text no longer ends as the split left it, new words stand there, and what comes back stands apart.
  */
 export function joinHalves(before: string, after: string, seam: Seam, title: string): string {
   const moved = seam.escaped && after.startsWith('\\# ') ? after.slice(1) : after
-  if (seam.back === undefined && !title.trim()) return meet(before, moved, seam.front, seam.raw)
+  const front = lastBlock(before) === seam.ending ? seam.front : 'apart'
+  if (seam.back === undefined && !title.trim()) return meet(before, moved, front, seam.raw)
   const line = serialize([{ type: 'paragraph', spans: [{ text: `# ${title}`, marks: [] }] }])
-  return meet(meet(before, line, seam.back === undefined ? 'apart' : seam.front), moved, seam.back ?? 'apart')
+  return meet(meet(before, line, seam.back === undefined ? 'apart' : front), moved, seam.back ?? 'apart')
+}
+
+/** A text's last block, as it is written. */
+export function lastBlock(markdown: string): string {
+  const block = parse(markdown).at(-1)
+  return block ? serializeBlock(block) : ''
 }
 
 function meet(before: string, after: string, how: Meeting, raw = false): string {

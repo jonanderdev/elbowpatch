@@ -241,7 +241,14 @@ describe('a rejoin through the page of the chapter going back', () => {
       closing: () => Promise.resolve(),
     })
     const rejoin = async (whole: string): Promise<Piece> =>
-      (await rejoinChapter(b.deps, b.piece.id, { sectionId: 'new', into: b.sectionId, whole, seam: { front: 'inside', raw: false, escaped: false } })).piece
+      (
+        await rejoinChapter(b.deps, b.piece.id, {
+          sectionId: 'new',
+          into: b.sectionId,
+          whole,
+          seam: { front: 'inside', ending: BEFORE, raw: false, escaped: false },
+        })
+      ).piece
     return { ...b, page, saving, rejoin }
   }
   const replay = (b: Awaited<ReturnType<typeof openSplit>>) =>
@@ -353,7 +360,7 @@ describe('reshaping behind a page still closing', () => {
           into: first,
           whole,
           keptAt: unsaved.get(first)?.at,
-          seam: { front: 'inside', raw: false, escaped: false },
+          seam: { front: 'inside', ending: BEFORE, raw: false, escaped: false },
         })
       ).piece
     const texts = async () => (await openPiece(deps, piece.id))!.sections.map((c) => c.content)
@@ -392,7 +399,7 @@ describe('reshaping behind a page still closing', () => {
     const done = here.saving.split(b.rejoin(AFTER))
     setTimeout(go, 10)
     expect(await done).toBe(true)
-    expect(await b.texts()).toEqual([`${BEFORE} Typed.${AFTER}`])
+    expect(await b.texts()).toEqual([`${BEFORE} Typed.\n\n${AFTER}`])
   })
 
   it('a split is refused while an earlier page of its own chapter may still write the whole text back', async () => {

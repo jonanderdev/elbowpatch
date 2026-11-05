@@ -756,7 +756,7 @@ describe('a chapter started at a point', () => {
   })
 
   describe('rejoining', () => {
-    const SEAM = { front: 'apart', raw: false, escaped: false } as const
+    const SEAM = { front: 'apart', ending: BEFORE, raw: false, escaped: false } as const
     const back = (b: Book, over: Partial<Parameters<typeof rejoinChapter>[2]> = {}) =>
       rejoinChapter(b.deps, b.id, { sectionId: 'new', into: b.first, whole: AFTER, seam: SEAM, ...over })
     const split = async (b: Book) => {

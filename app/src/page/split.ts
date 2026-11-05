@@ -3,7 +3,7 @@
 // and Markdown outside the v1 marks stays as written.
 
 import type { Node, ResolvedPos } from 'prosemirror-model'
-import { type Block, BREAK, type Meeting, type Seam, serialize } from '../domain/markdown'
+import { type Block, BREAK, lastBlock, type Meeting, type Seam, serialize } from '../domain/markdown'
 import { schema, toBlocks } from './schema'
 
 export interface Halves {
@@ -22,7 +22,8 @@ export function halvesAt(doc: Node, pos: number): Halves {
   const $pos = doc.resolve(pos)
   const { text, escaped } = moved(doc.cut(pos))
   const raw = $pos.parent.type === schema.nodes.raw
-  return { before: written(doc.cut(0, pos)), after: text, title: '', seam: { front: meetingAt($pos), raw, escaped } }
+  const before = written(doc.cut(0, pos))
+  return { before, after: text, title: '', seam: { front: meetingAt($pos), ending: lastBlock(before), raw, escaped } }
 }
 
 /** The halves at a `# ` line, `pos` just before its `#`: the rest of that line is the title. */
@@ -32,11 +33,18 @@ export function halvesAtLine(doc: Node, pos: number): Halves {
   // Past the line's break, if it has one: that goes with it.
   const next = doc.nodeAt(end)?.type === schema.nodes.hard_break ? end + 1 : end
   const { text, escaped } = moved(doc.cut(next))
+  const before = written(doc.cut(0, pos))
   return {
-    before: written(doc.cut(0, pos)),
+    before,
     after: text,
     title: doc.textBetween(pos + 2, end).trim(),
-    seam: { front: $pos.parentOffset === 0 ? 'apart' : 'line', back: next > end && next < $pos.end() ? 'line' : 'apart', raw: false, escaped },
+    seam: {
+      front: $pos.parentOffset === 0 ? 'apart' : 'line',
+      back: next > end && next < $pos.end() ? 'line' : 'apart',
+      ending: lastBlock(before),
+      raw: false,
+      escaped,
+    },
   }
 }
 
