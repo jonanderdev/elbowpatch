@@ -1539,9 +1539,12 @@ button {
   line-height: 1.55;
   color: var(--text);
 }
-.answer a {
+.answer a,
+.about-rows a {
   color: var(--title);
   text-decoration: underline;
+}
+.answer a {
   white-space: nowrap;
 }
 .answer ol {
@@ -1608,12 +1611,8 @@ button {
 .about-rows dd {
   line-height: 1.4;
 }
-.about-rows dt,
-.about-rows a {
+.about-rows dt {
   color: var(--title);
-}
-.about-rows a {
-  text-decoration: underline;
 }
 .about-rows + .settings-note {
   padding-top: 27px;
