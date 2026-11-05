@@ -41,6 +41,7 @@ export function halvesAtLine(doc: Node, pos: number): Halves {
     seam: {
       front: $pos.parentOffset === 0 ? 'apart' : 'line',
       back: next > end && next < $pos.end() ? 'line' : 'apart',
+      line: written(doc.cut(pos, end)),
       ending: lastBlock(before),
       raw: false,
       escaped,

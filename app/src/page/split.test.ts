@@ -183,6 +183,19 @@ describe('the halves back together', () => {
     }
   })
 
+  it('a # line keeps its marks, wherever it stood', () => {
+    for (const text of ['Before.\n\n\\# The **harbour** *in winter*\n\nAfter.', 'A\n\\# The **harbour**\nB', 'Before.\n\\# The *harbour*']) {
+      const { doc, pos } = posOf(text, '# The')
+      expect(back(halvesAtLine(doc, pos)), text).toBe(text)
+    }
+  })
+
+  it('a title changed since the split comes back as it now reads, without the old line', () => {
+    const { doc, pos } = posOf('Before.\n\n\\# The **harbour**\n\nAfter.', '# The')
+    const h = halvesAtLine(doc, pos)
+    expect(joinHalves(h.before, h.after, h.seam, 'The bay')).toBe('Before.\n\n\\# The bay\n\nAfter.')
+  })
+
   it('a # line with nothing on it comes back too', () => {
     const { doc, pos } = posOf('Before.\n\n\\# \n\nAfter.', '# ')
     expect(back(halvesAtLine(doc, pos))).toBe('Before.\n\n\\# \n\nAfter.')

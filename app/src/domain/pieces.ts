@@ -1,4 +1,4 @@
-import { type Block, countWords, joinHalves, parse, type Seam } from './markdown'
+import { countWords, joinHalves, parse, type Seam, wordsIn } from './markdown'
 import type { Kind, Outline, OutlineSection, Piece, Place, Screen, Version, Working } from './model'
 import type { Clock, Ids, Store, Tx } from './ports'
 
@@ -453,7 +453,7 @@ function joinIn(before: string, content: string): Pick<Place, 'paragraph' | 'off
   const paragraph = Math.max(blocks.length - 1, 0)
   const last = blocks.at(-1)
   const there = parse(content)[paragraph]
-  return { paragraph, offset: last ? wordsOf(last).length : 0, snippet: there ? wordsOf(there).replaceAll('\n', '').slice(0, 160) : '' }
+  return { paragraph, offset: last ? wordsIn(last).length : 0, snippet: there ? wordsIn(there).replaceAll('\n', '').slice(0, 160) : '' }
 }
 
 /** A changed section's count no longer holds on any screen: it is unknown until it is laid out again. */
@@ -464,12 +464,10 @@ function withoutCounts(pages: Piece['pages'], sectionIds: string[]): Piece['page
   return { ...pages, phone: left(pages.phone), desktop: left(pages.desktop) }
 }
 
-const wordsOf = (block: Block): string => (block.type === 'raw' ? block.text : block.spans.map((s) => s.text).join(''))
-
 /** A place's snippet: the first paragraph's words, as the page shows them. */
 function openingWords(markdown: string): string {
   const first = parse(markdown)[0]
-  return first ? wordsOf(first).slice(0, 160) : ''
+  return first ? wordsIn(first).slice(0, 160) : ''
 }
 
 /** On launch: text left in working copies by a crash enters history first (0005, 0010). */
