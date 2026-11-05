@@ -1970,6 +1970,25 @@ button {
   color: var(--title);
 }
 
+/* Installed on an iPhone, the system draws a soft blur down the top of the screen, into the head, unless a
+   solid fixed edge sits on top of the page there (docs/decisions/0017). It is a real element, in index.html:
+   a body::before did not work. It is the page's colour, ends where the head line starts, and lets touches
+   through, so it is never seen. */
+.top-edge {
+  display: none;
+}
+@media (display-mode: standalone) and (pointer: coarse) {
+  .top-edge {
+    display: block;
+    position: fixed;
+    inset: 0 0 auto;
+    height: 10px;
+    background: var(--page);
+    pointer-events: none;
+    z-index: 6;
+  }
+}
+
 /* When what is under it scrolls, the head stands on a strip of page colour with a fade under it,
    so the text thins out before it meets the head (DESIGN.md, One head). */
 :root {
