@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-import { write } from './helpers'
+import { saved, write } from './helpers'
 
 async function essay(page: Page, title: string, text: string) {
   await page.goto('./#/')
@@ -73,4 +73,36 @@ test('the shelf: switched to, remembered, and the piece menu works on it', async
 
   await page.getByRole('button', { name: 'Show as a list' }).click()
   await expect(page.locator('.row', { hasText: 'Shelved' })).toBeVisible()
+})
+
+test('on the shelf a long word shrinks the title to fit, not broken in two', async ({ page }) => {
+  await page.goto('./#/')
+  await page.locator('.start.journal').click()
+  await expect(page.locator('.book-title')).toBeFocused()
+  await page.keyboard.type('Thoughts')
+  await page.keyboard.press('Enter')
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('A day.')
+  await saved(page, 'A day.')
+  await page.locator('.head .home').click()
+  await essay(page, 'Wanderings', 'One.')
+  await essay(page, 'Short', 'Two.')
+  await essay(page, 'Unquestionably', 'Three.')
+  await page.getByRole('button', { name: 'Show as a shelf' }).click()
+  const size = (title: string) =>
+    page.locator('.shelf-object .row-title', { hasText: title }).evaluate((el) => ({
+      size: Number.parseFloat(getComputedStyle(el).fontSize),
+      lines: Math.round(el.getBoundingClientRect().height / Number.parseFloat(getComputedStyle(el).lineHeight)),
+    }))
+  // A title that fits keeps its size.
+  expect(await size('Short')).toEqual({ size: 15, lines: 1 })
+  // One that would break shrinks to stay on one line.
+  for (const title of ['Wanderings', 'Thoughts']) {
+    const fitted = await size(title)
+    expect(fitted.size).toBeLessThan(15)
+    expect(fitted.size).toBeGreaterThanOrEqual(12)
+    expect(fitted.lines).toBe(1)
+  }
+  // Never below the line under it: past that, the word breaks.
+  expect((await size('Unquestionably')).size).toBe(12)
 })

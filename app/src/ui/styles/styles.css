@@ -1147,8 +1147,9 @@ button {
   fill: var(--pressed);
 }
 .shelf-object .row-title {
+  /* 15px over 19px; a long word shrinks the size, and the leading with it (useFitTitle). */
   font-size: 15px;
-  line-height: 19px;
+  line-height: 1.267;
   white-space: normal;
   overflow-wrap: anywhere;
   display: -webkit-box;
