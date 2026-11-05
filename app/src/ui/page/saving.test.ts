@@ -2,7 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { memoryStore } from '../../adapters/memory-store'
 import type { Piece, Place } from '../../domain/model'
 import { newPiece, openPiece, rejoinChapter, renameSection, startChapterAt, takeMoment, write } from '../../domain/pieces'
+import type { Store } from '../../domain/ports'
 import { replayJournal } from '../app/replay'
+import { closingAfter, settledWithin } from '../app/settled'
 import { unsaved } from '../stores/unsaved'
 import { createSaving, type Held } from './saving'
 
@@ -42,6 +44,7 @@ async function openBook() {
     onFailed: (failed) => {
       page.failed = failed
     },
+    closing: () => Promise.resolve(),
   })
   const split = (whole: string, after = AFTER): Promise<Piece> =>
     startChapterAt(deps, piece.id, { sectionId, whole, before: BEFORE, after, title: '', newSectionId: 'new' })
@@ -234,6 +237,7 @@ describe('a rejoin through the page of the chapter going back', () => {
       pages: () => ({ screen: 'phone', count: 9 }),
       onStored: () => {},
       onFailed: () => {},
+      closing: () => Promise.resolve(),
     })
     const rejoin = async (whole: string): Promise<Piece> =>
       (await rejoinChapter(b.deps, b.piece.id, { sectionId: 'new', into: b.sectionId, whole, seam: { front: 'inside', raw: false, escaped: false } })).piece
@@ -286,5 +290,135 @@ describe('a rejoin through the page of the chapter going back', () => {
     b.saving.touch()
     await b.saving.flush()
     expect(await b.texts()).toEqual([BEFORE, `${AFTER} More.`])
+  })
+})
+
+/** A store whose next transaction waits until it is let go, as a stalled disk holds a save. The rest carry on. */
+function stalling(store: Store): Store & { stallNext(): () => void } {
+  let waiting: Promise<void> | undefined
+  return {
+    stallNext() {
+      let go = (): void => {}
+      waiting = new Promise((r) => {
+        go = r
+      })
+      return go
+    },
+    transaction(fn) {
+      const wait = waiting
+      waiting = undefined
+      return wait ? wait.then(() => store.transaction(fn)) : store.transaction(fn)
+    },
+  }
+}
+
+describe('reshaping behind a page still closing', () => {
+  const held = (markdown: string, title: string): Held => ({ markdown, title, bookTitle: '', subtitle: '' })
+
+  /** A book split in two, with a page open on each. `closing` is what the page on the new chapter waits for. */
+  async function twoPages() {
+    let n = 0
+    const raw = memoryStore()
+    const store = stalling(raw)
+    const deps = { store, clock: { now: () => Date.now() }, ids: { next: () => `id${++n}` } }
+    const draft = newPiece(deps, 'book', 'en')
+    const first = draft.sections[0]!.sectionId
+    await write(deps, draft, first, WHOLE)
+    await takeMoment(deps, draft.id)
+    await startChapterAt(deps, draft.id, { sectionId: first, whole: WHOLE, before: BEFORE, after: AFTER, title: '', newSectionId: 'new' })
+    const piece = (await openPiece(deps, draft.id))!.piece
+    const pageOn = (sectionId: string, markdown: string, closing: () => Promise<void>) => {
+      const page = { held: held(markdown, '') }
+      const saving = createSaving({
+        deps,
+        piece,
+        sectionId,
+        stored: { markdown, title: '', bookTitle: '', subtitle: '' },
+        read: () => page.held,
+        readOnly: () => false,
+        place: () => undefined,
+        pages: () => null,
+        onStored: () => {},
+        onFailed: () => {},
+        closing,
+      })
+      return { page, saving }
+    }
+    const rejoin = (whole: string) => async (): Promise<Piece> =>
+      (await rejoinChapter(deps, piece.id, { sectionId: 'new', into: first, whole, seam: { front: 'inside', raw: false, escaped: false } })).piece
+    const texts = async () => (await openPiece(deps, piece.id))!.sections.map((c) => c.content)
+    return { deps, raw, store, piece, first, pageOn, rejoin, texts }
+  }
+
+  it('a rejoin is refused while the closing save of the chapter it joins may still land, and no word leaves the book', async () => {
+    vi.useFakeTimers()
+    const b = await twoPages()
+    const left = b.pageOn(b.first, BEFORE, () => Promise.resolve())
+    left.page.held = held(`${BEFORE} Typed.`, '')
+    left.saving.touch()
+    const go = b.store.stallNext()
+    const closing = left.saving.close()
+    const here = b.pageOn('new', AFTER, () => closing)
+
+    const done = here.saving.split(b.rejoin(AFTER))
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(await done).toBe(false)
+
+    go()
+    await vi.runAllTimersAsync()
+    await closing
+    expect(await b.texts()).toEqual([`${BEFORE} Typed.`, AFTER])
+  })
+
+  it('a rejoin waits for a closing save that ends in time, and takes its words along', async () => {
+    const b = await twoPages()
+    const left = b.pageOn(b.first, BEFORE, () => Promise.resolve())
+    left.page.held = held(`${BEFORE} Typed.`, '')
+    left.saving.touch()
+    const go = b.store.stallNext()
+    const closing = left.saving.close()
+    const here = b.pageOn('new', AFTER, () => closing)
+
+    const done = here.saving.split(b.rejoin(AFTER))
+    setTimeout(go, 10)
+    expect(await done).toBe(true)
+    expect(await b.texts()).toEqual([`${BEFORE} Typed.${AFTER}`])
+  })
+
+  it('a split is refused while an earlier page of its own chapter may still write the whole text back', async () => {
+    vi.useFakeTimers()
+    const b = await twoPages()
+    const left = b.pageOn(b.first, BEFORE, () => Promise.resolve())
+    left.page.held = held(`${BEFORE} Typed.`, '')
+    left.saving.touch()
+    const go = b.store.stallNext()
+    const closing = left.saving.close()
+    const back = b.pageOn(b.first, `${BEFORE} Typed.`, () => closing)
+
+    const done = back.saving.split(async (whole) =>
+      startChapterAt(b.deps, b.piece.id, { sectionId: b.first, whole, before: BEFORE, after: ' Typed.', title: '', newSectionId: 'later' }),
+    )
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(await done).toBe(false)
+
+    go()
+    await vi.runAllTimersAsync()
+    await closing
+    expect(await b.texts()).toEqual([`${BEFORE} Typed.`, AFTER])
+  })
+
+  it('every closing page counts, not only the last', async () => {
+    let finish = (): void => {}
+    const stuck = new Promise<void>((r) => {
+      finish = r
+    })
+    const both = closingAfter(stuck, Promise.resolve())
+    expect(await settledWithin(both, 20)).toBe(false)
+    finish()
+    expect(await settledWithin(both, 20)).toBe(true)
+  })
+
+  it('a closing page that failed has finished: nothing of it can land later', async () => {
+    expect(await settledWithin(closingAfter(Promise.reject(new Error('The disk is full.')), Promise.resolve()), 20)).toBe(true)
   })
 })

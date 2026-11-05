@@ -44,7 +44,7 @@ interface Props {
   onWriteHere(): void
   /** Lets the app ask the page to save now, before another window takes the piece. */
   flushRef: { current: (() => Promise<void>) | null }
-  /** The closing page's last save, so the app lets go of the piece only after it. */
+  /** The closing pages' last saves, so the app lets go of the piece only after them. */
   closingRef: { current: Promise<void> }
   /** The library shows over the page; the page stays laid out behind it, inert. */
   covered: boolean
@@ -449,7 +449,6 @@ export function Page({
     editor,
     saving,
     keyboard,
-    closingRef,
     onRejoined: onChapterRejoined,
   })
 
