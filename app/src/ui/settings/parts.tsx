@@ -8,7 +8,7 @@ export const KIND_WORD: Record<Kind, string> = { book: 'Book', journal: 'Journal
 /** A short answer under a small italic heading. */
 export function Answer({ heading, children }: { heading: string; children: ReactNode }): ReactElement {
   return (
-    <section className="help-part">
+    <section className="answer">
       <h2>{heading}</h2>
       {children}
     </section>
