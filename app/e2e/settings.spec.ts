@@ -237,10 +237,10 @@ test('Settings shows the version in full, and About & privacy shows the same', a
   await page.goto('./#/settings')
   await expect(page.locator('.row-title')).toHaveText(['Export & import', 'Put away', 'About & privacy', 'Help'])
   const row = page.getByRole('button', { name: /^About & privacy/ })
-  await expect(row).toContainText(`Version ${manifest.version}`)
+  await expect(row.locator('.row-meta')).toHaveText(`Version ${manifest.version}`)
   await row.click()
   await expect(page.getByRole('heading', { name: 'About & privacy', level: 1 })).toBeFocused()
-  await expect(page.getByRole('definition').filter({ hasText: manifest.version })).toBeVisible()
+  await expect(page.getByText('Version', { exact: true }).locator('+ dd')).toHaveText(manifest.version)
 })
 
 test("Source in About & privacy opens the library's address in a new tab", async ({ page }) => {
