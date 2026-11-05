@@ -6,7 +6,7 @@ import type { Kind } from '../../domain/model'
 export const KIND_WORD: Record<Kind, string> = { book: 'Book', journal: 'Journal', essay: 'Essay' }
 
 /** A short answer under a small italic heading. */
-export function Part({ heading, children }: { heading: string; children: ReactNode }): ReactElement {
+export function Answer({ heading, children }: { heading: string; children: ReactNode }): ReactElement {
   return (
     <section className="help-part">
       <h2>{heading}</h2>

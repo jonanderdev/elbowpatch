@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 import { safariOutsideHomeScreen } from '../library/Notes'
-import { Part } from './parts'
+import { Answer } from './parts'
 
 // Help (DESIGN.md, Settings): short answers, inside the app so it works offline.
 // shortcut: Going back and the Time Machine's keys wait for the Time Machine, so Help never describes what isn't there.
@@ -20,30 +20,30 @@ export function Help(): ReactElement {
   return (
     <>
       <p className="settings-lead">How Elbowpatch works, in short.</p>
-      <Part heading="Where your writing lives">
+      <Answer heading="Where your writing lives">
         <p>
           In this browser, on this device. There is no save button: your words are saved as you write. Clearing the browser's data clears your writing too, so
           keep a copy: <a href="#/settings/export">Export &amp; import</a>.
         </p>
-      </Part>
+      </Answer>
       {TIME_MACHINE && (
-        <Part heading="Going back">
+        <Answer heading="Going back">
           <p>The Time Machine shows a piece as it was at any moment kept, and brings back a chapter, a day or a passage. Nothing later is lost.</p>
-        </Part>
+        </Answer>
       )}
-      <Part heading="Page numbers">
+      <Answer heading="Page numbers">
         <p>
           A phone's page holds fewer words than a desktop's, so a piece has more pages on a phone. Find your way by chapter or by date.
           {PDF && ' Exported pages keep fixed numbers.'}
         </p>
-      </Part>
+      </Answer>
       {/* Where the library shows its Safari note, and only there. */}
       {safariOutsideHomeScreen() && (
-        <Part heading="On an iPhone or iPad">
+        <Answer heading="On an iPhone or iPad">
           <p>
             Write from your Home Screen and Safari won't clear your words. <a href="#/settings/help/home-screen">Show me how</a>
           </p>
-        </Part>
+        </Answer>
       )}
       <section className="help-part help-keys">
         <h2>Keys</h2>
@@ -67,7 +67,7 @@ export function HomeScreen(): ReactElement {
       <p className="settings-lead">
         Write from your Home Screen and your words stay. Here in Safari, they may be cleared if you don't open Elbowpatch for a week.
       </p>
-      <Part heading="Bring your writing with you">
+      <Answer heading="Bring your writing with you">
         <p>The Home Screen app starts with its own empty library. If you have written here in Safari, export everything first.</p>
         <ol>
           <li>In Settings › Export &amp; import, tap Export.</li>
@@ -75,7 +75,7 @@ export function HomeScreen(): ReactElement {
           <li>Open Elbowpatch from your Home Screen.</li>
           <li>In Settings › Export &amp; import, tap Import and choose the file.</li>
         </ol>
-      </Part>
+      </Answer>
     </>
   )
 }
