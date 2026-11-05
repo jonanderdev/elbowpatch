@@ -3,6 +3,7 @@ import type { Piece } from '../../domain/model'
 import { type Deps, type Rejoined, rejoinChapter } from '../../domain/pieces'
 import type { Editor } from '../../page/editor'
 import { forgetSplit, type Split, splitOf } from '../../page/undoMemory'
+import { unsaved } from '../stores/unsaved'
 import type { Saving } from './saving'
 import { raiseKeyboard } from './useFocusOnOpen'
 
@@ -37,7 +38,8 @@ export function useRejoin({ deps, pieceId, sectionId, writes, chapterBefore, edi
     if (keyboard) raiseKeyboard()
     let back: Rejoined | undefined
     const done = await saving.split(async (whole) => {
-      back = await rejoinChapter(deps, pieceId, { sectionId, into: split.into, whole, seam: split.seam })
+      // Read here, past the wait: a closing save that failed keeps its words as it ends.
+      back = await rejoinChapter(deps, pieceId, { sectionId, into: split.into, whole, seam: split.seam, keptAt: unsaved.get(split.into)?.at })
       return back.piece
     })
     if (done && back) {

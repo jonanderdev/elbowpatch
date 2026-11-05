@@ -831,6 +831,22 @@ describe('a chapter started at a point', () => {
       expect(await everything(b)).toEqual(before)
     })
 
+    it('is refused while words newer than the chapter it joins wait to be stored: they would never come back', async () => {
+      const b = await storedBook()
+      await split(b)
+      const stored = (await openPiece(b.deps, b.id))!.sections[0]!.updatedAt!
+      const before = await everything(b)
+      await expect(back(b, { keptAt: stored + 1 })).rejects.toThrow()
+      expect(await everything(b)).toEqual(before)
+    })
+
+    it('runs over words kept for that chapter that were overtaken: they stay for Save a copy, and never block it', async () => {
+      const b = await storedBook()
+      await split(b)
+      const stored = (await openPiece(b.deps, b.id))!.sections[0]!.updatedAt!
+      expect((await back(b, { keptAt: stored - 1 })).content).toBe(WHOLE)
+    })
+
     it('a title taken from a # line returns as that line', async () => {
       const b = await storedBook()
       await startChapterAt(b.deps, b.id, at(b, { title: 'The harbour' }))

@@ -6,6 +6,7 @@ import type { Store } from '../../domain/ports'
 import { replayJournal } from '../app/replay'
 import { closingAfter, settledWithin } from '../app/settled'
 import { unsaved } from '../stores/unsaved'
+import { keptFor } from './fields'
 import { createSaving, type Held } from './saving'
 
 const WHOLE = 'Salt on the windows. The ferry at seven.'
@@ -320,7 +321,8 @@ describe('reshaping behind a page still closing', () => {
     let n = 0
     const raw = memoryStore()
     const store = stalling(raw)
-    const deps = { store, clock: { now: () => Date.now() }, ids: { next: () => `id${++n}` } }
+    // A second behind the journal's clock: what is stored here was stored before anything is kept.
+    const deps = { store, clock: { now: () => Date.now() - 1000 }, ids: { next: () => `id${++n}` } }
     const draft = newPiece(deps, 'book', 'en')
     const first = draft.sections[0]!.sectionId
     await write(deps, draft, first, WHOLE)
@@ -345,7 +347,15 @@ describe('reshaping behind a page still closing', () => {
       return { page, saving }
     }
     const rejoin = (whole: string) => async (): Promise<Piece> =>
-      (await rejoinChapter(deps, piece.id, { sectionId: 'new', into: first, whole, seam: { front: 'inside', raw: false, escaped: false } })).piece
+      (
+        await rejoinChapter(deps, piece.id, {
+          sectionId: 'new',
+          into: first,
+          whole,
+          keptAt: unsaved.get(first)?.at,
+          seam: { front: 'inside', raw: false, escaped: false },
+        })
+      ).piece
     const texts = async () => (await openPiece(deps, piece.id))!.sections.map((c) => c.content)
     return { deps, raw, store, piece, first, pageOn, rejoin, texts }
   }
@@ -405,6 +415,23 @@ describe('reshaping behind a page still closing', () => {
     await vi.runAllTimersAsync()
     await closing
     expect(await b.texts()).toEqual([`${BEFORE} Typed.`, AFTER])
+  })
+
+  it('words a failed closing save left in the journal are not lost to a rejoin: it is refused, and they open with the chapter', async () => {
+    const b = await twoPages()
+    const left = b.pageOn(b.first, BEFORE, () => Promise.resolve())
+    left.page.held = held(`${BEFORE} Typed.`, '')
+    left.saving.touch()
+    b.raw.failNext(new Error('The disk is full.'))
+    const closing = left.saving.close()
+    const here = b.pageOn('new', AFTER, () => closing)
+
+    expect(await here.saving.split(b.rejoin(AFTER))).toBe(false)
+    expect(await b.texts()).toEqual([BEFORE, AFTER])
+
+    const { sections, piece } = (await openPiece(b.deps, b.piece.id))!
+    const opened = { piece, sectionId: b.first, content: sections[0]!.content, updatedAt: sections[0]!.updatedAt, readAt: 1 }
+    expect(keptFor(opened)?.markdown).toBe(`${BEFORE} Typed.`)
   })
 
   it('every closing page counts, not only the last', async () => {

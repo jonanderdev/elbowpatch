@@ -369,6 +369,8 @@ export interface ChapterRejoin {
   /** Its text as the page holds it: the rejoin runs only if this is what is stored. */
   whole: string
   seam: Seam
+  /** When words not stored yet were kept for `into`, if any: newer than its text, they must reach it first. */
+  keptAt?: number
 }
 
 /** The chapter the text went back to, as it now stands. */
@@ -382,17 +384,19 @@ export interface Rejoined {
  * The reverse of a split, in one transaction: a moment first, so the chapter stays in history as it
  * stood, then its text back onto the end of the chapter before it, and the section out of the current
  * outline. Its versions stay, and earlier outlines still list it. Safe to run twice. Refused, with
- * nothing changed, unless `whole` is what is stored and `into` stands right before it.
+ * nothing changed, unless `whole` is what is stored and `into` stands right before it, or while words
+ * newer than `into`'s text wait to be stored: stamped newer than them, the joined text would shut them out.
  */
 export function rejoinChapter(deps: Deps, pieceId: string, rejoin: ChapterRejoin): Promise<Rejoined> {
   return deps.store.transaction(async (tx) => {
-    const { sectionId, into, whole, seam } = rejoin
+    const { sectionId, into, whole, seam, keptAt } = rejoin
     const found = await tx.piece(pieceId)
     if (found?.kind !== 'book') throw new Error('Only a book has chapters.')
     const at = found.sections.findIndex((s) => s.sectionId === sectionId)
     if (at < 0) return { piece: found, sectionId: into, content: (await current(tx, into)).content }
     if (found.sections[at - 1]?.sectionId !== into) throw new Error('The chapter it came from is not before it.')
     if ((await current(tx, sectionId)).content !== whole) throw new Error('The words are not stored yet.')
+    if (keptAt !== undefined && keptAt > (await current(tx, into)).updatedAt) throw new Error('The chapter it joins has words not stored yet.')
 
     await momentIn(tx, deps, pieceId)
     const piece = (await tx.piece(pieceId))!
