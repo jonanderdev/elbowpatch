@@ -62,7 +62,7 @@
   --foot: 92px;
   /* Installed on a phone, the app draws to the screen's foot. What sits at the foot (the page's end, the
      tools bar, the sheet above it) rises by half the home bar's inset: clear of it, without floating. */
-  --lift: calc(env(safe-area-inset-bottom, 0px) / 2);
+  --rise: calc(env(safe-area-inset-bottom, 0px) / 2);
 }
 [data-size='s'] {
   --type: 14px;
@@ -290,8 +290,8 @@ button {
 .page-screen {
   position: absolute;
   inset: 0;
-  /* Installed on a phone, the page ends --lift above the screen's foot, as the foot does. */
-  bottom: var(--lift);
+  /* Installed on a phone, the page ends --rise above the screen's foot, as the foot does. */
+  bottom: var(--rise);
   /* On a touch screen, the height it was laid out at (--page-height, from the pager). */
   min-height: var(--page-height, 658px);
   /* What sits at its edges (the foot, 20px from the bottom on desktop) never makes the window scroll. */
@@ -746,7 +746,7 @@ button {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: var(--lift);
+  bottom: var(--rise);
   height: var(--foot);
   display: flex;
   align-items: center;
@@ -815,7 +815,7 @@ button.count[aria-expanded='true'] {
 .line {
   position: fixed;
   left: calc(var(--frame) + var(--edge));
-  bottom: calc(var(--lift) + (var(--foot) - 44px) / 2);
+  bottom: calc(var(--rise) + (var(--foot) - 44px) / 2);
   max-width: calc(100% - 2 * var(--edge) - 56px);
   min-height: 44px;
   display: flex;
@@ -830,7 +830,7 @@ button.count[aria-expanded='true'] {
 }
 /* The tools bar stands where the line does: the line waits above it, so the bar can still be pressed. */
 .page-screen[data-tools] .line {
-  bottom: calc(var(--lift) + (var(--foot) - 44px) / 2 + 44px + 12px);
+  bottom: calc(var(--rise) + (var(--foot) - 44px) / 2 + 44px + 12px);
 }
 .line button {
   color: var(--title);
@@ -846,8 +846,8 @@ button.count[aria-expanded='true'] {
   left: 12px;
   right: 12px;
   /* Above the tools bar, which stays in view beneath it (Figma, Text settings). */
-  bottom: calc(var(--lift) + (var(--foot) - 44px) / 2 + 44px + 12px);
-  max-height: calc(100dvh - var(--lift) - var(--foot) - 24px);
+  bottom: calc(var(--rise) + (var(--foot) - 44px) / 2 + 44px + 12px);
+  max-height: calc(100dvh - var(--rise) - var(--foot) - 24px);
   overflow-y: auto;
   z-index: 5;
   display: flex;
@@ -1430,11 +1430,11 @@ button.count[aria-expanded='true'] {
 }
 
 /* Contents on a phone: dropped under the head, its list scrolling inside it, so its head and foot
-   stay in reach. With the keyboard up it ends above the keyboard. */
+   stay in reach. It ends 12px above the bar at the foot, the tools or the writing bar. */
 .sheet.contents {
   top: 56px;
   bottom: auto;
-  max-height: calc(var(--visible-height, 100dvh) - 68px);
+  max-height: calc(var(--visible-height, 100dvh) - 136px - var(--rise));
   overflow: hidden;
   gap: 0;
   padding: 18px 10px 16px;
@@ -1483,6 +1483,7 @@ button.count[aria-expanded='true'] {
 .contents-title {
   flex: 1;
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 .contents-page {
   flex: none;
@@ -1500,6 +1501,13 @@ button.count[aria-expanded='true'] {
 }
 .contents-foot .text-link {
   margin: -4px 0;
+  position: relative;
+}
+/* The word stays small; the finger gets 44px. */
+.contents-foot .text-link::after {
+  content: '';
+  position: absolute;
+  inset: -9px 0;
 }
 /* Done keeps its side when + New chapter is absent. */
 .contents-foot .text-link:last-child {
@@ -1514,7 +1522,7 @@ button.count[aria-expanded='true'] {
 .library-lines {
   position: fixed;
   left: calc(var(--frame) + var(--edge));
-  bottom: calc(var(--lift) + (var(--foot) - 44px) / 2);
+  bottom: calc(var(--rise) + (var(--foot) - 44px) / 2);
   max-width: calc(100% - 2 * var(--edge) - 56px);
   display: flex;
   flex-direction: column;
@@ -1953,7 +1961,7 @@ button.count[aria-expanded='true'] {
 .colophon-links.at-foot {
   position: fixed;
   left: calc(var(--frame) + 24px);
-  bottom: var(--lift);
+  bottom: var(--rise);
   height: var(--foot);
   margin: 0;
 }
