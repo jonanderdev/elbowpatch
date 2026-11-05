@@ -17,7 +17,7 @@ import { download } from '../files/download'
 import { markdownFile } from '../files/markdownFile'
 import { useSettings } from '../stores/settings'
 import { ContentsRail, ContentsSheet, NewChapter, RailToggle, RunningHeadControl } from './Contents'
-import { fillTitleFields, keptFor, type OpenAt, type Opened, type TitleRefs, titleOf } from './fields'
+import { fillTitleFields, keptFor, type OpenAt, type Opened, type TitleRefs } from './fields'
 import { PageFoot, StatusLine } from './PageFoot'
 import { SectionTitle, TitlePage } from './Titles'
 import { HeadTools, pageLine, TextSettings } from './Tools'
@@ -120,7 +120,8 @@ export function Page({
   /** The title field being written in, if any: the writing bar stands for it too. */
   const [field, setField] = useState<HTMLElement | null>(null)
   const [selection, setSelection] = useState<SelectionState | null>(null)
-  const [kept, setKept] = useState('')
+  /** What was last said beyond the page's own announcements, and over which one: the next turn is said over it. */
+  const [said, setSaid] = useState<{ text: string; over: string } | null>(null)
   // Where a sheet opened from the desktop head drops: under its control, right-aligned to it.
   const [anchor, setAnchor] = useState<CSSProperties | undefined>(undefined)
 
@@ -327,15 +328,6 @@ export function Page({
     }
   }, [saving, pager, editor])
 
-  // The latest thing to say wins: a turn is said after a kept moment or a chapter opening.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: \`announcement\` is the trigger.
-  useEffect(() => setKept(''), [announcement])
-
-  // The page changed under a screen reader: it hears which chapter it is in.
-  useEffect(() => {
-    if (opened.at) setKept(titleOf(opened).trim() || 'Untitled')
-  }, [opened])
-
   // Writing here or not changed (another window took the piece, or Write here): the editor asks
   // `editable` again at once.
   useEffect(() => {
@@ -497,7 +489,7 @@ export function Page({
   }
 
   async function keepMoment(): Promise<void> {
-    if (await saving?.keep()) setKept('Moment kept')
+    if (await saving?.keep()) setSaid({ text: 'Moment kept', over: announcement })
   }
 
   // Return in a title field: on to the text, at its start.
@@ -662,7 +654,7 @@ export function Page({
       <StatusLine writer={writer} failed={failed} line={line} onWriteHere={onWriteHere} onSaveCopy={() => void exportMarkdown()} />
 
       <div className="visually-hidden" aria-live="polite">
-        {kept || announcement}
+        {said?.over === announcement ? said.text : announcement}
       </div>
     </div>
   )

@@ -622,7 +622,7 @@ test('a long chapter opens on the page of the join, and says the chapter, not a 
   await undo(page)
   await expect(page.locator('.title')).toHaveText('One')
   await expect(page.locator('.body')).toBeFocused()
-  await expect(page.locator('[aria-live="polite"].visually-hidden')).toHaveText('One')
+  await expect(page.locator('.chapter-said')).toHaveText('One')
   expect((await caret(page)).before.startsWith('Part 8.')).toBe(true)
   const seen = await page.evaluate(() => {
     const range = getSelection()!.getRangeAt(0).cloneRange()

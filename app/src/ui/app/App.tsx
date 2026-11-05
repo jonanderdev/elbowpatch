@@ -8,6 +8,7 @@ import { isoDay } from '../../domain/words'
 import { download } from '../files/download'
 import { downloadEverything } from '../files/everything'
 import { Library } from '../library/Library'
+import { titleOf } from '../page/fields'
 import { type OpenAt, type Opened, Page } from '../page/Page'
 import { raiseKeyboard } from '../page/useFocusOnOpen'
 import { waiting } from '../settings/PutAway'
@@ -248,6 +249,11 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
           }}
         />
       )}
+      {/* The page changed under a screen reader: it hears which chapter it is in. Here, for a live region
+          must stand before its words do, and the page is new for each chapter. */}
+      <div className="visually-hidden chapter-said" aria-live="polite">
+        {opened?.at ? titleOf(opened).trim() || 'Untitled' : ''}
+      </div>
       {inSettings && (
         <Settings
           deps={deps}

@@ -204,7 +204,7 @@ test('Contents works by keyboard, Escape gives the focus back, and a screen read
   await expect(page.locator('.title')).toHaveText('Two')
   // The focus is not left on nothing, and the chapter is said.
   expect(await page.evaluate(() => document.activeElement === document.body)).toBe(false)
-  await expect(page.locator('.page-screen > [aria-live]')).toHaveText('Two')
+  await expect(page.locator('.chapter-said')).toHaveText('Two')
   // And a turn after it is still said.
   await page.keyboard.press('PageDown')
   await expect(page.locator('.page-screen > [aria-live]')).toHaveText(new RegExp(`^Page ${start + 1}( of \\d+)?$`))
@@ -465,7 +465,7 @@ test('the rail works by keyboard, is named for a screen reader, and Escape leave
   await expect(rows(page).nth(1)).toBeFocused()
   await page.keyboard.press('Enter')
   await expect(page.locator('.title')).toHaveText('Two')
-  await expect(page.locator('.page-screen > [aria-live]')).toHaveText('Two')
+  await expect(page.locator('.chapter-said')).toHaveText('Two')
   expect(await page.evaluate(() => document.activeElement === document.body)).toBe(false)
 
   // Folded, the keyboard passes it by.
