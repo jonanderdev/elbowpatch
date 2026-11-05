@@ -167,7 +167,7 @@ export function Page({
     return bookCount(live.outline, phone ? 'phone' : 'desktop', { sectionId, title: heading, pages: total, words }, at)
   }
 
-  const { pager, page, count, announcement } = usePager({
+  const { pager, page, count, laidOut, announcement } = usePager({
     screen,
     viewport,
     flow,
@@ -211,9 +211,9 @@ export function Page({
   // The count is kept with the piece whenever it changes (a turn of the text settings, a first reading
   // on this kind of screen), so the library shows a book's pages without laying it out (DESIGN.md).
   useEffect(() => {
-    if (readOnly || !pager || !screen.current || saving?.sealed()) return
+    if (readOnly || !pager || !laidOut || !screen.current || saving?.sealed()) return
     void savePages(deps, piece.id, screenOf(screen.current.clientWidth), sectionId, count).catch(() => {})
-  }, [deps, piece.id, sectionId, count, pager, readOnly, saving])
+  }, [deps, piece.id, sectionId, count, pager, laidOut, readOnly, saving])
 
   const shown = numbers(page, count)
 
@@ -527,7 +527,7 @@ export function Page({
         {/* In the head, so the toggle's next stop is what it opens, then the tools. */}
         {railed ? (
           <ContentsRail
-            {...contents(live.outline, 'desktop', pager ? { sectionId, title: heading, pages: count } : undefined)}
+            {...contents(live.outline, 'desktop', laidOut ? { sectionId, title: heading, pages: count } : undefined)}
             current={sectionId}
             open={rail.open}
             onOpen={openChapter}
@@ -628,7 +628,7 @@ export function Page({
 
       {sheet === 'contents' && phone ? (
         <ContentsSheet
-          {...contents(live.outline, 'phone', pager ? { sectionId, title: heading, pages: count } : undefined)}
+          {...contents(live.outline, 'phone', laidOut ? { sectionId, title: heading, pages: count } : undefined)}
           current={sectionId}
           takeFocus={contentsFocus}
           onOpen={openChapter}

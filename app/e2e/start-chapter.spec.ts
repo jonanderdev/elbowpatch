@@ -362,6 +362,54 @@ test('the numbers agree after a split: the long chapter is counted again, and th
   }
 })
 
+test('a new page keeps no count until it has laid out its text: a number kept before that would be wrong', async ({ page }) => {
+  // The fonts settling is what lays a new page's text out: held, that moment stays open. Every count written is noted.
+  await page.addInitScript(() => {
+    const w = window as unknown as { holdFonts?: Promise<void>; letFontsGo?: () => void; written: Record<string, number>[] }
+    w.written = []
+    const ready = Object.getOwnPropertyDescriptor(FontFaceSet.prototype, 'ready')!.get!
+    Object.defineProperty(document.fonts, 'ready', { get: () => w.holdFonts ?? ready.call(document.fonts) })
+    const put = IDBObjectStore.prototype.put
+    IDBObjectStore.prototype.put = function (value: { pages?: Record<string, Record<string, number>> }, key?: IDBValidKey) {
+      const counts = value?.pages?.[innerWidth < 700 ? 'phone' : 'desktop']
+      if (counts) w.written.push({ ...counts })
+      return put.call(this, value, key)
+    }
+  })
+  await importBook(page, LONG)
+  await expect.poll(async () => (await stored(page)).counts.every((n) => n !== undefined)).toBe(true)
+  await page.evaluate(() => {
+    const w = window as unknown as { holdFonts?: Promise<void>; letFontsGo?: () => void; written: Record<string, number>[] }
+    w.written = []
+    w.holdFonts = new Promise((done) => {
+      w.letFontsGo = done
+    })
+  })
+  await press(page, 'Part 9.')
+  await expect(page.locator('.title')).toBeFocused()
+  await page.evaluate(() => (window as unknown as { letFontsGo(): void }).letFontsGo())
+  await expect.poll(async () => (await stored(page)).counts.filter((n) => n !== undefined).length, { timeout: 15000 }).toBe(3)
+
+  const { counts } = await stored(page)
+  const ids = await page.evaluate(
+    () =>
+      new Promise<string[]>((done) => {
+        const open = indexedDB.open('elbowpatch')
+        open.onsuccess = () => {
+          const all = open.result.transaction('pieces').objectStore('pieces').getAll()
+          all.onsuccess = () => {
+            open.result.close()
+            done((all.result[0] as { sections: { sectionId: string }[] }).sections.map((s) => s.sectionId))
+          }
+        }
+      }),
+  )
+  const written = await page.evaluate(() => (window as unknown as { written: Record<string, number>[] }).written)
+  const kept = written.map((w) => w[ids[1]!]).filter((n) => n !== undefined)
+  expect(kept.length).toBeGreaterThan(0)
+  expect(new Set(kept)).toEqual(new Set([counts[1]]))
+})
+
 test('after a split no number shows that rests on a count not known yet', async ({ page }) => {
   // Everything waiting for the app to be idle waits for the test.
   await page.addInitScript(() => {

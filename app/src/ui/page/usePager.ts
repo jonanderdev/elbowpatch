@@ -9,6 +9,8 @@ export interface PagerState {
   /** The page in view, from 0. */
   page: number
   count: number
+  /** The text has been laid out at its fonts: until then `count` is only a start, and says nothing of the text. */
+  laidOut: boolean
   /** What `say` said after a turn; a page added by typing is not announced (DESIGN.md, Behaviour). */
   announcement: string
 }
@@ -37,6 +39,7 @@ export function usePager({ screen, viewport, flow, columns, kind, settings, keyb
   const [pager, setPager] = useState<Pager | null>(null)
   const [page, setPage] = useState(0)
   const [count, setCount] = useState(1)
+  const [laidOut, setLaidOut] = useState(false)
   const [announcement, setAnnouncement] = useState('')
   // Read when the window or the fonts change, long after this render.
   const onRelayoutNow = useRef(onRelayout)
@@ -66,7 +69,11 @@ export function usePager({ screen, viewport, flow, columns, kind, settings, keyb
     }
     // Laid out again once the fonts are in, so page breaks do not move after load (0011).
     let alive = true
-    void document.fonts.ready.then(() => alive && relayout())
+    void document.fonts.ready.then(() => {
+      if (!alive) return
+      relayout()
+      setLaidOut(true)
+    })
     // A font arriving late, for a script first used now, moves the breaks too.
     const remeasure = (): void => p.measure()
     document.fonts.addEventListener('loadingdone', remeasure)
@@ -92,5 +99,5 @@ export function usePager({ screen, viewport, flow, columns, kind, settings, keyb
     return () => cancelAnimationFrame(frame)
   }, [pager, screen, kind, size, leading, measure, align, dropcap, indent, keyboard])
 
-  return { pager, page, count, announcement }
+  return { pager, page, count, laidOut, announcement }
 }
