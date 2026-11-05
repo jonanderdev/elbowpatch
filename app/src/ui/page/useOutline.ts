@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Piece } from '../../domain/model'
-import { type Deps, withDraft } from '../../domain/pieces'
+import { type Deps, storedPiece, withDraft } from '../../domain/pieces'
 
 export interface LiveOutline {
   /** The piece as last stored (its chapters, their titles and their page counts), with the open chapter if it is still a draft. */
@@ -18,8 +18,7 @@ export interface LiveOutline {
 export function useOutline(deps: Deps, piece: Piece, sectionId: string, counted: number): LiveOutline {
   const [last, stored] = useState(piece)
   const reread = useCallback(() => {
-    void deps.store
-      .transaction((tx) => tx.piece(piece.id))
+    void storedPiece(deps, piece.id)
       .then((found) => {
         if (found) stored(found)
       })

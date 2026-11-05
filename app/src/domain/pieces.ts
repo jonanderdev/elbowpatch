@@ -489,6 +489,26 @@ export function openPiece(deps: Pick<Deps, 'store'>, pieceId: string): Promise<{
   })
 }
 
+/** The piece as stored now, for what reads it again without opening it. */
+export function storedPiece(deps: Pick<Deps, 'store'>, pieceId: string): Promise<Piece | undefined> {
+  return deps.store.transaction((tx) => tx.piece(pieceId))
+}
+
+/** What is stored of a section: its piece, its working copy, and whether it has ever been kept in a moment. */
+export interface StoredSection {
+  piece: Piece | undefined
+  working: Working | undefined
+  hasVersions: boolean
+}
+
+export function storedSection(deps: Pick<Deps, 'store'>, pieceId: string, sectionId: string): Promise<StoredSection> {
+  return deps.store.transaction(async (tx) => ({
+    piece: await tx.piece(pieceId),
+    working: await tx.working(sectionId),
+    hasVersions: (await tx.versionsOf(sectionId)).length > 0,
+  }))
+}
+
 async function current(tx: Tx, sectionId: string): Promise<{ content: string; updatedAt: number }> {
   const working = await tx.working(sectionId)
   if (working) return { content: working.content, updatedAt: working.updatedAt }
