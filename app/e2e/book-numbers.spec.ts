@@ -217,7 +217,10 @@ test('where you left off shows the page the folio shows, and none while it is no
   // The third chapter, with the second's count not known yet.
   await (await contents(page)).getByRole('button', { name: /^The third/ }).click()
   await expect(page.locator('.title')).toContainText('The third')
+  await laidOut(page)
   await page.keyboard.press('PageDown')
+  // The folio stands aside here: the running head is what says the page turned.
+  await expect(page.locator('.running-control, .running-head')).toBeVisible()
   await page.locator('.head .home').click()
   await expect(page.locator('.continue')).toContainText('The third')
   await expect(page.locator('.continue .patch')).toHaveCount(0)
