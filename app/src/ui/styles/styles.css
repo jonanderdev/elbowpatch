@@ -1521,11 +1521,11 @@ button {
   line-height: 1.4;
   color: var(--secondary);
 }
-/* Help: short answers under small italic headings (Figma, Help). */
-.help-part {
+/* Short answers under small italic headings: Help, About & privacy (Figma, Help). */
+.answer {
   padding: 0 12px 26px;
 }
-.help-part h2 {
+.answer h2 {
   margin: 0 0 6px;
   font-size: 15px;
   font-style: italic;
@@ -1533,18 +1533,21 @@ button {
   line-height: 1.4;
   color: var(--secondary);
 }
-.help-part p {
+.answer p {
   margin: 0;
   font-size: var(--body);
   line-height: 1.55;
   color: var(--text);
 }
-.help-part a {
+.answer a,
+.about-rows a {
   color: var(--title);
   text-decoration: underline;
+}
+.answer a {
   white-space: nowrap;
 }
-.help-part ol {
+.answer ol {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1556,12 +1559,12 @@ button {
   line-height: 1.55;
   color: var(--text);
 }
-.help-part li {
+.answer li {
   display: flex;
   gap: 8px;
   counter-increment: step;
 }
-.help-part li::before {
+.answer li::before {
   content: counter(step);
   flex: none;
   width: 18px;
@@ -1576,26 +1579,56 @@ button {
     display: block;
   }
 }
-.help-keys dl {
+/* A word and its value at the right: Help's keys, About & privacy's rows. */
+.value-rows {
   margin: 0;
 }
-.help-keys dl div {
+.value-rows div {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: 16px;
   padding: 9px 0;
 }
-.help-keys dt {
+.value-rows dt {
   font-size: 15px;
   line-height: 1.4;
   color: var(--text);
 }
-.help-keys dd {
+.value-rows dd {
   margin: 0;
   font-size: 13px;
   line-height: 1.6;
   color: var(--secondary);
+}
+/* Closer to the last answer than answers are to each other (Figma, About & privacy). */
+.about-rows {
+  margin-top: -8px;
+}
+.about-rows div {
+  padding: 9px 12px;
+}
+.about-rows dd {
+  line-height: 1.4;
+}
+.about-rows dt {
+  color: var(--title);
+}
+.about-rows + .settings-note {
+  padding-top: 27px;
+}
+@media (max-width: 699px) {
+  .about-rows div {
+    position: relative;
+    align-items: center;
+    min-height: 44px;
+  }
+  /* On a phone the whole row is the link, which is why it is 44px tall. */
+  .about-rows a::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
 }
 .area-rows {
   display: flex;

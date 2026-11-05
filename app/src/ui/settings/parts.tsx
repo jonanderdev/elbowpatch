@@ -1,9 +1,19 @@
-import type { ReactElement } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import type { Kind } from '../../domain/model'
 
 // What the Settings areas share.
 
 export const KIND_WORD: Record<Kind, string> = { book: 'Book', journal: 'Journal', essay: 'Essay' }
+
+/** A short answer under a small italic heading. */
+export function Answer({ heading, children }: { heading: string; children: ReactNode }): ReactElement {
+  return (
+    <section className="answer">
+      <h2>{heading}</h2>
+      {children}
+    </section>
+  )
+}
 
 /** One row like a place in Backup & sync: a name, its word at the right, a status line. */
 export function Row(props: { name: string; action: string; status: string; onAction(): void; busy?: boolean; announce?: boolean }): ReactElement {

@@ -3,18 +3,18 @@ import type { Piece } from '../../domain/model'
 import type { Deps } from '../../domain/pieces'
 import { longDate, number } from '../../domain/words'
 import { Path } from '../components/Path'
+import { APP_VERSION } from '../components/project'
 import { useScrolled } from '../components/useScrolled'
 import { lastExport } from '../files/everything'
+import { About } from './About'
 import { ExportImport } from './ExportImport'
 import { Help, HomeScreen } from './Help'
 import { goesIn, PutAway, waiting } from './PutAway'
 
 // Settings (DESIGN.md, Settings): opened from the library only. The areas
-// here are the ones that work today: Export & import, Put away and Help.
-// shortcut: Writing, Appearance, Time Machine, Backup & sync and About & privacy arrive as they are built.
+// here are the ones that work today: Export & import, Put away, About & privacy and Help.
+// shortcut: Writing, Appearance, Time Machine and Backup & sync arrive as they are built.
 
-// About opens from the library's colophon, so it goes back to the library.
-// shortcut: About is empty until its view is built (Figma, About & privacy).
 export type Area = 'list' | 'export' | 'put-away' | 'help' | 'home-screen' | 'about'
 
 const TITLES: Record<Area, string> = {
@@ -23,7 +23,7 @@ const TITLES: Record<Area, string> = {
   'put-away': 'Put away',
   help: 'Help',
   'home-screen': 'On your Home Screen',
-  about: 'About',
+  about: 'About & privacy',
 }
 
 interface Props {
@@ -47,14 +47,13 @@ export function Settings(props: Props): ReactElement {
     scroller.current?.scrollTo(0, 0)
     heading.current?.focus()
   }, [props.area])
-  const toLibrary = props.area === 'list' || props.area === 'about'
   const back =
     props.area === 'home-screen' ? { word: 'Help', onClick: () => props.go('/settings/help') } : { word: 'Settings', onClick: () => props.go('/settings') }
   return (
     <main ref={scroller} className="settings">
       <div className="settings-head" data-scrolled={scrolled || undefined}>
         {/* § goes home; an area inside Settings adds the way back to it (DESIGN.md, The path). */}
-        <Path onHome={() => props.go('/')} crumbs={toLibrary ? [] : [back]} />
+        <Path onHome={() => props.go('/')} crumbs={props.area === 'list' ? [] : [back]} />
       </div>
       <div className="settings-inner">
         <h1 ref={heading} tabIndex={-1} className="settings-title">
@@ -65,6 +64,7 @@ export function Settings(props: Props): ReactElement {
         {props.area === 'put-away' && <PutAway deps={props.deps} pieces={props.pieces} onChanged={props.onChanged} />}
         {props.area === 'help' && <Help />}
         {props.area === 'home-screen' && <HomeScreen />}
+        {props.area === 'about' && <About />}
       </div>
     </main>
   )
@@ -75,26 +75,29 @@ function List({ pieces, go }: Pick<Props, 'pieces' | 'go'>) {
   const last = lastExport()
   return (
     <ul className="rows">
-      <li>
-        <button type="button" className="row" onClick={() => go('/settings/export')}>
-          <span className="row-title">Export &amp; import</span>
-          <span className="row-meta">{last ? `Last exported ${longDate(last, Date.now())}` : 'Never exported yet'}</span>
-        </button>
-      </li>
-      <li>
-        <button type="button" className="row" onClick={() => go('/settings/put-away')}>
-          <span className="row-title">Put away</span>
-          <span className="row-meta">
-            {away.length === 0 ? 'Nothing put away' : `${number(away.length)} ${away.length === 1 ? 'piece' : 'pieces'} · the next goes ${goesIn(away[0]!)}`}
-          </span>
-        </button>
-      </li>
-      <li>
-        <button type="button" className="row" onClick={() => go('/settings/help')}>
-          <span className="row-title">Help</span>
-          <span className="row-meta">How Elbowpatch works</span>
-        </button>
-      </li>
+      <ListRow
+        title="Export & import"
+        meta={last ? `Last exported ${longDate(last, Date.now())}` : 'Never exported yet'}
+        onOpen={() => go('/settings/export')}
+      />
+      <ListRow
+        title="Put away"
+        meta={away.length === 0 ? 'Nothing put away' : `${number(away.length)} ${away.length === 1 ? 'piece' : 'pieces'} · the next goes ${goesIn(away[0]!)}`}
+        onOpen={() => go('/settings/put-away')}
+      />
+      <ListRow title="About & privacy" meta={`Version ${APP_VERSION}`} onOpen={() => go('/settings/about')} />
+      <ListRow title="Help" meta="How Elbowpatch works" onOpen={() => go('/settings/help')} />
     </ul>
+  )
+}
+
+function ListRow({ title, meta, onOpen }: { title: string; meta: string; onOpen(): void }) {
+  return (
+    <li>
+      <button type="button" className="row" onClick={onOpen}>
+        <span className="row-title">{title}</span>
+        <span className="row-meta">{meta}</span>
+      </button>
+    </li>
   )
 }
