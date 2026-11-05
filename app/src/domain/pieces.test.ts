@@ -81,7 +81,7 @@ describe("the page of the writer's place", () => {
     expect(placePage(book, 'phone')).toBeUndefined()
   })
 
-  it('is not known from a place that does not say whose page it was, past a chapter\'s opening page', () => {
+  it("is not known from a place that does not say whose page it was, past a chapter's opening page", () => {
     const { screen: _, ...unsaid } = place
     expect(placePage({ ...book, place: unsaid }, 'phone')).toBeUndefined()
     expect(placePage({ ...book, place: { ...unsaid, page: 1 } }, 'phone')).toBe(9)
