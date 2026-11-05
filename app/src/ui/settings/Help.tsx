@@ -47,7 +47,7 @@ export function Help(): ReactElement {
       )}
       <section className="answer help-keys">
         <h2>Keys</h2>
-        <dl className="key-rows">
+        <dl className="value-rows">
           {KEYS.map(([action, keys]) => (
             <div key={action}>
               <dt>{action}</dt>

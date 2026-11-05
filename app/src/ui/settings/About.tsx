@@ -28,7 +28,7 @@ export function About(): ReactElement {
       <Answer heading="The project">
         <p>Open source under the MIT License. The main copy runs on a best-effort basis, and anyone can host their own.</p>
       </Answer>
-      <dl className="key-rows about-rows">
+      <dl className="value-rows about-rows">
         <div>
           <dt>Version</dt>
           <dd>{APP_VERSION}</dd>

@@ -1577,22 +1577,22 @@ button {
   }
 }
 /* A word and its value at the right: Help's keys, About & privacy's rows. */
-.key-rows {
+.value-rows {
   margin: 0;
 }
-.key-rows div {
+.value-rows div {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: 16px;
   padding: 9px 0;
 }
-.key-rows dt {
+.value-rows dt {
   font-size: 15px;
   line-height: 1.4;
   color: var(--text);
 }
-.key-rows dd {
+.value-rows dd {
   margin: 0;
   font-size: 13px;
   line-height: 1.6;
