@@ -273,3 +273,16 @@ test('a window that is not writing has no + New chapter, and still reads Content
   await expect(titles(second)).toHaveText(['One', 'Two'])
   await expect(newChapterLink(second)).toHaveCount(0)
 })
+
+test('in an empty title the caret stands at the start of the placeholder, not after it', async ({ page }) => {
+  await importBook(page, TWO)
+  await newChapter(page)
+  await expect(page.locator('.title')).toBeFocused()
+  await expect(page.locator('.title')).toHaveAttribute('data-empty', '')
+  // A caret in an empty field has no box to measure: what puts it there is the placeholder standing out of its line.
+  const placeholder = await page.locator('.title').evaluate((el) => {
+    const before = getComputedStyle(el, '::before')
+    return { position: before.position, text: before.content }
+  })
+  expect(placeholder).toEqual({ position: 'absolute', text: '"Chapter title"' })
+})

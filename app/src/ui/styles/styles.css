@@ -631,9 +631,12 @@ button {
 [data-title-page] .title {
   left: var(--stride);
 }
+/* Out of the line, at the text's start: in the line, it pushed the caret to its end. */
 .title[data-empty]::before {
   content: attr(data-placeholder);
+  position: absolute;
   color: var(--secondary);
+  pointer-events: none;
 }
 
 .body {
