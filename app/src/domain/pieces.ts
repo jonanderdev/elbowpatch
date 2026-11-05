@@ -106,6 +106,11 @@ export function withChapter(deps: Pick<Deps, 'ids'>, piece: Piece, after?: strin
   return { piece: { ...piece, sections: [...piece.sections.slice(0, at), { sectionId, title: '' }, ...piece.sections.slice(at)] }, sectionId }
 }
 
+/** A book with nothing stored yet: its first chapter is all it has, and a chapter left empty in the draft goes. */
+export function neverStored(draft: Piece): Piece {
+  return { ...draft, sections: draft.sections.slice(0, 1) }
+}
+
 /** The piece as stored, with the draft's open section where it will join: what Contents lists. */
 export function withDraft(stored: Piece, draft: Piece, sectionId: string): Piece {
   return { ...stored, sections: joined(stored, draft, sectionId) }

@@ -1,7 +1,7 @@
 import { type ReactElement, useCallback, useEffect, useRef, useState } from 'react'
 import { pieceAsMarkdown } from '../../domain/export'
 import type { Kind, Piece } from '../../domain/model'
-import { type Deps, library, newPiece, openPiece, putAway, recover, rename, restore, withChapter, withDay } from '../../domain/pieces'
+import { type Deps, library, neverStored, newPiece, openPiece, putAway, recover, rename, restore, withChapter, withDay } from '../../domain/pieces'
 import type { WriterLock } from '../../domain/ports'
 import { forgetPutAway, thin } from '../../domain/thinning'
 import { isoDay } from '../../domain/words'
@@ -31,11 +31,6 @@ const AREAS: Record<string, Area> = {
   '/settings/put-away': 'put-away',
   '/settings/help': 'help',
   '/settings/about': 'about',
-}
-
-/** A book with nothing stored yet: its first chapter is all it has, and a chapter left empty in the draft goes. */
-function neverStored(draft: Piece): Piece {
-  return { ...draft, sections: draft.sections.slice(0, 1) }
 }
 
 export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElement | null {

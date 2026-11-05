@@ -30,8 +30,8 @@ export async function replayJournal(deps: Deps, lock: WriterLock): Promise<void>
       // A title only if it changed here and nothing renamed the piece since. A chapter never stored
       // has no other title, and may be stored by this one alone; one that left the book stays out.
       const quiet = !stored.piece || stored.piece.updatedAt <= u.at
-      const neverStored = titleIn(stored.piece, u.sectionId) === undefined && !stored.working && !stored.hasVersions
-      if (u.title !== null && (quiet || neverStored)) {
+      const newChapter = titleIn(stored.piece, u.sectionId) === undefined && !stored.working && !stored.hasVersions
+      if (u.title !== null && (quiet || newChapter)) {
         if (u.piece.kind === 'essay') await rename(deps, u.piece, u.title)
         else await renameSection(deps, u.piece, u.sectionId, u.title)
       }

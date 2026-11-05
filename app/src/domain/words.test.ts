@@ -1,7 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import { pieceAsMarkdown } from './export'
 import type { Piece } from './model'
-import { dayTitle, number, ordinal, words } from './words'
+import { countLine, countSaid, dayTitle, number, ordinal, pageLine, words } from './words'
+
+describe('the count, where a number is not known', () => {
+  it('says as much as is known, and nothing that is not', () => {
+    expect(pageLine(3, 9)).toBe('Page 3 of 9')
+    expect(pageLine(3, undefined)).toBe('Page 3')
+    expect(pageLine(undefined, 9)).toBe('')
+    expect(countLine(3, 9, '12 words')).toBe('3 of 9  ·  12 words')
+    expect(countLine(3, undefined, '12 words')).toBe('3  ·  12 words')
+    expect(countLine(undefined, undefined, '12 words')).toBe('12 words')
+    expect(countSaid(3, 9, 1240)).toBe('Page 3 of 9, 1.240 words')
+    expect(countSaid(undefined, undefined, 12)).toBe('12 words')
+  })
+})
 
 describe('words', () => {
   it('writes thousands with a dot', () => {

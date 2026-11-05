@@ -1,7 +1,7 @@
 import type { ReactElement, RefObject } from 'react'
-import { words as wordsLine } from '../../domain/words'
+import { pageLine, words as wordsLine } from '../../domain/words'
 import { Icon } from '../components/Icon'
-import { pageLine, ToolsBar } from './Tools'
+import { ToolsBar } from './Tools'
 
 interface PageFootProps {
   /** The page shown, from 1, and the pages; in a book, the book's, each once it is known. */

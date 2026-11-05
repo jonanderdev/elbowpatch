@@ -1,25 +1,8 @@
 import { type CSSProperties, type ReactElement, type ReactNode, useEffect, useRef } from 'react'
-import { number } from '../../domain/words'
+import { countLine, countSaid, number } from '../../domain/words'
 import { Icon, IconButton } from '../components/Icon'
 import { ThemeButton } from '../components/ThemeButton'
 import { type Settings, theme, update, useSettings } from '../stores/settings'
-
-/** "Page 3 of 9", or as much of it as is known; a number that is not known stands aside. */
-export function pageLine(page: number | undefined, count: number | undefined): string {
-  if (page === undefined) return ''
-  return count === undefined ? `Page ${number(page)}` : `Page ${number(page)} of ${number(count)}`
-}
-
-/** The count in the tools: the page and the pages once known, then the words. */
-function countLine(page: number | undefined, count: number | undefined, words: string): string {
-  if (page === undefined) return words
-  return `${number(page)}${count === undefined ? '' : ` of ${number(count)}`}  ·  ${words}`
-}
-
-/** What a screen reader hears of the count. */
-function countSaid(page: number | undefined, count: number | undefined, words: number): string {
-  return [pageLine(page, count), `${number(words)} words`].filter(Boolean).join(', ')
-}
 
 export function ToolsBar(props: {
   page?: number

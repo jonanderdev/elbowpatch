@@ -2,6 +2,7 @@ import { type ReactElement, type ReactNode, type RefObject, useEffect, useRef } 
 import type { ContentsChapter } from '../../domain/pieces'
 import { number } from '../../domain/words'
 import { Icon } from '../components/Icon'
+import { showCurrent } from './showCurrent'
 
 interface ContentsListProps {
   chapters: ContentsChapter[]
@@ -36,16 +37,6 @@ export function NewChapter({ onAdd }: { onAdd(): void }): ReactElement {
       <span className="new-chapter-mark">+</span> New chapter
     </button>
   )
-}
-
-/** The current chapter brought into a long list's view. Returns its row. */
-function showCurrent(root: HTMLElement | null): HTMLElement | null {
-  const list = root?.querySelector<HTMLElement>('.contents-list')
-  const row = root?.querySelector<HTMLElement>('[aria-current="true"]')
-  if (!list || !row) return null
-  const gap = row.getBoundingClientRect().bottom - list.getBoundingClientRect().bottom
-  if (gap > 0) list.scrollTop += gap
-  return row
 }
 
 const pagesWord = (pages: number): string => `${number(pages)} ${pages === 1 ? 'page' : 'pages'}`
