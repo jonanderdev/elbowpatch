@@ -1,7 +1,8 @@
+import { EditorState } from 'prosemirror-state'
 import { describe, expect, it } from 'vitest'
 import { countWords, joinHalves, parse, serialize } from '../domain/markdown'
 import { schema, toBlocks, toDoc } from './schema'
-import { halvesAt, halvesAtLine } from './split'
+import { halvesAt, halvesAtLine, lineGone, withoutLine } from './split'
 
 const docOf = (markdown: string) => toDoc(parse(markdown))
 
@@ -213,5 +214,27 @@ describe('the halves back together', () => {
   it('an empty half leaves the other as it is', () => {
     expect(joinHalves('', 'Two.', { front: 'inside', ending: '', raw: false, escaped: false }, '')).toBe('Two.')
     expect(joinHalves('One.', '', { front: 'inside', ending: 'One.', raw: false, escaped: false }, '')).toBe('One.')
+  })
+})
+
+describe('a # line taken out of the text', () => {
+  const stateOf = (doc: ReturnType<typeof docOf>) => EditorState.create({ doc })
+  const textOf = (doc: Parameters<typeof toBlocks>[0]) => serialize(toBlocks(doc))
+
+  it('goes with its block when the block held nothing else', () => {
+    const { doc, pos } = posOf('\\# The harbour\n\nAfter.', '# The')
+    expect(textOf(lineGone(stateOf(doc), pos).doc)).toBe('After.')
+  })
+
+  it('leaves the rest of its block, with its line break', () => {
+    const { doc, pos } = posOf('\\# The harbour\nIn winter.', '# The')
+    expect(textOf(lineGone(stateOf(doc), pos).doc)).toBe('In winter.')
+    expect(textOf(withoutLine(stateOf(doc), pos).doc)).toBe('In winter.')
+  })
+
+  it('leaves the block of an only line, for the page always holds one', () => {
+    const { doc, pos } = posOf('\\# The harbour', '# The')
+    expect(lineGone(stateOf(doc), pos).doc.childCount).toBe(1)
+    expect(textOf(lineGone(stateOf(doc), pos).doc)).toBe('')
   })
 })
