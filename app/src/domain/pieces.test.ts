@@ -11,6 +11,7 @@ import {
   measureNext,
   newPiece,
   openPiece,
+  placePage,
   putAway,
   recover,
   rejoinChapter,
@@ -38,6 +39,64 @@ function setup(start = 1_000_000) {
   const store = memoryStore()
   return { store, clock, ids, deps: { store, clock, ids } }
 }
+
+describe("the page of the writer's place", () => {
+  const book: Piece = {
+    id: 'p',
+    kind: 'book',
+    lang: 'en',
+    createdAt: 0,
+    updatedAt: 0,
+    title: 'The harbour',
+    sections: [
+      { sectionId: 'a', title: 'One' },
+      { sectionId: 'b', title: 'Two' },
+    ],
+    outlineId: null,
+    pages: { phone: { a: 8, b: 9 } },
+  }
+  const place = { sectionId: 'b', paragraph: 0, offset: 0, snippet: '', page: 3, screen: 'phone', caret: false, at: 1 } as const
+
+  it('in a book is the page the folio shows there, not the page in its chapter', () => {
+    const piece = { ...book, place }
+    expect(placePage(piece, 'phone')).toBe(bookCount(piece, 'phone', { sectionId: 'b', title: '', pages: 9, words: 0 }, 2).page)
+    expect(placePage(piece, 'phone')).toBe(11)
+  })
+
+  it('in chapter 1 counts the title page, as the folio does', () => {
+    expect(placePage({ ...book, place: { ...place, sectionId: 'a', page: 2 } }, 'phone')).toBe(2)
+  })
+
+  it('is not known while a chapter before it has not been laid out', () => {
+    expect(placePage({ ...book, place, pages: { phone: { b: 9 } } }, 'phone')).toBeUndefined()
+  })
+
+  it("is not known on the other screen's page, which breaks the chapter elsewhere", () => {
+    expect(placePage({ ...book, place, pages: { ...book.pages, desktop: { a: 4, b: 5 } } }, 'desktop')).toBeUndefined()
+  })
+
+  it('is not known where the page itself was not kept', () => {
+    const { page: _, ...unknown } = place
+    expect(placePage({ ...book, place: unknown }, 'phone')).toBeUndefined()
+    expect(placePage(book, 'phone')).toBeUndefined()
+  })
+
+  it('in an essay or a journal is the page as it was kept: there is no book to count', () => {
+    expect(placePage({ ...book, kind: 'essay', place }, 'desktop')).toBe(3)
+  })
+
+  it('stands aside with the counts when the text settings change, since its page moved with them', async () => {
+    const s = setup()
+    const piece = newPiece(s, 'book', 'en')
+    const sectionId = piece.sections[0]!.sectionId
+    await write(s.deps, piece, sectionId, 'Words.')
+    await savePlace(s.deps, piece.id, { ...place, sectionId })
+    await forgetPages(s.deps)
+    const stored = (await openPiece(s.deps, piece.id))!.piece
+    expect(stored.place).toMatchObject({ sectionId, paragraph: 0 })
+    expect(stored.place?.page).toBeUndefined()
+  })
+})
 
 describe("a book's count", () => {
   const book: Piece = {
@@ -747,6 +806,14 @@ describe('a chapter started at a point', () => {
     expect(piece.place).toMatchObject({ sectionId: 'new', paragraph: 0, offset: 0, snippet: 'Salt on the windows and the rail.' })
   })
 
+  it("the new chapter's opening page is the writer's, on any screen's page", async () => {
+    const b = await storedBook()
+    const piece = await startChapterAt(b.deps, b.id, at(b))
+    const counted = { ...piece, pages: { phone: { [b.first]: 2, new: 1, [b.last]: 1 }, desktop: { [b.first]: 1, new: 1, [b.last]: 1 } } }
+    expect(placePage(counted, 'phone')).toBe(3)
+    expect(placePage(counted, 'desktop')).toBe(2)
+  })
+
   it('splits a chapter added earlier once its words are stored, and the next one stays after it', async () => {
     const b = await storedBook()
     const { piece: draft, sectionId } = withChapter(b, (await openPiece(b.deps, b.id))!.piece, b.first)
@@ -829,6 +896,14 @@ describe('a chapter started at a point', () => {
       await expect(back(b, { whole: 'Not stored yet.' })).rejects.toThrow()
       await expect(back(b, { into: b.last })).rejects.toThrow()
       expect(await everything(b)).toEqual(before)
+    })
+
+    it("leaves the page of the writer's place unknown, until the page says where the join fell", async () => {
+      const b = await storedBook()
+      await split(b)
+      const { piece } = await back(b)
+      expect(piece.place).toMatchObject({ sectionId: b.first })
+      expect(placePage({ ...piece, pages: { phone: { [b.first]: 3, [b.last]: 1 } } }, 'phone')).toBeUndefined()
     })
 
     it('is refused while words newer than the chapter it joins wait to be stored: they would never come back', async () => {

@@ -196,6 +196,26 @@ test('the folio, the tools and the library read as one book; the title page is p
   await expect(page.locator('.page-screen > [aria-live]')).toHaveText(`Page ${one! + two! + 2} of ${total}`)
 })
 
+test('where you left off shows the page the folio shows, and none while it is not known', async ({ page }) => {
+  await holdIdle(page)
+  await importBook(page, BOOK)
+  await page.locator('.row', { hasText: 'harbour' }).click()
+  await expect(page.locator('.page-screen[inert]')).toHaveCount(0)
+  // The third chapter, with the second's count not known yet.
+  await (await contents(page)).getByRole('button', { name: /^The third/ }).click()
+  await expect(page.locator('.title')).toContainText('The third')
+  await page.keyboard.press('PageDown')
+  await page.locator('.head .home').click()
+  await expect(page.locator('.continue')).toContainText('The third')
+  await expect(page.locator('.continue .patch')).toHaveCount(0)
+
+  await letIdleRun(page)
+  const [one, two] = await counts(page)
+  await expect(page.locator('.continue .patch')).toHaveText(`page ${one! + two! + 2}`)
+  await page.locator('.continue').click()
+  await expect(page.locator('.folio')).toHaveText(String(one! + two! + 2))
+})
+
 test('Contents agrees with the folio and the tools', async ({ page }) => {
   await importBook(page, BOOK)
   const [one, two, three] = await counts(page)

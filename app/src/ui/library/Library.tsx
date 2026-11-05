@@ -1,5 +1,6 @@
 import { type ReactElement, useEffect, useRef, useState } from 'react'
 import type { Kind, Piece } from '../../domain/model'
+import { placePage } from '../../domain/pieces'
 import { screenOf } from '../../page/pager'
 import { ExportSheet } from '../components/ExportSheet'
 import { IconButton } from '../components/Icon'
@@ -66,6 +67,8 @@ export function Library({
   const now = Date.now()
   // A book's pages are those of this screen's page: a phone and a desktop count them apart (DESIGN.md, Layout).
   const screen = screenOf(document.documentElement.clientWidth)
+  /** Continue's page, as the folio shows it there; none where that is not known. */
+  const lastPage = last && placePage(last, screen)
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const [exporting, setExporting] = useState<Piece | null>(null)
   const [line, setLine] = useState<string | null>(null)
@@ -174,10 +177,12 @@ export function Library({
                       <span className="continue-excerpt">{excerpt(last)}</span>
                       <span className="continue-foot">
                         <span className="continue-meta">{continueMeta(last)}</span>
-                        <span className="patch">
-                          <span className="visually-hidden">page </span>
-                          {last.place?.page ?? 1}
-                        </span>
+                        {lastPage === undefined ? null : (
+                          <span className="patch">
+                            <span className="visually-hidden">page </span>
+                            {lastPage}
+                          </span>
+                        )}
                       </span>
                     </>
                   }

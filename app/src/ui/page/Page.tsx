@@ -191,7 +191,7 @@ export function Page({
     readOnly,
     place: () => {
       const e = editorNow.current
-      const place = moved.current && e && pager ? placeOf(e.view, sectionId, pager.page, viewport.current) : undefined
+      const place = moved.current && e && pager ? placeOf(e.view, sectionId, pager.page, phone ? 'phone' : 'desktop', viewport.current) : undefined
       // Once kept, it stays until they move again: a later save, as the page closes behind the
       // library, would read a page no longer laid out as they left it.
       moved.current = false

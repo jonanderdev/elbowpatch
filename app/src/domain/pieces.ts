@@ -178,6 +178,18 @@ export function bookCount(piece: Piece, screen: Screen, open: OpenChapter & { wo
   return { ...(start === undefined ? {} : { page: start + page }), ...(pages === undefined ? {} : { pages }), words }
 }
 
+/**
+ * The page of the writer's place, as the folio shows it there: in a book the book's page, unknown while a chapter
+ * before it has not been laid out, or if the place was kept on the other screen's page or no longer says.
+ */
+export function placePage(piece: Piece, screen: Screen): number | undefined {
+  const { place } = piece
+  if (piece.kind !== 'book' || !place || place.page === undefined) return place?.page
+  if (place.screen && place.screen !== screen) return undefined
+  const start = contents(piece, screen).chapters.find((c) => c.sectionId === place.sectionId)?.startPage
+  return start === undefined ? undefined : start + place.page - 1
+}
+
 /** Keeps a section's page count on a screen's page. Not a change to the piece: its date stays. Safe to run twice. */
 export function savePages(deps: Pick<Deps, 'store'>, pieceId: string, screen: Screen, sectionId: string, count: number): Promise<void> {
   return deps.store.transaction(async (tx) => {
@@ -232,11 +244,21 @@ export async function measureNext(
   return true
 }
 
-/** The text settings changed: every count on this device is stale, so none is known until it is laid out again. */
+/** The text settings changed: every count on this device is stale, and so is a place's page in a book, so none is known until it is laid out again. */
 export function forgetPages(deps: Pick<Deps, 'store'>): Promise<void> {
   return deps.store.transaction(async (tx) => {
-    for (const { pages, ...piece } of await tx.pieces()) if (pages) await tx.putPiece(piece)
+    for (const { pages, ...piece } of await tx.pieces()) {
+      const stale = piece.kind === 'book' && piece.place?.screen !== undefined
+      if (pages || stale) await tx.putPiece(stale ? { ...piece, place: withoutPage(piece.place!) } : piece)
+    }
   })
+}
+
+/** The place itself holds on any page; the number it was on a screen's page does not. */
+export function withoutPage(place: Place): Place {
+  if (!place.screen) return place
+  const { page: _, screen: __, ...left } = place
+  return left
 }
 
 export function savePlace(deps: Pick<Deps, 'store'>, pieceId: string, place: Place): Promise<void> {
@@ -352,6 +374,7 @@ export function startChapterAt(deps: Deps, pieceId: string, start: ChapterStart)
       sections: [...piece.sections.slice(0, at + 1), { sectionId: newSectionId, title }, ...piece.sections.slice(at + 1)],
       words: { ...piece.words, [sectionId]: countWords(before), [newSectionId]: countWords(after) },
       pages: withoutCounts(piece.pages, [sectionId]),
+      // Its opening page, which is page 1 of the chapter on any screen's page.
       place: { sectionId: newSectionId, paragraph: 0, offset: 0, snippet: openingWords(after), page: 1, caret: true, at: now },
       updatedAt: now,
     }
@@ -415,7 +438,8 @@ export function rejoinChapter(deps: Deps, pieceId: string, rejoin: ChapterRejoin
       sections: piece.sections.filter((s) => s.sectionId !== sectionId),
       words: { ...words, [into]: countWords(content) },
       pages: withoutCounts(piece.pages, [sectionId, into]),
-      place: { sectionId: into, ...joinIn(before, content), page: 1, caret: true, at: now },
+      // Which page the join fell on is not known here: the page says, once it has opened there.
+      place: { sectionId: into, ...joinIn(before, content), caret: true, at: now },
       updatedAt: now,
     }
     await tx.putPiece(next)
