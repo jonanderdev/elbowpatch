@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
+import manifest from '../package.json' with { type: 'json' }
 import { openTools, saved, write } from './helpers'
 
 async function essay(page: Page, title: string, text: string) {
@@ -174,4 +175,98 @@ test('no storage warning; a quiet export reminder after 30 days without a copy',
   expect((await download).suggestedFilename()).toMatch(/^Elbowpatch .*\.zip$/)
   await expect(page.getByText(/^Everything is in Elbowpatch .*\.zip\.$/)).toBeVisible()
   await expect(reminder).toHaveCount(0)
+})
+
+test('Help opens from Settings, and says only what this screen can use', async ({ page }) => {
+  await page.goto('./#/settings')
+  await page.getByRole('button', { name: /^Help/ }).click()
+  await expect(page.getByRole('heading', { name: 'Help', level: 1 })).toBeFocused()
+  await expect(page.getByText('In this browser, on this device.')).toBeVisible()
+  // The keys are for a keyboard: desktop only.
+  const phone = (page.viewportSize()?.width ?? 0) < 700
+  await expect(page.getByText('Turn the page')).toBeVisible({ visible: !phone })
+  await expect(page.getByText('On an iPhone or iPad')).toHaveCount(0)
+  await page.getByRole('link', { name: 'Export & import' }).click()
+  await expect(page.getByRole('heading', { name: 'Export & import', level: 1 })).toBeVisible()
+})
+
+test("the library's About opens About & privacy, one step inside Settings", async ({ page }) => {
+  await page.goto('./#/')
+  await page.getByRole('link', { name: 'About', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'About & privacy', level: 1 })).toBeFocused()
+  await page.getByRole('button', { name: 'Settings' }).click()
+  await expect(page.getByRole('heading', { name: 'Settings', level: 1 })).toBeVisible()
+  await page.goBack()
+  await page.getByRole('button', { name: 'Library' }).click()
+  await expect(page.getByRole('link', { name: 'About', exact: true })).toBeVisible()
+})
+
+test('About & privacy opens at its top, however far down the list was', async ({ page }) => {
+  // A window so short that the list itself scrolls: Settings stays open from one area to the next.
+  await page.setViewportSize({ width: page.viewportSize()?.width ?? 0, height: 240 })
+  await page.goto('./#/settings')
+  const view = page.locator('.settings')
+  await view.evaluate((settings) => settings.scrollTo(0, settings.scrollHeight))
+  const row = page.getByRole('button', { name: /^About & privacy/ })
+  await row.scrollIntoViewIfNeeded()
+  expect(await view.evaluate((settings) => settings.scrollTop)).toBeGreaterThan(0)
+  await row.click()
+  await expect(page.getByRole('heading', { name: 'About & privacy', level: 1 })).toBeFocused()
+  expect(await view.evaluate((settings) => settings.scrollTop)).toBe(0)
+})
+
+test('About & privacy says what it promises, and only what is true here', async ({ page }) => {
+  await page.goto('./#/settings/about')
+  await expect(page.getByText('A quiet place to write journals, essays and books, for people who want to do the writing themselves.')).toBeVisible()
+  for (const heading of ['Your writing', 'Privacy', 'No warranty', 'The project']) {
+    await expect(page.getByRole('heading', { name: heading, level: 2 })).toBeVisible()
+  }
+  await expect(page.getByText('It stays on this device.', { exact: true })).toBeVisible()
+  await expect(page.getByText('No cookies, no fingerprinting, no tracking in the editor.', { exact: true })).toBeVisible()
+  await expect(page.getByText('Open source under the MIT License. The main copy runs on a best-effort basis, and anyone can host their own.')).toBeVisible()
+  await expect(page.getByText('Set in Literata by TypeTogether and EB Garamond by Georg Duffner, both under the SIL Open Font License.')).toBeVisible()
+  // Neither is true yet: nothing can be connected, and nothing counts visits.
+  await expect(page.getByText('a place you connect')).toHaveCount(0)
+  await expect(page.getByText('Visits to this site are counted')).toHaveCount(0)
+  await expect(page.getByText('Elbowpatch is provided as-is, with no warranty. Keep a copy of what matters:')).toBeVisible()
+  await page.getByRole('link', { name: 'Export & import' }).click()
+  await expect(page.getByRole('heading', { name: 'Export & import', level: 1 })).toBeVisible()
+})
+
+test('Settings shows the version in full, and About & privacy shows the same', async ({ page }) => {
+  await page.goto('./#/settings')
+  await expect(page.locator('.row-title')).toHaveText(['Export & import', 'Put away', 'About & privacy', 'Help'])
+  const row = page.getByRole('button', { name: /^About & privacy/ })
+  await expect(row.locator('.row-meta')).toHaveText(`Version ${manifest.version}`)
+  await row.click()
+  await expect(page.getByRole('heading', { name: 'About & privacy', level: 1 })).toBeFocused()
+  await expect(page.getByText('Version', { exact: true }).locator('+ dd')).toHaveText(manifest.version)
+})
+
+test("Source in About & privacy opens the library's address in a new tab", async ({ page }) => {
+  await page.goto('./#/')
+  const address = await page.getByRole('link', { name: 'Source', exact: true }).getAttribute('href')
+  expect(address).toBe('https://github.com/jonanderdev/elbowpatch')
+  await page.goto('./#/settings/about')
+  const source = page.getByRole('link', { name: 'GitHub' })
+  await expect(source).toHaveAttribute('href', address ?? '')
+  await expect(source).toHaveAttribute('target', '_blank')
+  await expect(source).toHaveAttribute('rel', /\bnoopener\b/)
+})
+
+test('in Safari on an iPhone, Show me how lands on the Home Screen steps', async ({ browser }) => {
+  const iphone = await browser.newContext({
+    userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+    viewport: { width: 390, height: 844 },
+  })
+  const phone = await iphone.newPage()
+  await phone.goto('./#/')
+  await expect(phone.getByText('Write from your Home Screen and your words stay.')).toBeVisible()
+  await phone.getByRole('link', { name: 'Show me how' }).click()
+  await expect(phone.getByRole('heading', { name: 'On your Home Screen', level: 1 })).toBeVisible()
+  await expect(phone.getByRole('listitem')).toHaveCount(4)
+  await phone.getByRole('button', { name: 'Help' }).click()
+  await expect(phone.getByText('On an iPhone or iPad')).toBeVisible()
+  await expect(phone.getByText('Turn the page')).toBeHidden()
+  await iphone.close()
 })

@@ -2,6 +2,7 @@ import { type ReactElement, type ReactNode, useEffect, useRef, useState } from '
 import type { Piece } from '../../domain/model'
 import { IconButton } from '../components/Icon'
 import { ShelfOutline } from './ShelfOutline'
+import { useFitTitle } from './useFitTitle'
 
 /**
  * One piece: a list row, an object on the shelf, or the Continue card. Press and hold, right-click, or
@@ -32,6 +33,8 @@ export function PieceRow(props: {
   const hold = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const held = useRef(false)
   const renamed = useRef<string | null>(null)
+  const title = useRef<HTMLSpanElement>(null)
+  useFitTitle(title, piece.title, !!onShelf && !renaming)
 
   useEffect(() => {
     if (menuOpen) menu.current?.querySelector('button')?.focus()
@@ -133,7 +136,9 @@ export function PieceRow(props: {
           {outline}
           {card ?? (
             <>
-              <span className="row-title">{piece.title.trim() || 'Untitled'}</span>
+              <span ref={title} className="row-title">
+                {piece.title.trim() || 'Untitled'}
+              </span>
               <span className="row-meta">{props.meta}</span>
             </>
           )}

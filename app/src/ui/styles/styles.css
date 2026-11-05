@@ -1212,8 +1212,9 @@ button.count[aria-expanded='true'] {
   fill: var(--pressed);
 }
 .shelf-object .row-title {
+  /* 15px over 19px; a long word shrinks the size, and the leading with it (useFitTitle). */
   font-size: 15px;
-  line-height: 19px;
+  line-height: 1.267;
   white-space: normal;
   overflow-wrap: anywhere;
   display: -webkit-box;
@@ -1663,6 +1664,115 @@ button.count[aria-expanded='true'] {
   line-height: 1.4;
   color: var(--secondary);
 }
+/* Short answers under small italic headings: Help, About & privacy (Figma, Help). */
+.answer {
+  padding: 0 12px 26px;
+}
+.answer h2 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-style: italic;
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--secondary);
+}
+.answer p {
+  margin: 0;
+  font-size: var(--body);
+  line-height: 1.55;
+  color: var(--text);
+}
+.answer a,
+.about-rows a {
+  color: var(--title);
+  text-decoration: underline;
+}
+.answer a {
+  white-space: nowrap;
+}
+.answer ol {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+  font-size: var(--body);
+  line-height: 1.55;
+  color: var(--text);
+}
+.answer li {
+  display: flex;
+  gap: 8px;
+  counter-increment: step;
+}
+.answer li::before {
+  content: counter(step);
+  flex: none;
+  width: 18px;
+  color: var(--secondary);
+}
+/* The keys are for a keyboard: desktop only. */
+.help-keys {
+  display: none;
+}
+@media (min-width: 700px) {
+  .help-keys {
+    display: block;
+  }
+}
+/* A word and its value at the right: Help's keys, About & privacy's rows. */
+.value-rows {
+  margin: 0;
+}
+.value-rows div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 9px 0;
+}
+.value-rows dt {
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--text);
+}
+.value-rows dd {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--secondary);
+}
+/* Closer to the last answer than answers are to each other (Figma, About & privacy). */
+.about-rows {
+  margin-top: -8px;
+}
+.about-rows div {
+  padding: 9px 12px;
+}
+.about-rows dd {
+  line-height: 1.4;
+}
+.about-rows dt {
+  color: var(--title);
+}
+.about-rows + .settings-note {
+  padding-top: 27px;
+}
+@media (max-width: 699px) {
+  .about-rows div {
+    position: relative;
+    align-items: center;
+    min-height: 44px;
+  }
+  /* On a phone the whole row is the link, which is why it is 44px tall. */
+  .about-rows a::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+}
 .area-rows {
   display: flex;
   flex-direction: column;
@@ -2034,6 +2144,25 @@ button.count[aria-expanded='true'] {
   font-size: 22px;
   font-weight: 300;
   color: var(--title);
+}
+
+/* Installed on an iPhone, the system draws a soft blur down the top of the screen, into the head, unless a
+   solid fixed edge sits on top of the page there (docs/decisions/0017). It is a real element, in index.html:
+   a body::before did not work. It is the page's colour, ends where the head line starts, and lets touches
+   through, so it is never seen. */
+.top-edge {
+  display: none;
+}
+@media (display-mode: standalone) and (pointer: coarse) {
+  .top-edge {
+    display: block;
+    position: fixed;
+    inset: 0 0 auto;
+    height: 10px;
+    background: var(--page);
+    pointer-events: none;
+    z-index: 6;
+  }
 }
 
 /* When what is under it scrolls, the head stands on a strip of page colour with a fade under it,

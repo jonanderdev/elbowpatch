@@ -45,7 +45,7 @@ npm run dev
 
 Then open http://localhost:5173 in your browser and start writing.
 
-**Host your own copy:** run `npm run build` in `app/`. It creates a `dist/` folder of plain files with no server needed, which you can upload to any static host.
+**Host your own copy:** run `npm run build` in `app/`. It creates a `dist/` folder of plain files with no server needed, which you can upload to any static host. Set `SITE_URL` to your copy's address when you build, so shared links show a picture.
 
 The other scripts (tests, lint, typecheck) are listed in [`app/package.json`](app/package.json).
 

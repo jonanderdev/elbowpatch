@@ -17,6 +17,11 @@ The launch screen (§) shows while the app:
 
 The launch screen leaves once the first page is ready, and not before it has been on screen a moment, counted from its first frame. *Added 2026-11-04:* a launch the service worker cannot answer can be slow, so the mark lives in `index.html` and asks the network for nothing. Thinning runs afterwards, when idle. Persistent storage (`navigator.storage.persist()`) is requested after the first piece is written, not at launch, because some browsers ask the user.
 
+### No launch image on iOS yet
+*Added 2026-11-04.* iOS draws its own launch screen only from an `apple-touch-startup-image`, and the app has none, so an installed iPhone shows black before the launch screen. On an iPhone 16 Pro with iOS 27, in dark mode, two images did not show: one matched on `device-width` and pixel ratio, one with no media query. Both were opaque PNGs at the screen's exact size, on a fresh Home Screen icon.
+
+iOS 27 has a known fault here: [WebKit bug 326500](https://bugs.webkit.org/show_bug.cgi?id=326500), where `device-height` is read from Safari's window, so a query that tests it never matches. Leaving `device-height` out was enough in that report, but not in this test, so this may not be the whole cause. Try again when that bug is fixed or a new iOS arrives.
+
 ### A save never fails silently
 *Added 2026-10-27.* Safari on iOS can drop the database connection when the app goes to the background, and a full disk fails a save the same way.
 - The store reopens its connection when the app comes back (`visibilitychange`, `pageshow`) and retries.
@@ -27,7 +32,7 @@ The launch screen leaves once the first page is ready, and not before it has bee
 ### Keeping the browser from clearing it
 *Added 2026-10-27.* Safari deletes a site's storage after 7 days of browsing without a visit; an app added to the Home Screen keeps its own count, reset each time it opens, and is the one Safari grants persistent storage to.
 - The app encourages installing it (Add to Home Screen on Safari, Install elsewhere), and, once sync exists, connecting a place.
-- In Safari outside the Home Screen, the library says it plainly: "Safari may clear your writing if you don't open Elbowpatch for a week. Keep it on your Home Screen and it stays." with *Show me how*. Elsewhere there is no warning; a quiet reminder appears after 30 days without an export (DESIGN.md, The library). *Updated 2026-10-28; wording 2026-10-30.*
+- In Safari on an iPhone or iPad, outside the Home Screen, the library says it plainly: "Write from your Home Screen and your words stay. Here in Safari, they may be cleared if you don't open Elbowpatch for a week." with *Show me how*. Elsewhere there is no warning; a quiet reminder appears after 30 days without an export (DESIGN.md, The library). *Updated 2026-10-28; wording 2026-10-30 and 2026-11-04.*
 - How the invitation looks, and its area in Settings, are not designed yet (DESIGN.md, Gaps).
 
 ### One window writes a piece

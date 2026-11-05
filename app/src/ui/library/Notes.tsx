@@ -47,9 +47,9 @@ export function SafariNote({ atFoot }: { atFoot?: boolean }): ReactElement | nul
   if (!safariOutsideHomeScreen()) return null
   return (
     <div className={atFoot ? 'first-run at-foot' : 'first-run'}>
-      <p>Safari may clear your writing if you don't open Elbowpatch for a week. Keep it on your Home Screen and it stays.</p>
+      <p>Write from your Home Screen and your words stay. Here in Safari, they may be cleared if you don't open Elbowpatch for a week.</p>
       <div className="links">
-        <a className="text-link" href="#/settings/help">
+        <a className="text-link" href="#/settings/help/home-screen">
           Show me how
         </a>
         <span aria-hidden="true">·</span>
@@ -130,9 +130,11 @@ function ago(ms: number): string {
   return months < 24 ? `${months} months ago` : `${Math.floor(days / 365)} years ago`
 }
 
-function safariOutsideHomeScreen(): boolean {
+export function safariOutsideHomeScreen(): boolean {
   const ua = navigator.userAgent
   const safari = /Safari\//.test(ua) && !/Chrome|Chromium|CriOS|FxiOS|Edg|Android/.test(ua)
+  // An iPad's Safari says it is a Mac: only its touch screen tells them apart.
+  const phoneOrTablet = /iPhone|iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)
   const standalone = matchMedia('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true
-  return safari && !standalone
+  return safari && phoneOrTablet && !standalone
 }

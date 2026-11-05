@@ -31,4 +31,5 @@ The schema and export numbers move only with a migration and its test, never jus
 ## Consequences
 - Cutting a release is four steps: bump in a PR, merge, tag `main`, push the tag (CONTRIBUTING.md).
 - PR titles become release notes, so they are written for a reader of the app, and a PR gets a label (`enhancement`, `bug`, `accessibility`, `documentation`) to land in the right group.
-- Not decided yet: whether the hosted instance deploys from release tags or from `main`, and where the app shows its own version.
+- Not decided yet: whether the hosted instance deploys from release tags or from `main`.
+- *Added 2026-11-04:* the app shows its version in About & privacy and on that row in Settings, in full and the same in both: `0.1.0`, as in `app/package.json`, never shortened to `0.1`.

@@ -176,8 +176,12 @@ export function Page({
     settings,
     keyboard,
     onRelayout: (p) => {
-      if (editorNow.current) showCaret(editorNow.current.view, p)
       rail.laidOut(p.g.side)
+      const e = editorNow.current
+      if (!e) return
+      showCaret(e.view, p)
+      // The words moved, and the selection menu with them.
+      setSelection((now) => now && { ...now, rect: selectionBox(e.view, viewport.current) })
     },
     say: (at, total) => {
       const { page: n, pages } = numbers(at, total)
@@ -234,7 +238,7 @@ export function Page({
       if (focused) moved.current = true
       setWriting(focused)
       const e = editorNow.current
-      setSelection(focused && e ? { rect: selectionBox(e.view), active: e.active() } : null)
+      setSelection(focused && e ? { rect: selectionBox(e.view, viewport.current), active: e.active() } : null)
       if (!focused) void saving?.flush()
     },
     onChapterLine: (at) => chapter.line(at),
@@ -245,7 +249,7 @@ export function Page({
     },
     onSelection(view, tr) {
       const e = editorNow.current
-      if (e) setSelection({ rect: selectionBox(view), active: e.active() })
+      if (e) setSelection({ rect: selectionBox(view, viewport.current), active: e.active() })
       caretKeys.onSelection(tr, view.state.selection)
     },
     onKey: caretKeys.onKey,
@@ -290,7 +294,7 @@ export function Page({
       cancelAnimationFrame(frame)
     }
   }, [editor])
-  useOpenAtPlace(editor, pager, opened)
+  useOpenAtPlace(editor, pager, opened, covered)
   usePageTurns({
     screen,
     viewport,

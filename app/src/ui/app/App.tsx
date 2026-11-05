@@ -30,6 +30,7 @@ const AREAS: Record<string, Area> = {
   '/settings/export': 'export',
   '/settings/put-away': 'put-away',
   '/settings/help': 'help',
+  '/settings/help/home-screen': 'home-screen',
   '/settings/about': 'about',
 }
 

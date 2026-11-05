@@ -195,6 +195,54 @@ async function toStart(page: Page) {
     .toBe('1')
 }
 
+/** Waits until the selection menu stands at the selected words on the page in view, just above or below them and across them. */
+async function menuAtWords(page: Page) {
+  await expect(page.getByRole('toolbar', { name: 'Formatting' })).toBeVisible()
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const menu = document.querySelector('.selection-menu')!.getBoundingClientRect()
+        const text = document.querySelector('.pager')!.getBoundingClientRect()
+        const shown = [...getSelection()!.getRangeAt(0).getClientRects()].filter((b) => b.height > 0 && b.right > text.left + 1 && b.left < text.right - 1)
+        const top = Math.max(text.top, Math.min(...shown.map((b) => b.top)))
+        const bottom = Math.min(text.bottom, Math.max(...shown.map((b) => b.bottom)))
+        const across = menu.left + menu.width / 2 > text.left && menu.left + menu.width / 2 < text.right
+        const above = Math.abs(menu.bottom + 10 - top) < 2
+        const below = Math.abs(menu.top - 10 - bottom) < 2
+        return across && (above || below)
+      }),
+    )
+    .toBe(true)
+}
+
+test('a selection across pages keeps its menu at the words on the page in view', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'phones use the writing bar')
+  await newEssay(page)
+  await fill(page, 8)
+  await toStart(page)
+  // Starting on the page before.
+  await page.keyboard.press('Shift+PageDown')
+  await onPage(page, '2')
+  await page.keyboard.press('Shift+ArrowUp')
+  await menuAtWords(page)
+  // Running on to the page after.
+  await page.keyboard.press('ControlOrMeta+ArrowDown')
+  await page.keyboard.press('ControlOrMeta+Shift+ArrowUp')
+  await onPage(page, '1')
+  await menuAtWords(page)
+})
+
+test('the selection menu stays at the words when the window changes size', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'phones use the writing bar')
+  await newEssay(page)
+  await fill(page, 2)
+  await page.keyboard.press('Shift+ArrowUp')
+  await page.keyboard.press('Shift+ArrowUp')
+  await menuAtWords(page)
+  await page.setViewportSize({ width: 1000, height: 700 })
+  await menuAtWords(page)
+})
+
 test('Alt + Shift + → selects as the system does, and never turns the page', async ({ page }) => {
   await newEssay(page)
   await fill(page, 8)
@@ -1098,4 +1146,38 @@ test('installed on iPhone, the keyboard leaves the window as it is: the bars sta
   await expect(page.locator('.page-screen')).not.toHaveAttribute('data-keyboard')
   expect(await slidBack()).toBe(before + 1)
   expect(Math.round((await page.locator('.head').boundingBox())!.y)).toBe(0)
+})
+
+test('a journal opened again lands on today, not its title page', async ({ page }) => {
+  await page.goto('./')
+  await page.locator('.start.journal').click()
+  await expect(page.locator('.book-title')).toBeFocused()
+  await page.keyboard.type('Thoughts')
+  await page.keyboard.press('Enter')
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('A first line.')
+  await saved(page, 'A first line.')
+  await page.locator('.head .home').click()
+  await page.locator('.row', { hasText: 'Thoughts' }).last().click()
+  await expect(page.locator('.body')).toContainText('A first line.')
+  await onPage(page, '2')
+  // From a reload too, read rather than written.
+  await page.reload()
+  await onPage(page, '2')
+  await page.locator('.head .home').click()
+  await page.locator('.row', { hasText: 'Thoughts' }).last().click()
+  await onPage(page, '2')
+  // Turned back to the title page and left there, it still opens on today.
+  await page.locator('.body').blur()
+  await page.evaluate(() => document.fonts.ready.then(() => new Promise(requestAnimationFrame)))
+  await page.keyboard.press('PageUp')
+  await onPage(page, '1')
+  await page.locator('.head .home').click()
+  await page.locator('.row', { hasText: 'Thoughts' }).last().click()
+  await onPage(page, '2')
+  // And after a reload, its place kept at the day's very start.
+  await page.keyboard.press('PageUp')
+  await onPage(page, '1')
+  await page.reload()
+  await onPage(page, '2')
 })

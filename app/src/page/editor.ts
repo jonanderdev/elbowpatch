@@ -261,12 +261,26 @@ function nightFocus(): Plugin {
   })
 }
 
-/** Where a selection is on screen, for the selection menu; null for a caret, or while not writing. */
-export function selectionBox(view: EditorView): DOMRect | null {
+/**
+ * Where a selection is on the page in view, for the selection menu: only the words shown count, as the rest
+ * of a selection across pages stands a screen's width away. Null for a caret, while not writing, or when none
+ * of the selection is on this page.
+ */
+export function selectionBox(view: EditorView, viewport: HTMLElement | null): DOMRect | null {
   const { from, to, empty } = view.state.selection
-  if (empty || !view.hasFocus()) return null
-  const a = view.coordsAtPos(from)
-  const b = view.coordsAtPos(to)
-  const top = Math.min(a.top, b.top)
-  return new DOMRect(Math.min(a.left, b.left), top, Math.abs(b.right - a.left), Math.max(a.bottom, b.bottom) - top)
+  if (empty || !viewport || !view.hasFocus()) return null
+  const page = viewport.getBoundingClientRect()
+  const start = view.domAtPos(from)
+  const end = view.domAtPos(to)
+  const range = document.createRange()
+  range.setStart(start.node, start.offset)
+  range.setEnd(end.node, end.offset)
+  const shown = [...range.getClientRects()].filter((b) => b.height > 0 && b.right > page.left + 1 && b.left < page.right - 1)
+  if (!shown.length) return null
+  // A paragraph's own box can run on past the page, so the page bounds them.
+  const left = Math.max(page.left, Math.min(...shown.map((b) => b.left)))
+  const right = Math.min(page.right, Math.max(...shown.map((b) => b.right)))
+  const top = Math.max(page.top, Math.min(...shown.map((b) => b.top)))
+  const bottom = Math.min(page.bottom, Math.max(...shown.map((b) => b.bottom)))
+  return new DOMRect(left, top, right - left, bottom - top)
 }
