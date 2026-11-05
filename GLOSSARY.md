@@ -135,7 +135,7 @@ _Avoid_: Undelete, recover
 ## Leaving and arriving
 
 **Export**:
-Taking writing out of the app as plain Markdown: everything with its history, or one piece.
+Taking writing out of the app: everything with its history as Markdown, or one piece as Markdown or PDF.
 _Avoid_: Backup, download
 
 **Archive**:
