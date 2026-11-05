@@ -33,7 +33,8 @@ async function caretBefore(page: Page, words: string, length = 0) {
         const at = node.textContent!.indexOf(words)
         if (at < 0) continue
         getSelection()!.setBaseAndExtent(node, at, node, at + length)
-        return
+        // The editor reads a selection when the browser reports it: a press before that finds the old one.
+        return new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done())))
       }
       throw new Error(`No "${words}" in the text.`)
     },
@@ -625,4 +626,24 @@ test('a long chapter opens on the page of the join, and says the chapter, not a 
     return box.left >= pager.left && box.left <= pager.right
   })
   expect(seen).toBe(true)
+})
+
+test('two splits undo in turn, back to the text as it was', async ({ page }) => {
+  await importBook(page, '# One\n\nFirst part.\n\nSecond part.\n\nThird part.\n\n# Two\n\nThe end.\n')
+  await press(page, 'Second part.')
+  await expect(page.locator('.body')).toContainText('Third part.')
+  await expect(page.locator('.title')).toBeFocused()
+  await expect.poll(() => texts(page)).toHaveLength(3)
+  await page.locator('.title').press('Enter')
+  await expect(page.locator('.body')).toBeFocused()
+  await press(page, 'Third part.')
+  await expect(page.locator('.body')).toHaveText('Third part.')
+  await expect(page.locator('.title')).toBeFocused()
+  await expect.poll(() => texts(page)).toEqual(['First part.', 'Second part.', 'Third part.', 'The end.'])
+  await undo(page)
+  await expect.poll(() => texts(page)).toEqual(['First part.', 'Second part.\n\nThird part.', 'The end.'])
+  await expect(page.locator('.body')).toBeFocused()
+  await undo(page)
+  await expect(page.locator('.title')).toHaveText('One')
+  await expect.poll(() => texts(page)).toEqual(['First part.\n\nSecond part.\n\nThird part.', 'The end.'])
 })
