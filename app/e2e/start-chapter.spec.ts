@@ -32,9 +32,14 @@ async function caretBefore(page: Page, words: string, length = 0) {
       for (let node = walker.nextNode(); node; node = walker.nextNode()) {
         const at = node.textContent!.indexOf(words)
         if (at < 0) continue
-        getSelection()!.setBaseAndExtent(node, at, node, at + length)
         // The editor reads a selection when the browser reports it: a press before that finds the old one.
-        return new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done())))
+        // Its listener came first, so by this one it has read it. No report means nothing moved.
+        const reported = new Promise<void>((done) => {
+          document.addEventListener('selectionchange', () => done(), { once: true })
+          setTimeout(done, 1000)
+        })
+        getSelection()!.setBaseAndExtent(node, at, node, at + length)
+        return reported
       }
       throw new Error(`No "${words}" in the text.`)
     },
