@@ -1,7 +1,7 @@
 import type { ReactElement, RefObject } from 'react'
-import { words as wordsLine } from '../../domain/words'
+import { pageLine, words as wordsLine } from '../../domain/words'
 import { Icon } from '../components/Icon'
-import { pageLine, ToolsBar } from './Tools'
+import { ToolsBar } from './Tools'
 
 interface PageFootProps {
   /** The page shown, from 1, and the pages; in a book, the book's, each once it is known. */
@@ -21,7 +21,7 @@ interface PageFootProps {
   onExport(): void
   /** A book's count opens Contents. */
   onContents?(from: HTMLElement): void
-  contents: boolean
+  contentsOpen: boolean
 }
 
 /**
@@ -42,7 +42,7 @@ export function PageFoot({
   onTextSettings,
   onExport,
   onContents,
-  contents,
+  contentsOpen,
 }: PageFootProps): ReactElement {
   const folio = page !== undefined && !journal && !titlePage && !tools && !keyboard
   const said = pageLine(page, count)
@@ -63,7 +63,7 @@ export function PageFoot({
             count={count}
             words={words}
             onContents={onContents}
-            contents={contents}
+            contentsOpen={contentsOpen}
             onClose={onCloseTools}
             onTextSettings={onTextSettings}
             onExport={onExport}

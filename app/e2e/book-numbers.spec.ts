@@ -110,8 +110,21 @@ async function reopenIn(page: Page, index: number) {
   await page.goto('./#/')
   await page.reload()
   await page.locator('.row', { hasText: 'harbour' }).click()
-  // Not `.flow` being visible: it is, laid out behind the library, before the book has opened.
-  await expect(page.locator('.page-screen[inert]')).toHaveCount(0)
+  await pageOpen(page)
+}
+
+/** The book's page is open. Neither `.flow` being visible, for it is laid out behind the library first, nor no page being inert, as before any page exists. */
+const pageOpen = (page: Page) => expect(page.locator('.page-screen:not([inert])')).toBeVisible()
+
+/** The page has laid itself out at its fonts, so what shows its count is what it found. */
+const laidOut = (page: Page) =>
+  page.evaluate(() => document.fonts.ready.then(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done())))))
+
+/** Contents as it reads on an open page, which counts the chapter on it as laid out, against the counts given. */
+async function contentsAgree(page: Page, [one, two, three]: number[]) {
+  const list = await contents(page)
+  await expect(list.locator('.contents-pages')).toHaveText(`${one! + two! + three!} pages`)
+  await expect(list.locator('.contents-page')).toHaveText(['1', String(one! + 1), String(one! + two! + 1)])
 }
 
 const countText = (page: Page) => page.locator('.head-tools .count > [aria-hidden], .tools .count').first()
@@ -156,8 +169,8 @@ test('a count measured off screen is the count the page finds when the chapter o
   const measured = await counts(page)
   for (const chapter of [0, 1, 2]) {
     await reopenIn(page, chapter)
-    await page.waitForTimeout(300)
-    expect(await counts(page), `chapter ${chapter + 1}`).toEqual(measured)
+    await laidOut(page)
+    await contentsAgree(page, measured)
   }
 })
 
@@ -167,13 +180,13 @@ test('so is one measured at other text settings', async ({ page }) => {
   await reopenIn(page, 1)
   await textSize(page, 'Large')
   await page.goto('./#/')
-  await expect.poll(async () => sum(await counts(page))).toBeGreaterThan(0)
-  await page.waitForTimeout(500)
+  // Recorded once the old counts are forgotten: from here, any count is of the new settings.
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('elbowpatch.layout')?.startsWith('l '))).toBe(true)
   const measured = await counts(page)
   for (const chapter of [0, 2]) {
     await reopenIn(page, chapter)
-    await page.waitForTimeout(300)
-    expect(await counts(page), `chapter ${chapter + 1}`).toEqual(measured)
+    await laidOut(page)
+    await contentsAgree(page, measured)
   }
 })
 
@@ -194,6 +207,29 @@ test('the folio, the tools and the library read as one book; the title page is p
   await page.keyboard.press('PageDown')
   await expect(page.locator('.folio')).toHaveText(String(one! + two! + 2))
   await expect(page.locator('.page-screen > [aria-live]')).toHaveText(`Page ${one! + two! + 2} of ${total}`)
+})
+
+test('where you left off shows the page the folio shows, and none while it is not known', async ({ page }) => {
+  await holdIdle(page)
+  await importBook(page, BOOK)
+  await page.locator('.row', { hasText: 'harbour' }).click()
+  await pageOpen(page)
+  // The third chapter, with the second's count not known yet.
+  await (await contents(page)).getByRole('button', { name: /^The third/ }).click()
+  await expect(page.locator('.title')).toContainText('The third')
+  await laidOut(page)
+  await page.keyboard.press('PageDown')
+  // The folio stands aside here: the running head is what says the page turned.
+  await expect(page.locator('.running-control, .running-head')).toBeVisible()
+  await page.locator('.head .home').click()
+  await expect(page.locator('.continue')).toContainText('The third')
+  await expect(page.locator('.continue .patch')).toHaveCount(0)
+
+  await letIdleRun(page)
+  const [one, two] = await counts(page)
+  await expect(page.locator('.continue .patch')).toHaveText(`page ${one! + two! + 2}`)
+  await page.locator('.continue').click()
+  await expect(page.locator('.folio')).toHaveText(String(one! + two! + 2))
 })
 
 test('Contents agrees with the folio and the tools', async ({ page }) => {

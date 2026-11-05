@@ -1,7 +1,8 @@
+import { EditorState } from 'prosemirror-state'
 import { describe, expect, it } from 'vitest'
 import { countWords, joinHalves, parse, serialize } from '../domain/markdown'
 import { schema, toBlocks, toDoc } from './schema'
-import { halvesAt, halvesAtLine } from './split'
+import { halvesAt, halvesAtLine, lineGone, withoutLine } from './split'
 
 const docOf = (markdown: string) => toDoc(parse(markdown))
 
@@ -146,9 +147,29 @@ describe('the halves back together', () => {
   })
 
   it('two halves of one mark are one mark again, not two strung together', () => {
-    expect(joinHalves('Salt on the *windows *', '*and* the rail.', { front: 'inside', raw: false, escaped: false }, '')).toBe(
+    expect(joinHalves('Salt on the *windows *', '*and* the rail.', { front: 'inside', ending: 'Salt on the *windows *', raw: false, escaped: false }, '')).toBe(
       'Salt on the *windows and* the rail.',
     )
+  })
+
+  it('new words on the end of the earlier chapter stand apart from what comes back, every word kept', () => {
+    const h = cutBefore('The ferry at seven.', 'at seven')
+    expect(joinHalves(`${h.before}\n\nNew para`, h.after, h.seam, '')).toBe('The ferry \n\nNew para\n\nat seven.')
+    expect(joinHalves(`${h.before}more`, h.after, h.seam, '')).toBe('The ferry more\n\nat seven.')
+  })
+
+  it('so do they in Markdown kept as written, and at a line break', () => {
+    const text = 'Two **stars and no end'
+    const raw = halvesAt(docOf(text), 5)
+    expect(joinHalves(`${raw.before}\n\nNew para`, raw.after, raw.seam, '')).toBe(`${raw.before}\n\nNew para\n\n${raw.after}`)
+    const { doc, pos } = posOf('Before.\n\\# The harbour', '# The')
+    const line = halvesAtLine(doc, pos)
+    expect(joinHalves('Before.\n\nNew para', line.after, line.seam, line.title)).toBe('Before.\n\nNew para\n\n\\# The harbour')
+  })
+
+  it('the earlier chapter changed further back still meets what comes back', () => {
+    const h = cutBefore('First.\n\nThe ferry at seven.', 'at seven')
+    expect(joinHalves(h.before.replace('First.', 'Earlier.'), h.after, h.seam, '')).toBe('Earlier.\n\nThe ferry at seven.')
   })
 
   it('a # line comes back as an escaped line, where it stood', () => {
@@ -163,6 +184,19 @@ describe('the halves back together', () => {
     }
   })
 
+  it('a # line keeps its marks, wherever it stood', () => {
+    for (const text of ['Before.\n\n\\# The **harbour** *in winter*\n\nAfter.', 'A\n\\# The **harbour**\nB', 'Before.\n\\# The *harbour*']) {
+      const { doc, pos } = posOf(text, '# The')
+      expect(back(halvesAtLine(doc, pos)), text).toBe(text)
+    }
+  })
+
+  it('a title changed since the split comes back as it now reads, without the old line', () => {
+    const { doc, pos } = posOf('Before.\n\n\\# The **harbour**\n\nAfter.', '# The')
+    const h = halvesAtLine(doc, pos)
+    expect(joinHalves(h.before, h.after, h.seam, 'The bay')).toBe('Before.\n\n\\# The bay\n\nAfter.')
+  })
+
   it('a # line with nothing on it comes back too', () => {
     const { doc, pos } = posOf('Before.\n\n\\# \n\nAfter.', '# ')
     expect(back(halvesAtLine(doc, pos))).toBe('Before.\n\n\\# \n\nAfter.')
@@ -174,11 +208,33 @@ describe('the halves back together', () => {
   })
 
   it('when the halves are no longer of a kind, they stand apart with every word', () => {
-    expect(joinHalves('One', '> two', { front: 'inside', raw: false, escaped: false }, '')).toBe('One\n\n> two')
+    expect(joinHalves('One', '> two', { front: 'inside', ending: 'One', raw: false, escaped: false }, '')).toBe('One\n\n> two')
   })
 
   it('an empty half leaves the other as it is', () => {
-    expect(joinHalves('', 'Two.', { front: 'inside', raw: false, escaped: false }, '')).toBe('Two.')
-    expect(joinHalves('One.', '', { front: 'inside', raw: false, escaped: false }, '')).toBe('One.')
+    expect(joinHalves('', 'Two.', { front: 'inside', ending: '', raw: false, escaped: false }, '')).toBe('Two.')
+    expect(joinHalves('One.', '', { front: 'inside', ending: 'One.', raw: false, escaped: false }, '')).toBe('One.')
+  })
+})
+
+describe('a # line taken out of the text', () => {
+  const stateOf = (doc: ReturnType<typeof docOf>) => EditorState.create({ doc })
+  const textOf = (doc: Parameters<typeof toBlocks>[0]) => serialize(toBlocks(doc))
+
+  it('goes with its block when the block held nothing else', () => {
+    const { doc, pos } = posOf('\\# The harbour\n\nAfter.', '# The')
+    expect(textOf(lineGone(stateOf(doc), pos).doc)).toBe('After.')
+  })
+
+  it('leaves the rest of its block, with its line break', () => {
+    const { doc, pos } = posOf('\\# The harbour\nIn winter.', '# The')
+    expect(textOf(lineGone(stateOf(doc), pos).doc)).toBe('In winter.')
+    expect(textOf(withoutLine(stateOf(doc), pos).doc)).toBe('In winter.')
+  })
+
+  it('leaves the block of an only line, for the page always holds one', () => {
+    const { doc, pos } = posOf('\\# The harbour', '# The')
+    expect(lineGone(stateOf(doc), pos).doc.childCount).toBe(1)
+    expect(textOf(lineGone(stateOf(doc), pos).doc)).toBe('')
   })
 })

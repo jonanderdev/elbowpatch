@@ -1,7 +1,7 @@
 import { pieceAsMarkdown } from './export'
 import { countWords } from './markdown'
 import type { Kind, Outline, Piece, Version, Working } from './model'
-import type { Deps, OpenSection } from './pieces'
+import { type Deps, type OpenSection, withoutPage } from './pieces'
 import { dayTitle } from './words'
 
 // The full export and import (docs/decisions/0007). Everything leaves as plain
@@ -130,14 +130,14 @@ export async function importArchive(deps: Deps, files: ArchiveFile[]): Promise<I
           return fresh
         }
       }
-      // Page counts stay behind: they belong to the screen and the text settings the export left (0003).
+      // Page counts stay behind, and in a book the place's page: they belong to the screen and the text settings the export left (0003).
       const { pages: _, ...arriving } = incoming
       await tx.putPiece({
         ...arriving,
         id: ids(incoming.id),
         outlineId: incoming.outlineId && ids(incoming.outlineId),
         sections: incoming.sections.map((s) => ({ ...s, sectionId: ids(s.sectionId) })),
-        place: incoming.place && { ...incoming.place, sectionId: ids(incoming.place.sectionId) },
+        place: incoming.place && { ...(incoming.kind === 'book' ? withoutPage(incoming.place) : incoming.place), sectionId: ids(incoming.place.sectionId) },
         words: incoming.words && Object.fromEntries(Object.entries(incoming.words).map(([k, n]) => [ids(k), n])),
         // Put away when it was exported: it waits a fresh 30 days, rather than arriving already due to go.
         ...(incoming.putAwayAt !== undefined ? { putAwayAt: now } : {}),

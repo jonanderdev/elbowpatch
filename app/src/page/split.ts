@@ -3,7 +3,8 @@
 // and Markdown outside the v1 marks stays as written.
 
 import type { Node, ResolvedPos } from 'prosemirror-model'
-import { type Block, BREAK, type Meeting, type Seam, serialize } from '../domain/markdown'
+import type { EditorState, Transaction } from 'prosemirror-state'
+import { type Block, BREAK, lastBlock, type Meeting, type Seam, serialize } from '../domain/markdown'
 import { schema, toBlocks } from './schema'
 
 export interface Halves {
@@ -22,22 +23,49 @@ export function halvesAt(doc: Node, pos: number): Halves {
   const $pos = doc.resolve(pos)
   const { text, escaped } = moved(doc.cut(pos))
   const raw = $pos.parent.type === schema.nodes.raw
-  return { before: written(doc.cut(0, pos)), after: text, title: '', seam: { front: meetingAt($pos), raw, escaped } }
+  const before = written(doc.cut(0, pos))
+  return { before, after: text, title: '', seam: { front: meetingAt($pos), ending: lastBlock(before), raw, escaped } }
 }
 
 /** The halves at a `# ` line, `pos` just before its `#`: the rest of that line is the title. */
 export function halvesAtLine(doc: Node, pos: number): Halves {
   const $pos = doc.resolve(pos)
   const end = lineEnd($pos.parent, $pos.parentOffset) + $pos.start()
-  // Past the line's break, if it has one: that goes with it.
-  const next = doc.nodeAt(end)?.type === schema.nodes.hard_break ? end + 1 : end
+  const next = pastLine(doc, pos)
   const { text, escaped } = moved(doc.cut(next))
+  const before = written(doc.cut(0, pos))
   return {
-    before: written(doc.cut(0, pos)),
+    before,
     after: text,
     title: doc.textBetween(pos + 2, end).trim(),
-    seam: { front: $pos.parentOffset === 0 ? 'apart' : 'line', back: next > end && next < $pos.end() ? 'line' : 'apart', raw: false, escaped },
+    seam: {
+      front: $pos.parentOffset === 0 ? 'apart' : 'line',
+      back: next > end && next < $pos.end() ? 'line' : 'apart',
+      line: written(doc.cut(pos, end)),
+      ending: lastBlock(before),
+      raw: false,
+      escaped,
+    },
   }
+}
+
+/** The `# ` line at `pos` taken back out of the text. */
+export function withoutLine(state: EditorState, pos: number): Transaction {
+  return state.tr.delete(pos, pastLine(state.doc, pos))
+}
+
+/** The `# ` line at `pos` gone to the title: with the block too if it held nothing else, so no empty paragraph stays. */
+export function lineGone(state: EditorState, pos: number): Transaction {
+  const $pos = state.doc.resolve(pos)
+  const whole = pos === $pos.start() && pastLine(state.doc, pos) === $pos.end() && state.doc.childCount > 1
+  return whole ? state.tr.delete($pos.before(), $pos.after()) : withoutLine(state, pos)
+}
+
+/** Where the line at `pos` ends, past its line break if it has one: that goes with it. */
+function pastLine(doc: Node, pos: number): number {
+  const $pos = doc.resolve(pos)
+  const end = lineEnd($pos.parent, $pos.parentOffset) + $pos.start()
+  return doc.nodeAt(end)?.type === schema.nodes.hard_break ? end + 1 : end
 }
 
 /** Whether a point is inside its block, and at a line break. One at the block's end is only space. */

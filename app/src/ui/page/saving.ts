@@ -7,6 +7,7 @@ import { debounced, moments, type Scheduled } from '../../adapters/schedule'
 import { pieceAsMarkdown } from '../../domain/export'
 import type { Piece, Place, Screen } from '../../domain/model'
 import { type Deps, openPiece, rename, renameSection, savePages, savePlace, setSubtitle, takeMoment, write } from '../../domain/pieces'
+import { settledWithin } from '../app/settled'
 import { type Unsaved, unsaved } from '../stores/unsaved'
 
 /** What the page holds now. A title is null when the page has no such field. */
@@ -39,6 +40,8 @@ export interface SavingOptions {
   pages(): { screen: Screen; count: number } | null
   onStored(piece: Piece): void
   onFailed(failed: boolean): void
+  /** The pages closed before this one: settled once none of them can write any more. */
+  closing(): Promise<void>
 }
 
 export interface Saving {
@@ -53,16 +56,18 @@ export interface Saving {
   /** The page closes: one last save on what it holds now, then nothing more. */
   close(): Promise<void>
   /**
-   * Reshapes the section (a chapter starting in it, or going back): `reshape` runs on the text the page holds, once
-   * that is stored. From then on this page writes nothing, for the text it holds is no longer the
-   * section's. False, with everything as it was, when the words could not be stored or `reshape` failed.
+   * Reshapes the section (a chapter starting in it, or going back): `change` runs on the text the page holds, once
+   * that is stored and no page closed before this one can still write. A late write would land on the reshaped
+   * text and undo it, so a page that has not finished closing refuses it. From then on this page writes nothing,
+   * for the text it holds is no longer the section's. False, with everything as it was, when the words could not
+   * be stored, an earlier page has not finished, or `change` failed.
    */
-  split(reshape: (whole: string) => Promise<Piece>): Promise<boolean>
+  reshape(change: (whole: string) => Promise<Piece>): Promise<boolean>
   /** A split is running or has run: what this page holds and counts is no longer the section's. */
   sealed(): boolean
 }
 
-/** How long a split waits for the words to be stored before leaving the text as it is. */
+/** How long a split waits for the words to be stored, and earlier pages to finish, before leaving the text as it is. */
 const SPLIT_WAIT = 1500
 
 export function createSaving(o: SavingOptions): Saving {
@@ -197,27 +202,30 @@ export function createSaving(o: SavingOptions): Saving {
       return last
     },
     sealed: () => sealed,
-    async split(reshape): Promise<boolean> {
+    async reshape(change): Promise<boolean> {
       if (closed || sealed || o.readOnly()) return false
       // Text read differently from how it is stored counts as a change too: it is stored first.
       if (changed(o.read())) save.touch()
-      const stored = await Promise.race([
-        save.flush().then(
-          () => true,
-          () => false,
-        ),
-        new Promise<boolean>((r) => setTimeout(() => r(false), SPLIT_WAIT)),
+      const [closedBehind, stored] = await Promise.all([
+        settledWithin(o.closing(), SPLIT_WAIT),
+        Promise.race([
+          save.flush().then(
+            () => true,
+            () => false,
+          ),
+          new Promise<boolean>((r) => setTimeout(() => r(false), SPLIT_WAIT)),
+        ]),
       ])
       const held = o.read()
       // `sealed`: another reshaping got here first, while this one waited.
-      if (!stored || closed || sealed || o.readOnly() || changed(held)) return false
+      if (!closedBehind || !stored || closed || sealed || o.readOnly() || changed(held)) return false
       // No await between the check above and this: nothing can be typed or saved in between.
       sealed = true
       clearTimeout(retry)
       save.cancel()
       moment.cancel()
       try {
-        const piece = await reshape(held.markdown)
+        const piece = await change(held.markdown)
         // These words are stored. Different ones kept earlier stay for Save a copy: older than the split, they never replay.
         unsaved.saved(o.sectionId, held.markdown, held.title)
         o.onStored(piece)

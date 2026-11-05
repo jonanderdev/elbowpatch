@@ -8,7 +8,7 @@ import { forgetSplit, keepUndo, rememberSplit, splitOf, takeUndo } from './undoM
 const opened = (markdown: string) => EditorState.create({ doc: toDoc(parse(markdown)), plugins: [history()] })
 const typed = (state: EditorState, text: string) => state.apply(state.tr.insertText(text, 1))
 const markdownOf = (state: EditorState) => serialize(toBlocks(state.doc))
-const SEAM = { front: 'inside', raw: false, escaped: false } as const
+const SEAM = { front: 'inside', ending: 'Salt', raw: false, escaped: false } as const
 
 describe("a chapter's undo, kept for the session", () => {
   it('comes back on a new page and still steps back', () => {

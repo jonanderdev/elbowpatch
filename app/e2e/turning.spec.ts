@@ -240,7 +240,7 @@ test('the caret goes with the writer: to the end of the opening page turned to, 
 test('a screen reader hears the chapter it turned into, both ways', async ({ page }) => {
   await importBook(page, THREE)
   await toLastPage(page)
-  const said = page.locator('.page-screen > [aria-live]')
+  const said = page.locator('.chapter-said')
   await page.keyboard.press('PageDown')
   await expect(title(page)).toHaveText('Two')
   await expect(said).toHaveText('Two')

@@ -9,6 +9,7 @@ import {
   rename,
   renameSection,
   savePages,
+  savePlace,
   startChapterAt,
   takeMoment,
   totalWords,
@@ -161,6 +162,21 @@ describe('export and import', () => {
     expect(read.sections.map((s) => s.title)).toEqual(['One', 'Added', 'Untitled', 'Winter'])
   })
 
+  it("the page of the writer's place stays behind with the counts: it belongs to the screen the export left", async () => {
+    const deps = setup()
+    const book = newPiece(deps, 'book', 'en')
+    const first = book.sections[0]!.sectionId
+    await write(deps, book, first, 'One.')
+    await savePlace(deps, book.id, { sectionId: first, paragraph: 0, offset: 0, snippet: 'One.', page: 4, screen: 'phone', caret: false, at: 1 })
+    await takeMoment(deps, book.id)
+
+    const elsewhere = { ...setup(), store: memoryStore() }
+    await importArchive(elsewhere, await exportAll(deps))
+    const { place } = (await openPiece(elsewhere, book.id))!.piece
+    expect(place).toMatchObject({ sectionId: first, snippet: 'One.' })
+    expect(place?.page).toBeUndefined()
+  })
+
   it('a chapter rejoined stays out of the book, and its versions come along', async () => {
     const deps = setup()
     const book = newPiece(deps, 'book', 'en')
@@ -169,7 +185,7 @@ describe('export and import', () => {
     await takeMoment(deps, book.id)
     await startChapterAt(deps, book.id, { sectionId: first, whole: 'One.\n\nTwo.', before: 'One.', after: 'Two.', title: '', newSectionId: 'cut' })
     await takeMoment(deps, book.id)
-    await rejoinChapter(deps, book.id, { sectionId: 'cut', into: first, whole: 'Two.', seam: { front: 'apart', raw: false, escaped: false } })
+    await rejoinChapter(deps, book.id, { sectionId: 'cut', into: first, whole: 'Two.', seam: { front: 'apart', ending: '', raw: false, escaped: false } })
     await takeMoment(deps, book.id)
 
     const elsewhere = { ...setup(), store: memoryStore() }

@@ -32,14 +32,11 @@ async function caretBefore(page: Page, words: string, length = 0) {
       for (let node = walker.nextNode(); node; node = walker.nextNode()) {
         const at = node.textContent!.indexOf(words)
         if (at < 0) continue
-        // The editor reads a selection when the browser reports it: a press before that finds the old one.
-        // Its listener came first, so by this one it has read it. No report means nothing moved.
-        const reported = new Promise<void>((done) => {
-          document.addEventListener('selectionchange', () => done(), { once: true })
-          setTimeout(done, 1000)
-        })
         getSelection()!.setBaseAndExtent(node, at, node, at + length)
-        return reported
+        // Reported at once, so the editor reads it now. Left to the browser's report, it can come after the
+        // editor, just given the focus, has put its own caret back.
+        document.dispatchEvent(new Event('selectionchange'))
+        return
       }
       throw new Error(`No "${words}" in the text.`)
     },
@@ -362,6 +359,54 @@ test('the numbers agree after a split: the long chapter is counted again, and th
   }
 })
 
+test('a new page keeps no count until it has laid out its text: a number kept before that would be wrong', async ({ page }) => {
+  // The fonts settling is what lays a new page's text out: held, that moment stays open. Every count written is noted.
+  await page.addInitScript(() => {
+    const w = window as unknown as { holdFonts?: Promise<void>; letFontsGo?: () => void; written: Record<string, number>[] }
+    w.written = []
+    const ready = Object.getOwnPropertyDescriptor(FontFaceSet.prototype, 'ready')!.get!
+    Object.defineProperty(document.fonts, 'ready', { get: () => w.holdFonts ?? ready.call(document.fonts) })
+    const put = IDBObjectStore.prototype.put
+    IDBObjectStore.prototype.put = function (value: { pages?: Record<string, Record<string, number>> }, key?: IDBValidKey) {
+      const counts = value?.pages?.[innerWidth < 700 ? 'phone' : 'desktop']
+      if (counts) w.written.push({ ...counts })
+      return put.call(this, value, key)
+    }
+  })
+  await importBook(page, LONG)
+  await expect.poll(async () => (await stored(page)).counts.every((n) => n !== undefined)).toBe(true)
+  await page.evaluate(() => {
+    const w = window as unknown as { holdFonts?: Promise<void>; letFontsGo?: () => void; written: Record<string, number>[] }
+    w.written = []
+    w.holdFonts = new Promise((done) => {
+      w.letFontsGo = done
+    })
+  })
+  await press(page, 'Part 9.')
+  await expect(page.locator('.title')).toBeFocused()
+  await page.evaluate(() => (window as unknown as { letFontsGo(): void }).letFontsGo())
+  await expect.poll(async () => (await stored(page)).counts.filter((n) => n !== undefined).length, { timeout: 15000 }).toBe(3)
+
+  const { counts } = await stored(page)
+  const ids = await page.evaluate(
+    () =>
+      new Promise<string[]>((done) => {
+        const open = indexedDB.open('elbowpatch')
+        open.onsuccess = () => {
+          const all = open.result.transaction('pieces').objectStore('pieces').getAll()
+          all.onsuccess = () => {
+            open.result.close()
+            done((all.result[0] as { sections: { sectionId: string }[] }).sections.map((s) => s.sectionId))
+          }
+        }
+      }),
+  )
+  const written = await page.evaluate(() => (window as unknown as { written: Record<string, number>[] }).written)
+  const kept = written.map((w) => w[ids[1]!]).filter((n) => n !== undefined)
+  expect(kept.length).toBeGreaterThan(0)
+  expect(new Set(kept)).toEqual(new Set([counts[1]]))
+})
+
 test('after a split no number shows that rests on a count not known yet', async ({ page }) => {
   // Everything waiting for the app to be idle waits for the test.
   await page.addInitScript(() => {
@@ -622,7 +667,7 @@ test('a long chapter opens on the page of the join, and says the chapter, not a 
   await undo(page)
   await expect(page.locator('.title')).toHaveText('One')
   await expect(page.locator('.body')).toBeFocused()
-  await expect(page.locator('[aria-live="polite"].visually-hidden')).toHaveText('One')
+  await expect(page.locator('.chapter-said')).toHaveText('One')
   expect((await caret(page)).before.startsWith('Part 8.')).toBe(true)
   const seen = await page.evaluate(() => {
     const range = getSelection()!.getRangeAt(0).cloneRange()

@@ -1,13 +1,14 @@
 import { type ReactElement, useCallback, useEffect, useRef, useState } from 'react'
 import { pieceAsMarkdown } from '../../domain/export'
 import type { Kind, Piece } from '../../domain/model'
-import { type Deps, library, newPiece, openPiece, putAway, recover, rename, restore, withChapter, withDay } from '../../domain/pieces'
+import { type Deps, library, neverStored, newPiece, openPiece, putAway, recover, rename, restore, withChapter, withDay } from '../../domain/pieces'
 import type { WriterLock } from '../../domain/ports'
 import { forgetPutAway, thin } from '../../domain/thinning'
 import { isoDay } from '../../domain/words'
 import { download } from '../files/download'
 import { downloadEverything } from '../files/everything'
 import { Library } from '../library/Library'
+import { titleOf } from '../page/fields'
 import { type OpenAt, type Opened, Page } from '../page/Page'
 import { raiseKeyboard } from '../page/useFocusOnOpen'
 import { waiting } from '../settings/PutAway'
@@ -30,11 +31,6 @@ const AREAS: Record<string, Area> = {
   '/settings/put-away': 'put-away',
   '/settings/help': 'help',
   '/settings/about': 'about',
-}
-
-/** A book with nothing stored yet: its first chapter is all it has, and a chapter left empty in the draft goes. */
-function neverStored(draft: Piece): Piece {
-  return { ...draft, sections: draft.sections.slice(0, 1) }
 }
 
 export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElement | null {
@@ -164,7 +160,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
   }
 
   // A new chapter at the end of the book or right after a chapter, read from what is stored once the
-  // section left is saved. It is a draft: it joins the piece with its first words or title, so one
+  // section left is saved. It is not stored yet: it joins the piece with its first words or title, so one
   // left empty is gone.
   const newChapter = async (draft: Piece, after?: string): Promise<void> => {
     const turn = ++chosen.current
@@ -248,6 +244,11 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
           }}
         />
       )}
+      {/* The page changed under a screen reader: it hears which chapter it is in. Here, for a live region
+          must stand before its words do, and the page is new for each chapter. */}
+      <div className="visually-hidden chapter-said" aria-live="polite">
+        {opened?.at ? titleOf(opened).trim() || 'Untitled' : ''}
+      </div>
       {inSettings && (
         <Settings
           deps={deps}

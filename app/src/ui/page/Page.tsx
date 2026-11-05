@@ -3,6 +3,7 @@ import { type CSSProperties, type ReactElement, useCallback, useEffect, useLayou
 import { countWords } from '../../domain/markdown'
 import type { Piece } from '../../domain/model'
 import { type BookCount, bookCount, contents, type Deps, savePages } from '../../domain/pieces'
+import { pageLine } from '../../domain/words'
 import { scrollToCaret, showCaret, toOpeningPage } from '../../page/caret'
 import { type Editor, selectionBox } from '../../page/editor'
 import { screenOf } from '../../page/pager'
@@ -17,10 +18,10 @@ import { download } from '../files/download'
 import { markdownFile } from '../files/markdownFile'
 import { useSettings } from '../stores/settings'
 import { ContentsRail, ContentsSheet, NewChapter, RailToggle, RunningHeadControl } from './Contents'
-import { fillTitleFields, keptFor, type OpenAt, type Opened, type TitleRefs, titleOf } from './fields'
+import { fillTitleFields, keptFor, type OpenAt, type Opened, type TitleRefs } from './fields'
 import { PageFoot, StatusLine } from './PageFoot'
 import { SectionTitle, TitlePage } from './Titles'
-import { HeadTools, pageLine, TextSettings } from './Tools'
+import { HeadTools, TextSettings } from './Tools'
 import { useCaretFollowing, useCaretKeys } from './useCaret'
 import { useChapterStart } from './useChapterStart'
 import { useEditor } from './useEditor'
@@ -44,7 +45,7 @@ interface Props {
   onWriteHere(): void
   /** Lets the app ask the page to save now, before another window takes the piece. */
   flushRef: { current: (() => Promise<void>) | null }
-  /** The closing page's last save, so the app lets go of the piece only after it. */
+  /** The closing pages' last saves, so the app lets go of the piece only after them. */
   closingRef: { current: Promise<void> }
   /** The library shows over the page; the page stays laid out behind it, inert. */
   covered: boolean
@@ -120,7 +121,8 @@ export function Page({
   /** The title field being written in, if any: the writing bar stands for it too. */
   const [field, setField] = useState<HTMLElement | null>(null)
   const [selection, setSelection] = useState<SelectionState | null>(null)
-  const [kept, setKept] = useState('')
+  /** What was last said beyond the page's own announcements, and over which one: the next turn is said over it. */
+  const [said, setSaid] = useState<{ text: string; over: string } | null>(null)
   // Where a sheet opened from the desktop head drops: under its control, right-aligned to it.
   const [anchor, setAnchor] = useState<CSSProperties | undefined>(undefined)
 
@@ -165,7 +167,7 @@ export function Page({
     return bookCount(live.outline, phone ? 'phone' : 'desktop', { sectionId, title: heading, pages: total, words }, at)
   }
 
-  const { pager, page, count, announcement } = usePager({
+  const { pager, page, count, laidOut, announcement } = usePager({
     screen,
     viewport,
     flow,
@@ -191,13 +193,13 @@ export function Page({
     readOnly,
     place: () => {
       const e = editorNow.current
-      const place = moved.current && e && pager ? placeOf(e.view, sectionId, pager.page, viewport.current) : undefined
+      const place = moved.current && e && pager ? placeOf(e.view, sectionId, pager.page, phone ? 'phone' : 'desktop', viewport.current) : undefined
       // Once kept, it stays until they move again: a later save, as the page closes behind the
       // library, would read a page no longer laid out as they left it.
       moved.current = false
       return place
     },
-    pages: () => (pager && screen.current ? { screen: screenOf(screen.current.clientWidth), count: pager.count } : null),
+    pages: () => (pager && laidOut && screen.current ? { screen: screenOf(screen.current.clientWidth), count: pager.count } : null),
     onStored: (stored) => {
       live.stored(stored)
       onChange(stored)
@@ -209,9 +211,9 @@ export function Page({
   // The count is kept with the piece whenever it changes (a turn of the text settings, a first reading
   // on this kind of screen), so the library shows a book's pages without laying it out (DESIGN.md).
   useEffect(() => {
-    if (readOnly || !pager || !screen.current || saving?.sealed()) return
+    if (readOnly || !pager || !laidOut || !screen.current || saving?.sealed()) return
     void savePages(deps, piece.id, screenOf(screen.current.clientWidth), sectionId, count).catch(() => {})
-  }, [deps, piece.id, sectionId, count, pager, readOnly, saving])
+  }, [deps, piece.id, sectionId, count, pager, laidOut, readOnly, saving])
 
   const shown = numbers(page, count)
 
@@ -327,15 +329,6 @@ export function Page({
     }
   }, [saving, pager, editor])
 
-  // The latest thing to say wins: a turn is said after a kept moment or a chapter opening.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: \`announcement\` is the trigger.
-  useEffect(() => setKept(''), [announcement])
-
-  // The page changed under a screen reader: it hears which chapter it is in.
-  useEffect(() => {
-    if (opened.at) setKept(titleOf(opened).trim() || 'Untitled')
-  }, [opened])
-
   // Writing here or not changed (another window took the piece, or Write here): the editor asks
   // `editable` again at once.
   useEffect(() => {
@@ -449,7 +442,6 @@ export function Page({
     editor,
     saving,
     keyboard,
-    closingRef,
     onRejoined: onChapterRejoined,
   })
 
@@ -498,7 +490,7 @@ export function Page({
   }
 
   async function keepMoment(): Promise<void> {
-    if (await saving?.keep()) setKept('Moment kept')
+    if (await saving?.keep()) setSaid({ text: 'Moment kept', over: announcement })
   }
 
   // Return in a title field: on to the text, at its start.
@@ -535,7 +527,7 @@ export function Page({
         {/* In the head, so the toggle's next stop is what it opens, then the tools. */}
         {railed ? (
           <ContentsRail
-            {...contents(live.outline, 'desktop', pager ? { sectionId, title: heading, pages: count } : undefined)}
+            {...contents(live.outline, 'desktop', laidOut ? { sectionId, title: heading, pages: count } : undefined)}
             current={sectionId}
             open={rail.open}
             onOpen={openChapter}
@@ -631,12 +623,12 @@ export function Page({
         onTextSettings={() => openSheet('text')}
         onExport={() => openSheet('export')}
         onContents={book ? openContents : undefined}
-        contents={sheet === 'contents'}
+        contentsOpen={sheet === 'contents'}
       />
 
       {sheet === 'contents' && phone ? (
         <ContentsSheet
-          {...contents(live.outline, 'phone', pager ? { sectionId, title: heading, pages: count } : undefined)}
+          {...contents(live.outline, 'phone', laidOut ? { sectionId, title: heading, pages: count } : undefined)}
           current={sectionId}
           takeFocus={contentsFocus}
           onOpen={openChapter}
@@ -663,7 +655,7 @@ export function Page({
       <StatusLine writer={writer} failed={failed} line={line} onWriteHere={onWriteHere} onSaveCopy={() => void exportMarkdown()} />
 
       <div className="visually-hidden" aria-live="polite">
-        {kept || announcement}
+        {said?.over === announcement ? said.text : announcement}
       </div>
     </div>
   )

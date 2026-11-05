@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { whenQuiet } from '../../adapters/schedule'
 import { type Deps, forgetPages, measureNext } from '../../domain/pieces'
 import { fontsFor, measureChapter } from '../../page/measure'
@@ -6,6 +6,7 @@ import { screenOf } from '../../page/pager'
 import { usePhone } from '../components/usePhone'
 import { layoutOf, readLayout, writeLayout } from '../stores/layoutKept'
 import { useSettings } from '../stores/settings'
+import { layoutWatch } from './layoutWatch'
 
 interface Options {
   deps: Deps
@@ -32,8 +33,7 @@ export function useBookNumbers({ deps, ready, openId, pieces, onCounted }: Optio
   now.current = { openId, onCounted }
   /** Wakes the measuring, if it has stopped. */
   const wake = useRef((): void => {})
-  /** Counts the layouts seen: a measurement begun under an earlier one is not kept. */
-  const generation = useRef(0)
+  const [watch] = useState(() => layoutWatch({ read: readLayout, write: writeLayout, forget: () => forgetPages(deps) }))
 
   useEffect(() => {
     if (!ready) return
@@ -43,13 +43,13 @@ export function useBookNumbers({ deps, ready, openId, pieces, onCounted }: Optio
     let cancel = (): void => {}
 
     const step = async (): Promise<void> => {
-      const started = generation.current
+      const started = watch.generation()
       const more = await measureNext(
         deps,
         screenOf(document.documentElement.clientWidth),
         async (chapter) => {
           await fontsFor(chapter)
-          return alive && started === generation.current ? measureChapter(chapter) : undefined
+          return alive && started === watch.generation() ? measureChapter(chapter) : undefined
         },
         now.current.openId,
       ).catch(() => false)
@@ -73,18 +73,17 @@ export function useBookNumbers({ deps, ready, openId, pieces, onCounted }: Optio
       cancel()
       wake.current = () => {}
     }
-  }, [deps, ready])
+  }, [deps, ready, watch])
 
   // The layout changed, here or since the last launch: what is stored was counted at another one.
   useEffect(() => {
-    if (!ready || layout === readLayout()) return
-    generation.current++
-    writeLayout(layout)
-    void forgetPages(deps)
-      .then(() => now.current.onCounted())
+    if (!ready) return
+    void watch
+      .see(layout)
+      ?.then(() => now.current.onCounted())
       .catch(() => {})
       .finally(() => wake.current())
-  }, [deps, ready, layout])
+  }, [ready, layout, watch])
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: these are the triggers. Crossing to the other screen's page, or a new piece, may bring chapters with no count.
   useEffect(() => {

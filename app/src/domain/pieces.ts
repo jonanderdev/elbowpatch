@@ -1,4 +1,4 @@
-import { type Block, countWords, joinHalves, parse, type Seam } from './markdown'
+import { countWords, joinHalves, parse, type Seam, wordsIn } from './markdown'
 import type { Kind, Outline, OutlineSection, Piece, Place, Screen, Version, Working } from './model'
 import type { Clock, Ids, Store, Tx } from './ports'
 
@@ -106,8 +106,13 @@ export function withChapter(deps: Pick<Deps, 'ids'>, piece: Piece, after?: strin
   return { piece: { ...piece, sections: [...piece.sections.slice(0, at), { sectionId, title: '' }, ...piece.sections.slice(at)] }, sectionId }
 }
 
-/** The piece as stored, with the draft's open section where it will join: what Contents lists. */
-export function withDraft(stored: Piece, draft: Piece, sectionId: string): Piece {
+/** A book with nothing stored yet: its first chapter is all it has, and a chapter left empty in the draft goes. */
+export function neverStored(draft: Piece): Piece {
+  return { ...draft, sections: draft.sections.slice(0, 1) }
+}
+
+/** The piece as stored, with the page's open section where it will join: what Contents lists. */
+export function withOpenSection(stored: Piece, draft: Piece, sectionId: string): Piece {
   return { ...stored, sections: joined(stored, draft, sectionId) }
 }
 
@@ -178,11 +183,23 @@ export function bookCount(piece: Piece, screen: Screen, open: OpenChapter & { wo
   return { ...(start === undefined ? {} : { page: start + page }), ...(pages === undefined ? {} : { pages }), words }
 }
 
+/**
+ * The page of the writer's place, as the folio shows it there: in a book the book's page, unknown while a chapter
+ * before it has not been laid out, or if the place was kept on the other screen's page or no longer says.
+ */
+export function placePage(piece: Piece, screen: Screen): number | undefined {
+  const { place } = piece
+  if (piece.kind !== 'book' || !place || place.page === undefined) return place?.page
+  if (place.screen ? place.screen !== screen : place.page !== 1) return undefined
+  const start = contents(piece, screen).chapters.find((c) => c.sectionId === place.sectionId)?.startPage
+  return start === undefined ? undefined : start + place.page - 1
+}
+
 /** Keeps a section's page count on a screen's page. Not a change to the piece: its date stays. Safe to run twice. */
 export function savePages(deps: Pick<Deps, 'store'>, pieceId: string, screen: Screen, sectionId: string, count: number): Promise<void> {
   return deps.store.transaction(async (tx) => {
     const piece = await tx.piece(pieceId)
-    // A draft section is not kept yet: left empty, its count would stay behind.
+    // A section not stored yet: left empty, its count would stay behind.
     if (!piece?.sections.some((s) => s.sectionId === sectionId) || piece.pages?.[screen]?.[sectionId] === count) return
     await tx.putPiece({ ...piece, pages: { ...piece.pages, [screen]: { ...piece.pages?.[screen], [sectionId]: count } } })
   })
@@ -232,17 +249,27 @@ export async function measureNext(
   return true
 }
 
-/** The text settings changed: every count on this device is stale, so none is known until it is laid out again. */
+/** The text settings changed: every count on this device is stale, and so is a place's page in a book, so none is known until it is laid out again. */
 export function forgetPages(deps: Pick<Deps, 'store'>): Promise<void> {
   return deps.store.transaction(async (tx) => {
-    for (const { pages, ...piece } of await tx.pieces()) if (pages) await tx.putPiece(piece)
+    for (const { pages, ...piece } of await tx.pieces()) {
+      const place = piece.kind === 'book' && piece.place ? withoutPage(piece.place) : piece.place
+      if (pages || place !== piece.place) await tx.putPiece(place ? { ...piece, place } : piece)
+    }
   })
+}
+
+/** The place itself holds on any page; the number it was on a screen's page does not. A chapter's opening page is page 1 on every one. */
+export function withoutPage(place: Place): Place {
+  if (place.page === undefined || (!place.screen && place.page === 1)) return place
+  const { page: _, screen: __, ...left } = place
+  return left
 }
 
 export function savePlace(deps: Pick<Deps, 'store'>, pieceId: string, place: Place): Promise<void> {
   return deps.store.transaction(async (tx) => {
     const piece = await tx.piece(pieceId)
-    // A draft section is not kept yet: the writer's place stays where it was, in case it is left empty.
+    // A section not stored yet: the writer's place stays where it was, in case it is left empty.
     if (piece?.sections.some((s) => s.sectionId === place.sectionId)) await tx.putPiece({ ...piece, place })
   })
 }
@@ -343,15 +370,14 @@ export function startChapterAt(deps: Deps, pieceId: string, start: ChapterStart)
     await momentIn(tx, deps, pieceId)
     const piece = (await tx.piece(pieceId))!
     const now = deps.clock.now()
-    const working = await tx.working(sectionId)
-    const base = working?.baseVersionId ?? latest(await tx.versionsOf(sectionId))?.id ?? null
-    await tx.putWorking({ sectionId, pieceId, content: before, baseVersionId: base, updatedAt: now })
+    await tx.putWorking({ sectionId, pieceId, content: before, baseVersionId: await baseOf(tx, sectionId), updatedAt: now })
     await tx.putWorking({ sectionId: newSectionId, pieceId, content: after, baseVersionId: null, updatedAt: now })
     const next: Piece = {
       ...piece,
       sections: [...piece.sections.slice(0, at + 1), { sectionId: newSectionId, title }, ...piece.sections.slice(at + 1)],
       words: { ...piece.words, [sectionId]: countWords(before), [newSectionId]: countWords(after) },
       pages: withoutCounts(piece.pages, [sectionId]),
+      // Its opening page, which is page 1 of the chapter on any screen's page.
       place: { sectionId: newSectionId, paragraph: 0, offset: 0, snippet: openingWords(after), page: 1, caret: true, at: now },
       updatedAt: now,
     }
@@ -369,6 +395,8 @@ export interface ChapterRejoin {
   /** Its text as the page holds it: the rejoin runs only if this is what is stored. */
   whole: string
   seam: Seam
+  /** When words not stored yet were kept for `into`, if any: newer than its text, they must reach it first. */
+  keptAt?: number
 }
 
 /** The chapter the text went back to, as it now stands. */
@@ -382,26 +410,26 @@ export interface Rejoined {
  * The reverse of a split, in one transaction: a moment first, so the chapter stays in history as it
  * stood, then its text back onto the end of the chapter before it, and the section out of the current
  * outline. Its versions stay, and earlier outlines still list it. Safe to run twice. Refused, with
- * nothing changed, unless `whole` is what is stored and `into` stands right before it.
+ * nothing changed, unless `whole` is what is stored and `into` stands right before it, or while words
+ * newer than `into`'s text wait to be stored: stamped newer than them, the joined text would shut them out.
  */
 export function rejoinChapter(deps: Deps, pieceId: string, rejoin: ChapterRejoin): Promise<Rejoined> {
   return deps.store.transaction(async (tx) => {
-    const { sectionId, into, whole, seam } = rejoin
+    const { sectionId, into, whole, seam, keptAt } = rejoin
     const found = await tx.piece(pieceId)
     if (found?.kind !== 'book') throw new Error('Only a book has chapters.')
     const at = found.sections.findIndex((s) => s.sectionId === sectionId)
     if (at < 0) return { piece: found, sectionId: into, content: (await current(tx, into)).content }
     if (found.sections[at - 1]?.sectionId !== into) throw new Error('The chapter it came from is not before it.')
     if ((await current(tx, sectionId)).content !== whole) throw new Error('The words are not stored yet.')
+    if (keptAt !== undefined && keptAt > (await current(tx, into)).updatedAt) throw new Error('The chapter it joins has words not stored yet.')
 
     await momentIn(tx, deps, pieceId)
     const piece = (await tx.piece(pieceId))!
     const now = deps.clock.now()
     const before = (await current(tx, into)).content
     const content = joinHalves(before, whole, seam, piece.sections[at]!.title)
-    const working = await tx.working(into)
-    const base = working?.baseVersionId ?? latest(await tx.versionsOf(into))?.id ?? null
-    await tx.putWorking({ sectionId: into, pieceId, content, baseVersionId: base, updatedAt: now })
+    await tx.putWorking({ sectionId: into, pieceId, content, baseVersionId: await baseOf(tx, into), updatedAt: now })
     // The chapter's copy stays, stamped now: words kept for it earlier are older, and never replay it into the book.
     const left = await tx.working(sectionId)
     if (left) await tx.putWorking({ ...left, updatedAt: now })
@@ -411,12 +439,18 @@ export function rejoinChapter(deps: Deps, pieceId: string, rejoin: ChapterRejoin
       sections: piece.sections.filter((s) => s.sectionId !== sectionId),
       words: { ...words, [into]: countWords(content) },
       pages: withoutCounts(piece.pages, [sectionId, into]),
-      place: { sectionId: into, ...joinIn(before, content), page: 1, caret: true, at: now },
+      // Which page the join fell on is not known here: the page says, once it has opened there.
+      place: { sectionId: into, ...joinIn(before, content), caret: true, at: now },
       updatedAt: now,
     }
     await tx.putPiece(next)
     return { piece: next, sectionId: into, content }
   })
+}
+
+/** The version a section's working copy grew from: its own, else the section's latest. */
+async function baseOf(tx: Tx, sectionId: string): Promise<string | null> {
+  return (await tx.working(sectionId))?.baseVersionId ?? latest(await tx.versionsOf(sectionId))?.id ?? null
 }
 
 /** Where the two texts join: the end of what was there before. */
@@ -425,7 +459,7 @@ function joinIn(before: string, content: string): Pick<Place, 'paragraph' | 'off
   const paragraph = Math.max(blocks.length - 1, 0)
   const last = blocks.at(-1)
   const there = parse(content)[paragraph]
-  return { paragraph, offset: last ? wordsOf(last).length : 0, snippet: there ? wordsOf(there).replaceAll('\n', '').slice(0, 160) : '' }
+  return { paragraph, offset: last ? wordsIn(last).length : 0, snippet: there ? wordsIn(there).replaceAll('\n', '').slice(0, 160) : '' }
 }
 
 /** A changed section's count no longer holds on any screen: it is unknown until it is laid out again. */
@@ -436,12 +470,10 @@ function withoutCounts(pages: Piece['pages'], sectionIds: string[]): Piece['page
   return { ...pages, phone: left(pages.phone), desktop: left(pages.desktop) }
 }
 
-const wordsOf = (block: Block): string => (block.type === 'raw' ? block.text : block.spans.map((s) => s.text).join(''))
-
 /** A place's snippet: the first paragraph's words, as the page shows them. */
 function openingWords(markdown: string): string {
   const first = parse(markdown)[0]
-  return first ? wordsOf(first).slice(0, 160) : ''
+  return first ? wordsIn(first).slice(0, 160) : ''
 }
 
 /** On launch: text left in working copies by a crash enters history first (0005, 0010). */
@@ -461,6 +493,26 @@ export function openPiece(deps: Pick<Deps, 'store'>, pieceId: string): Promise<{
     for (const s of piece.sections) sections.push({ ...s, ...(await current(tx, s.sectionId)) })
     return { piece, sections }
   })
+}
+
+/** The piece as stored now, for what reads it again without opening it. */
+export function storedPiece(deps: Pick<Deps, 'store'>, pieceId: string): Promise<Piece | undefined> {
+  return deps.store.transaction((tx) => tx.piece(pieceId))
+}
+
+/** What is stored of a section: its piece, its working copy, and whether it has ever been kept in a moment. */
+export interface StoredSection {
+  piece: Piece | undefined
+  working: Working | undefined
+  hasVersions: boolean
+}
+
+export function storedSection(deps: Pick<Deps, 'store'>, pieceId: string, sectionId: string): Promise<StoredSection> {
+  return deps.store.transaction(async (tx) => ({
+    piece: await tx.piece(pieceId),
+    working: await tx.working(sectionId),
+    hasVersions: (await tx.versionsOf(sectionId)).length > 0,
+  }))
 }
 
 async function current(tx: Tx, sectionId: string): Promise<{ content: string; updatedAt: number }> {

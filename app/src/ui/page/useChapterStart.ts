@@ -2,11 +2,11 @@ import { type RefObject, useRef } from 'react'
 import type { Piece } from '../../domain/model'
 import { type Deps, startChapterAt } from '../../domain/pieces'
 import type { Editor } from '../../page/editor'
-import { type Halves, halvesAt, halvesAtLine } from '../../page/split'
+import { type Halves, halvesAt, halvesAtLine, lineGone, withoutLine } from '../../page/split'
 import { rememberSplit } from '../../page/undoMemory'
 import { caretToFieldEnd, fillField } from './fields'
+import { reshapeHeld } from './reshapeHeld'
 import type { Saving } from './saving'
-import { raiseKeyboard } from './useFocusOnOpen'
 
 interface Options {
   deps: Deps
@@ -44,12 +44,10 @@ export function useChapterStart({ deps, pieceId, sectionId, writes, editor, savi
   async function split(halves: Halves): Promise<void> {
     if (!editor || !saving || splitting.current) return
     splitting.current = true
-    // From here to the end the text cannot change, so the halves stay true to it.
-    editor.hold(true)
-    if (keyboard) raiseKeyboard()
     const newSectionId = deps.ids.next()
     let piece: Piece | undefined
-    const done = await saving.split(async (whole) => {
+    // The text cannot change from here, so the halves stay true to it.
+    const done = await reshapeHeld(editor, saving, keyboard, async (whole) => {
       piece = await startChapterAt(deps, pieceId, { sectionId, whole, ...halves, newSectionId })
       return piece
     })
@@ -59,7 +57,6 @@ export function useChapterStart({ deps, pieceId, sectionId, writes, editor, savi
       return
     }
     // The text stays as it is, and the writer stays in it.
-    editor.hold(false)
     splitting.current = false
     editor.focus()
   }
@@ -76,11 +73,7 @@ export function useChapterStart({ deps, pieceId, sectionId, writes, editor, savi
   /** A `# ` line at the very start of the text goes into an empty title. Under a title, it stays text. */
   function lineToTitle(at: number, text: string): void {
     if (!editor || title.current?.textContent) return
-    const { state } = editor.view
-    const $at = state.doc.resolve(at)
-    const end = lineEndAfter(editor, at)
-    const whole = at === $at.start() && end === $at.end() && state.doc.childCount > 1
-    editor.view.dispatch(whole ? state.tr.delete($at.before(), $at.after()) : state.tr.delete(at, end))
+    editor.view.dispatch(lineGone(editor.view.state, at))
     const field = title.current
     if (!field) return
     field.focus()
@@ -95,23 +88,10 @@ export function useChapterStart({ deps, pieceId, sectionId, writes, editor, savi
     else if (halves.title || halves.after.trim()) void split(halves)
     else {
       // Nothing to move and nothing to name: as § at the end, with the `# ` taken back.
-      const { state } = editor.view
-      editor.view.dispatch(state.tr.delete(at, lineEndAfter(editor, at)))
+      editor.view.dispatch(withoutLine(editor.view.state, at))
       onAddAfter()
     }
   }
 
   return { here, line }
-}
-
-/** Where the line starting at `at` ends, past its line break if it has one. */
-function lineEndAfter(editor: Editor, at: number): number {
-  const { doc } = editor.view.state
-  const $at = doc.resolve(at)
-  let end = $at.end()
-  $at.parent.forEach((child, offset) => {
-    const pos = $at.start() + offset
-    if (pos >= at && pos < end && child.type.name === 'hard_break') end = pos + 1
-  })
-  return end
 }
