@@ -32,14 +32,11 @@ async function caretBefore(page: Page, words: string, length = 0) {
       for (let node = walker.nextNode(); node; node = walker.nextNode()) {
         const at = node.textContent!.indexOf(words)
         if (at < 0) continue
-        // The editor reads a selection when the browser reports it: a press before that finds the old one.
-        // Its listener came first, so by this one it has read it. No report means nothing moved.
-        const reported = new Promise<void>((done) => {
-          document.addEventListener('selectionchange', () => done(), { once: true })
-          setTimeout(done, 1000)
-        })
         getSelection()!.setBaseAndExtent(node, at, node, at + length)
-        return reported
+        // Reported at once, so the editor reads it now. Left to the browser's report, it can come after the
+        // editor, just given the focus, has put its own caret back.
+        document.dispatchEvent(new Event('selectionchange'))
+        return
       }
       throw new Error(`No "${words}" in the text.`)
     },
