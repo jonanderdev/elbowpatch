@@ -124,7 +124,11 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
     settings,
     keyboard,
     onRelayout: (p) => {
-      if (editorNow.current) showCaret(editorNow.current.view, p)
+      const e = editorNow.current
+      if (!e) return
+      showCaret(e.view, p)
+      // The words moved, and the selection menu with them.
+      setSelection((now) => now && { ...now, rect: selectionBox(e.view, viewport.current) })
     },
   })
 
@@ -172,12 +176,12 @@ export function Page({ deps, opened, writer, onWriteHere, flushRef, closingRef, 
       if (focused) moved.current = true
       setWriting(focused)
       const e = editorNow.current
-      setSelection(focused && e ? { rect: selectionBox(e.view), active: e.active() } : null)
+      setSelection(focused && e ? { rect: selectionBox(e.view, viewport.current), active: e.active() } : null)
       if (!focused) void saving?.flush()
     },
     onSelection(view, tr) {
       const e = editorNow.current
-      if (e) setSelection({ rect: selectionBox(view), active: e.active() })
+      if (e) setSelection({ rect: selectionBox(view, viewport.current), active: e.active() })
       caretKeys.onSelection(tr, view.state.selection)
     },
     onKey: caretKeys.onKey,
