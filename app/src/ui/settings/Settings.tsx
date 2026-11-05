@@ -3,7 +3,7 @@ import type { Piece } from '../../domain/model'
 import type { Deps } from '../../domain/pieces'
 import { longDate, number } from '../../domain/words'
 import { Path } from '../components/Path'
-import { VERSION } from '../components/project'
+import { APP_VERSION } from '../components/project'
 import { useScrolled } from '../components/useScrolled'
 import { lastExport } from '../files/everything'
 import { About } from './About'
@@ -92,7 +92,7 @@ function List({ pieces, go }: Pick<Props, 'pieces' | 'go'>) {
       <li>
         <button type="button" className="row" onClick={() => go('/settings/about')}>
           <span className="row-title">About &amp; privacy</span>
-          <span className="row-meta">Version {VERSION}</span>
+          <span className="row-meta">Version {APP_VERSION}</span>
         </button>
       </li>
       <li>

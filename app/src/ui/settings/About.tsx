@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import { SOURCE, VERSION } from '../components/project'
+import { APP_VERSION, SOURCE } from '../components/project'
 import { Part } from './parts'
 
 // About & privacy (DESIGN.md, Settings; docs/decisions/0014): the promises, inside the app so it works offline.
@@ -31,7 +31,7 @@ export function About(): ReactElement {
       <dl className="key-rows about-rows">
         <div>
           <dt>Version</dt>
-          <dd>{VERSION}</dd>
+          <dd>{APP_VERSION}</dd>
         </div>
         <div>
           <dt>Source</dt>

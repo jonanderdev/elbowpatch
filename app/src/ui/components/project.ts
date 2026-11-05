@@ -6,4 +6,4 @@ export const SOURCE = 'https://github.com/jonanderdev/elbowpatch'
 declare const __APP_VERSION__: string
 
 /** Always in full, and the same wherever it shows (docs/decisions/0012). */
-export const VERSION: string = __APP_VERSION__
+export const APP_VERSION: string = __APP_VERSION__
