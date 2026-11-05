@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import { APP_VERSION, SOURCE } from '../components/project'
+import { APP_VERSION, SOURCE_LINK } from '../components/project'
 import { Answer } from './parts'
 
 // About & privacy (DESIGN.md, Settings; docs/decisions/0014): the promises, inside the app so it works offline.
@@ -36,9 +36,7 @@ export function About(): ReactElement {
         <div>
           <dt>Source</dt>
           <dd>
-            <a href={SOURCE} target="_blank" rel="noopener noreferrer">
-              GitHub
-            </a>
+            <a {...SOURCE_LINK}>GitHub</a>
           </dd>
         </div>
       </dl>

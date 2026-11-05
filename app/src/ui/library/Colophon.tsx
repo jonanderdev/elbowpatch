@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import { SOURCE } from '../components/project'
+import { SOURCE_LINK } from '../components/project'
 
 /** Help · About · Source: the library's plain links (DESIGN.md, The colophon). */
 export function FootLinks({ atFoot }: { atFoot?: boolean }): ReactElement {
@@ -13,7 +13,7 @@ export function FootLinks({ atFoot }: { atFoot?: boolean }): ReactElement {
         About
       </a>
       <span aria-hidden="true">·</span>
-      <a className="text-link strong" href={SOURCE} target="_blank" rel="noopener noreferrer">
+      <a className="text-link strong" {...SOURCE_LINK}>
         Source
       </a>
     </nav>

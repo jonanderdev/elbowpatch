@@ -1,6 +1,7 @@
 // What the app says about itself.
 
-export const SOURCE = 'https://github.com/jonanderdev/elbowpatch'
+/** For an <a>: the project's source, in a new tab. */
+export const SOURCE_LINK = { href: 'https://github.com/jonanderdev/elbowpatch', target: '_blank', rel: 'noopener noreferrer' } as const
 
 /** Set at build time from package.json, so the manifest itself stays out of the bundle (vite.config.ts). */
 declare const __APP_VERSION__: string
