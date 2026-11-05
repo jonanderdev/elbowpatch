@@ -75,32 +75,29 @@ function List({ pieces, go }: Pick<Props, 'pieces' | 'go'>) {
   const last = lastExport()
   return (
     <ul className="rows">
-      <li>
-        <button type="button" className="row" onClick={() => go('/settings/export')}>
-          <span className="row-title">Export &amp; import</span>
-          <span className="row-meta">{last ? `Last exported ${longDate(last, Date.now())}` : 'Never exported yet'}</span>
-        </button>
-      </li>
-      <li>
-        <button type="button" className="row" onClick={() => go('/settings/put-away')}>
-          <span className="row-title">Put away</span>
-          <span className="row-meta">
-            {away.length === 0 ? 'Nothing put away' : `${number(away.length)} ${away.length === 1 ? 'piece' : 'pieces'} · the next goes ${goesIn(away[0]!)}`}
-          </span>
-        </button>
-      </li>
-      <li>
-        <button type="button" className="row" onClick={() => go('/settings/about')}>
-          <span className="row-title">About &amp; privacy</span>
-          <span className="row-meta">Version {APP_VERSION}</span>
-        </button>
-      </li>
-      <li>
-        <button type="button" className="row" onClick={() => go('/settings/help')}>
-          <span className="row-title">Help</span>
-          <span className="row-meta">How Elbowpatch works</span>
-        </button>
-      </li>
+      <ListRow
+        title="Export & import"
+        meta={last ? `Last exported ${longDate(last, Date.now())}` : 'Never exported yet'}
+        onOpen={() => go('/settings/export')}
+      />
+      <ListRow
+        title="Put away"
+        meta={away.length === 0 ? 'Nothing put away' : `${number(away.length)} ${away.length === 1 ? 'piece' : 'pieces'} · the next goes ${goesIn(away[0]!)}`}
+        onOpen={() => go('/settings/put-away')}
+      />
+      <ListRow title="About & privacy" meta={`Version ${APP_VERSION}`} onOpen={() => go('/settings/about')} />
+      <ListRow title="Help" meta="How Elbowpatch works" onOpen={() => go('/settings/help')} />
     </ul>
+  )
+}
+
+function ListRow({ title, meta, onOpen }: { title: string; meta: string; onOpen(): void }) {
+  return (
+    <li>
+      <button type="button" className="row" onClick={onOpen}>
+        <span className="row-title">{title}</span>
+        <span className="row-meta">{meta}</span>
+      </button>
+    </li>
   )
 }
