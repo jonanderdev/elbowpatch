@@ -43,7 +43,8 @@ export function write(deps: Pick<Deps, 'store' | 'clock'>, draft: Piece, section
     const working = await tx.working(sectionId)
     if (stored && working?.content === content) return
     // A section new in the draft, with nothing in it yet, is not stored: left empty, it was never here.
-    if (stored && content === '' && !stored.sections.some((s) => s.sectionId === sectionId)) return
+    // A journal's day, even in a journal not stored yet; a book or an essay is stored with its first section.
+    if (content === '' && (stored ? !stored.sections.some((s) => s.sectionId === sectionId) : draft.kind === 'journal')) return
     const piece = stored ?? draft
     // A section new in the draft (today, in a journal, a new chapter) joins the piece with its first words.
     const sections = joined(piece, draft, sectionId)
@@ -59,12 +60,15 @@ export function write(deps: Pick<Deps, 'store' | 'clock'>, draft: Piece, section
   })
 }
 
+/** A piece stored by its name alone: a journal's open day still waits for its first words. */
+const firstStored = (draft: Piece): Piece => (draft.kind === 'journal' ? { ...draft, sections: [] } : draft)
+
 /** Saves the piece's title like a working copy; the next moment keeps it in an outline version. */
 export function rename(deps: Pick<Deps, 'store' | 'clock'>, draft: Piece, title: string): Promise<void> {
   return deps.store.transaction(async (tx) => {
     const stored = await tx.piece(draft.id)
     if (stored?.title === title) return
-    await tx.putPiece({ ...(stored ?? draft), title, updatedAt: deps.clock.now() })
+    await tx.putPiece({ ...(stored ?? firstStored(draft)), title, updatedAt: deps.clock.now() })
   })
 }
 
@@ -73,7 +77,7 @@ export function setSubtitle(deps: Pick<Deps, 'store' | 'clock'>, draft: Piece, s
   return deps.store.transaction(async (tx) => {
     const stored = await tx.piece(draft.id)
     if ((stored?.subtitle ?? '') === subtitle) return
-    await tx.putPiece({ ...(stored ?? draft), subtitle, updatedAt: deps.clock.now() })
+    await tx.putPiece({ ...(stored ?? firstStored(draft)), subtitle, updatedAt: deps.clock.now() })
   })
 }
 

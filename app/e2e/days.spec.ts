@@ -91,6 +91,23 @@ const storedDays = (page: Page): Promise<string[]> =>
       }),
   )
 
+/** The journal's name, as stored. */
+const storedTitle = (page: Page): Promise<string | undefined> =>
+  page.evaluate(
+    () =>
+      new Promise<string | undefined>((done) => {
+        const open = indexedDB.open('elbowpatch')
+        open.onsuccess = () => {
+          const db = open.result
+          const all = db.transaction('pieces').objectStore('pieces').getAll()
+          all.onsuccess = () => {
+            db.close()
+            done(all.result[0]?.title)
+          }
+        }
+      }),
+  )
+
 const sheet = (page: Page) => page.getByRole('dialog', { name: 'Days' })
 const rail = (page: Page) => page.getByRole('navigation', { name: 'Days' })
 const day = (page: Page, name: string) => sheet(page).getByRole('button', { name, exact: true })
@@ -174,6 +191,51 @@ test('in a journal with nothing stored, a past day opens and keeps its first wor
   await page.keyboard.insertText('The first words.')
   await saved(page, 'The first words.')
   await expect.poll(() => storedDays(page)).toEqual(['2026-10-04'])
+})
+
+test('a new journal named on its title page stores its name, and no day until its first words', async ({ page }) => {
+  await page.clock.setFixedTime(NOW)
+  await page.goto('./')
+  await page.locator('.start.journal').click()
+  await expect(page.locator('.book-title')).toBeFocused()
+  await page.keyboard.insertText('Dream journal')
+  await expect.poll(() => storedTitle(page)).toBe('Dream journal')
+  expect(await storedDays(page)).toEqual([])
+  await page.keyboard.press('PageDown')
+  await expect(page.locator('.title')).toHaveText('Friday 30 October')
+  await expect(page.locator('.body')).toHaveAttribute('contenteditable', 'true')
+  await caretToEnd(page)
+  await page.keyboard.insertText('The first words.')
+  await saved(page, 'The first words.')
+  await expect.poll(() => storedDays(page)).toEqual(['2026-10-30'])
+})
+
+test('a day before all the others, its journal renamed on its title page, still keeps its first words', async ({ page }) => {
+  phoneOnly(page)
+  await openJournal(page, { '2026-10-22': 'Rain on the skylight.' })
+  await openMonth(page)
+  await day(page, '4 October, nothing written').click()
+  await expect(page.locator('.title')).toHaveText('Sunday 4 October')
+  await expect(page.locator('.body')).toHaveAttribute('contenteditable', 'true')
+  await expect(async () => {
+    await page.keyboard.press('PageUp')
+    await expect(page.locator('.book-title')).toBeInViewport({ timeout: 300 })
+  }).toPass({ timeout: 5000 })
+  await page.locator('.book-title').click()
+  await page.keyboard.press('ControlOrMeta+a')
+  await page.keyboard.insertText('Dream journal')
+  await expect.poll(() => storedTitle(page)).toBe('Dream journal')
+  expect(await storedDays(page)).toEqual(['2026-10-22'])
+  await page.keyboard.press('PageDown')
+  await caretToEnd(page)
+  await page.keyboard.insertText('Written late.')
+  await saved(page, 'Written late.')
+  await expect.poll(() => storedDays(page)).toEqual(['2026-10-04', '2026-10-22'])
+  await page.reload()
+  await expect(page.locator('.title')).toHaveText('Friday 30 October')
+  await openMonth(page)
+  await day(page, '4 October, written').click()
+  await expect(page.locator('.body')).toHaveText('Written late.')
 })
 
 test('days still to come cannot be opened; today can', async ({ page }) => {
