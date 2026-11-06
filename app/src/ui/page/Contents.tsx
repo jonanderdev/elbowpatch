@@ -51,7 +51,7 @@ export function NewChapter({ onAdd }: { onAdd(): void }): ReactElement {
   )
 }
 
-export const pagesWord = (pages: number): string => `${number(pages)} ${pages === 1 ? 'page' : 'pages'}`
+const pagesWord = (pages: number): string => `${number(pages)} ${pages === 1 ? 'page' : 'pages'}`
 
 interface ContentsSheetProps extends ContentsListProps {
   /** The book's name: a phone shows it nowhere else past the title page. */

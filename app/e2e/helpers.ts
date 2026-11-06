@@ -48,7 +48,7 @@ export async function saved(page: Page, words: string): Promise<void> {
 
 /** Starts a new piece of this kind from Write: a bar on a phone, a menu from the rail on desktop. */
 export async function write(page: Page, kind: 'Book' | 'Journal' | 'Essay'): Promise<void> {
-  await page.getByRole('button', { name: 'Write', exact: true }).click()
+  await page.getByRole('button', { name: 'Write' }).click()
   await page
     .getByRole('button', { name: kind, exact: true })
     .or(page.getByRole('menuitem', { name: kind, exact: true }))

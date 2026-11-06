@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-import { caretToEnd, openTools, saved } from './helpers'
+import { caretToEnd, openTools, saved, write } from './helpers'
 
 const machine = (page: Page) => page.locator('.time-machine')
 const oldText = (page: Page) => machine(page).locator('.body')
@@ -76,9 +76,9 @@ test('opens from the tools on the most recent moment that differs, with the late
   await expect(ticks(page)).toHaveCount(2)
   await expect(machine(page).locator('.moment-name')).toHaveText('Just now')
   await expect(tape(page)).toBeFocused()
-  // On page 1 too, where the writing page has none.
-  await expect(machine(page).locator('.running-head')).toBeVisible()
-  await expect(machine(page).locator('.running-head')).toHaveText('Salt')
+  // An essay's page 1 has no running head here, as on the writing page: its title stands there.
+  await expect(machine(page).locator('.title')).toHaveText('Salt')
+  await expect(machine(page).locator('.running-head')).toHaveCount(0)
   const versions = await stored<{ content: string }>(page, 'versions')
   expect(versions.map((v) => v.content)).toContain('The second words.')
 })
@@ -244,7 +244,7 @@ test('the actions do nothing yet', async ({ page }) => {
   await expect(page.locator('.body')).toHaveText('After.')
 })
 
-test('the path keeps the longest names of a moment whole, and inside the rail', async ({ page }) => {
+test('the path keeps the longest names of a moment whole, and ends by x316', async ({ page }) => {
   test.skip(phone(page), 'the path is desktop’s')
   await essay(page, 'Before.', 'A very long title that could never fit beside the moment in the rail')
   await open(page)
@@ -278,10 +278,8 @@ test('the path keeps the longest names of a moment whole, and inside the rail', 
     await open(page)
     const moment = machine(page).locator('.crumb').nth(1).locator('.crumb-word')
     await expect(moment).toHaveText(name)
-    const toggle = (await machine(page).getByRole('button', { name: 'Pages' }).boundingBox())!
     const box = (await moment.boundingBox())!
-    expect(toggle.x + toggle.width).toBeLessThanOrEqual(316)
-    expect(box.x + box.width).toBeLessThanOrEqual(toggle.x)
+    expect(box.x + box.width).toBeLessThanOrEqual(316)
     // Whole: as wide as its words, where the name beside it gives way.
     const words = await moment.evaluate((el) => {
       const range = document.createRange()
@@ -339,7 +337,6 @@ test('a title of that moment reads as it did', async ({ page }) => {
   await page.keyboard.type('Renamed')
   await open(page)
   await expect(machine(page).locator('.title')).toHaveText('Salt')
-  await expect(machine(page).locator('.running-head')).toHaveText('Salt')
   await expect(tape(page)).toBeFocused()
   await page.keyboard.press('End')
   await expect(machine(page).locator('.title')).toHaveText('Renamed')
@@ -367,14 +364,42 @@ test('old text keeps the type, never runs under the bar, turns by key, and saves
       .locator('.pager')
       .evaluate((el) => el.scrollLeft)
   expect(await left()).toBe(0)
+  // None on page 1, as on the writing page; later pages have it, as plain text, centred over the column.
+  await expect(machine(page).locator('.running-head')).toHaveCount(0)
   await page.keyboard.press('PageDown')
   await expect.poll(left).toBeGreaterThan(0)
+  const head = machine(page).locator('.running-head')
+  await expect(head).toHaveText('Salt')
+  expect(await head.evaluate((el) => el.tagName)).toBe('DIV')
+  const column = (await machine(page).locator('.pager').boundingBox())!
+  const said = (await head.boundingBox())!
+  expect(Math.abs(said.x + said.width / 2 - (column.x + column.width / 2))).toBeLessThanOrEqual(1)
   await page.keyboard.press('Alt+ArrowLeft')
   await expect.poll(left).toBe(0)
+  await expect(head).toHaveCount(0)
   await close(page)
   const after = await stored<{ place?: unknown; pages?: unknown }>(page, 'pieces')
   expect(after[0]!.place).toEqual(before[0]!.place)
   expect(after[0]!.pages).toEqual(before[0]!.pages)
+})
+
+test('a book’s and a journal’s page 1 keep the running head here, which an essay’s lacks', async ({ page }) => {
+  for (const kind of ['Book', 'Journal'] as const) {
+    await page.goto('./#/')
+    await write(page, kind)
+    await expect(page.locator('.book-title')).toBeFocused()
+    await page.keyboard.type('Thoughts')
+    // A book's words are in its first chapter, past the title page; a journal's go in today's page.
+    if (kind === 'Book') await page.locator('.title').click()
+    await page.keyboard.press('Enter')
+    await page.keyboard.type('Some words.')
+    await saved(page, 'Some words.')
+    await page.keyboard.press('Control+Alt+z')
+    await expect(machine(page)).toBeVisible()
+    await expect(machine(page).locator('.running-head')).toHaveCount(1)
+    await page.keyboard.press('Escape')
+    await expect(machine(page)).toHaveCount(0)
+  }
 })
 
 test('old text can be selected but not changed, and has no caret', async ({ page }) => {
@@ -453,6 +478,76 @@ test('when moments cannot be read, today’s text stays and Try again reads them
   await machine(page).getByRole('button', { name: 'Try again' }).click()
   await expect(oldText(page)).toHaveText('Before.')
 })
+
+/** A window shorter than the page: the page keeps its size, and the window scrolls. */
+const shortWindow = (page: Page) => (phone(page) ? { width: 390, height: 560 } : { width: 1440, height: 640 })
+
+for (const state of ['moments', 'loading', 'error', 'nothing'] as const) {
+  test(`in a short window the bar stays on screen, ✕ included, and the page scrolls under it (${state})`, async ({ page }) => {
+    if (state === 'nothing') await essay(page, 'Nobody remembers the first draft.')
+    else await history(page, ['Before.', 'After.'])
+    if (state === 'loading') {
+      // A transaction held open: everything the app reads waits behind it.
+      await page.evaluate(
+        () =>
+          new Promise<void>((done) => {
+            const open = indexedDB.open('elbowpatch')
+            open.onsuccess = () => {
+              const tx = open.result.transaction('versions', 'readwrite')
+              const w = window as unknown as { held: boolean }
+              w.held = true
+              const spin = (): void => {
+                if (w.held) tx.objectStore('versions').count().onsuccess = spin
+              }
+              spin()
+              done()
+            }
+          }),
+      )
+    }
+    if (state === 'error') {
+      await page.evaluate(() => {
+        const getAll = IDBIndex.prototype.getAll
+        IDBIndex.prototype.getAll = function (...args) {
+          if (this.objectStore.name === 'versions') throw new Error('No reading')
+          return getAll.apply(this, args)
+        }
+      })
+    }
+    const size = shortWindow(page)
+    await page.setViewportSize(size)
+    await open(page)
+    await expect(bar(page)).toContainText(
+      { moments: 'Just now', loading: 'Finding your moments…', error: 'Can’t read your moments', nothing: 'Nothing earlier yet.' }[state],
+    )
+    const scroller = () => page.evaluate(() => ({ top: document.scrollingElement!.scrollTop, room: document.scrollingElement!.scrollHeight - innerHeight }))
+    const barBox = async () => (await bar(page).boundingBox())!
+    const onScreen = async (): Promise<void> => {
+      const box = await barBox()
+      expect(box.y).toBeGreaterThanOrEqual(0)
+      expect(box.y + box.height).toBeLessThanOrEqual(size.height)
+      await expect(machine(page).getByRole('button', { name: 'Back to now' })).toBeInViewport({ ratio: 1 })
+    }
+    // The window is shorter than the page, so it scrolls; the bar is on screen at the top of it.
+    expect((await scroller()).room).toBeGreaterThan(0)
+    await page.evaluate(() => scrollTo(0, 0))
+    await onScreen()
+    const standing = await barBox()
+    // Scrolled to the end it stands where it did, and no text stands under it.
+    await page.evaluate(() => scrollTo(0, document.scrollingElement!.scrollHeight))
+    expect((await scroller()).top).toBeGreaterThan(0)
+    await onScreen()
+    expect(await barBox()).toEqual(standing)
+    const text = (await machine(page).locator('.pager').boundingBox())!
+    expect(text.y + text.height).toBeLessThanOrEqual(standing.y)
+    await expect(oldText(page)).toBeVisible()
+    if (state === 'loading') {
+      await page.evaluate(() => {
+        ;(window as unknown as { held: boolean }).held = false
+      })
+    }
+  })
+}
 
 test('thinning waits while the Time Machine is open, and runs once it closes', async ({ page }) => {
   // The app's idle moments, in the test's hands.
@@ -533,66 +628,13 @@ test('the desktop path keeps the moment whole and shortens the name', async ({ p
       .locator('.crumb-word')
       .evaluate((el) => el.scrollWidth > el.clientWidth),
   ).toBe(true)
-  // The toggle ends where the rail's rows do, with the path inside it.
-  const toggle = (await machine(page).getByRole('button', { name: 'Pages' }).boundingBox())!
-  expect(toggle.x + toggle.width).toBeLessThanOrEqual(316)
-  expect((await moment.boundingBox())!.x + (await moment.boundingBox())!.width).toBeLessThanOrEqual(toggle.x)
+  // The path ends by x316, and an essay's path has no toggle after it.
+  expect((await moment.boundingBox())!.x + (await moment.boundingBox())!.width).toBeLessThanOrEqual(316)
+  await expect(machine(page).getByRole('button', { name: 'Pages' })).toHaveCount(0)
   // The name goes back to now.
   await machine(page).locator('.crumb').first().getByRole('button').click()
   await expect(machine(page)).toHaveCount(0)
   await expect(page.locator('.body')).toHaveText('After.')
-})
-
-test('an essay’s rail shows the words and pages of that moment, and only on desktop', async ({ page }) => {
-  await history(page, ['One two three.', 'Four.'])
-  await open(page)
-  await expect(oldText(page)).toHaveText('One two three.')
-  const rail = machine(page).locator('.pages-rail')
-  if (phone(page)) {
-    await expect(rail).toHaveCount(0)
-    return
-  }
-  await expect(rail.locator('.rail-line')).toHaveText('3 words · 1 page')
-  await expect(rail.locator('.contents-title')).toHaveText('One two three.')
-  await expect(tape(page)).toBeFocused()
-  await page.keyboard.press('End')
-  await expect(rail.locator('.rail-line')).toHaveText('1 word · 1 page')
-  await expect(rail.locator('.contents-title')).toHaveText('Four.')
-})
-
-test('a row of the rail turns to that page of the old text, and saves no place', async ({ page }) => {
-  test.skip(phone(page), 'the rail is desktop’s')
-  const long = Array.from({ length: 40 }, (_, i) => `Paragraph ${i + 1} goes on for a while, so that the text fills more than one page.`)
-  await essay(page, long.join(' '))
-  await open(page)
-  await close(page)
-  await rewrite(page, 'Now it is short.')
-  await open(page)
-  await expect(oldText(page)).toContainText('Paragraph 40')
-  const before = await stored<{ place?: unknown }>(page, 'pieces')
-  const rows = machine(page).locator('.pages-rail .contents-row')
-  await expect(rows.nth(1)).toBeVisible()
-  await rows.nth(1).click()
-  await expect(rows.nth(1)).toHaveAttribute('aria-current', 'true')
-  expect(
-    await machine(page)
-      .locator('.pager')
-      .evaluate((el) => el.scrollLeft),
-  ).toBeGreaterThan(0)
-  await close(page)
-  expect((await stored<{ place?: unknown }>(page, 'pieces'))[0]!.place).toEqual(before[0]!.place)
-})
-
-test('Escape in the rail stays in the Time Machine, and the next one leaves', async ({ page }) => {
-  test.skip(phone(page), 'the rail is desktop’s')
-  await history(page, ['Before.', 'After.'])
-  await open(page)
-  await expect(tape(page)).toBeFocused()
-  await machine(page).locator('.pages-rail .contents-row').first().focus()
-  await page.keyboard.press('Escape')
-  await expect(machine(page).getByRole('button', { name: 'Pages' })).toBeFocused()
-  await page.keyboard.press('Escape')
-  await expect(machine(page)).toHaveCount(0)
 })
 
 test('tools leave the head on desktop', async ({ page }) => {
@@ -600,7 +642,9 @@ test('tools leave the head on desktop', async ({ page }) => {
   await history(page, ['Before.', 'After.'])
   await open(page)
   await expect(machine(page).locator('.head-tools')).toHaveCount(0)
-  await expect(machine(page).locator('.running-head')).toBeVisible()
+  // No rail and no toggle on an essay's head: the path alone, at the left.
+  await expect(machine(page).locator('.rail-toggle')).toHaveCount(0)
+  await expect(machine(page).locator('.rail')).toHaveCount(0)
 })
 
 test('a window that does not write looks back and writes nothing', async ({ page, context }) => {
