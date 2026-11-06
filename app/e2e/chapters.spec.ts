@@ -610,6 +610,21 @@ test('the rail folds and opens, is remembered on this device, and never moves th
   expect(await column()).toEqual(open)
 })
 
+test('a rail opened again shows the current chapter, however far the list was scrolled while it was folded away', async ({ page }) => {
+  desktopOnly(page)
+  await importBook(page, MANY)
+  const list = contents(page).locator('.contents-list')
+  await expect(rows(page).first()).toHaveAttribute('aria-current', 'true')
+  await list.evaluate((el) => {
+    el.scrollTop = el.scrollHeight
+  })
+  await expect(rows(page).first()).not.toBeInViewport()
+  await toggle(page).click()
+  await expect(contents(page)).toBeHidden()
+  await toggle(page).click()
+  await expect(rows(page).first()).toBeInViewport({ ratio: 1 })
+})
+
 test('folding the rail leaves the caret in the text', async ({ page }) => {
   desktopOnly(page)
   await importBook(page, TWO)
