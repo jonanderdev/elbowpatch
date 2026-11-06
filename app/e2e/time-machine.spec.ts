@@ -76,6 +76,9 @@ test('opens from the tools on the most recent moment that differs, with the late
   await expect(ticks(page)).toHaveCount(2)
   await expect(machine(page).locator('.moment-name')).toHaveText('Just now')
   await expect(tape(page)).toBeFocused()
+  // On page 1 too, where the writing page has none.
+  await expect(machine(page).locator('.running-head')).toBeVisible()
+  await expect(machine(page).locator('.running-head')).toHaveText('Salt')
   const versions = await stored<{ content: string }>(page, 'versions')
   expect(versions.map((v) => v.content)).toContain('The second words.')
 })
@@ -239,6 +242,55 @@ test('the actions do nothing yet', async ({ page }) => {
   expect(await stored(page, 'versions')).toEqual(before)
   await close(page)
   await expect(page.locator('.body')).toHaveText('After.')
+})
+
+test('the path keeps the longest names of a moment whole, and inside the rail', async ({ page }) => {
+  test.skip(phone(page), 'the path is desktop’s')
+  await essay(page, 'Before.', 'A very long title that could never fit beside the moment in the rail')
+  await open(page)
+  await close(page)
+  await rewrite(page, 'After.')
+  const yesterday = new Date()
+  yesterday.setDate(yesterday.getDate() - 1)
+  yesterday.setHours(14, 5)
+  for (const [at, name] of [
+    [yesterday.getTime(), 'Yesterday afternoon'],
+    [new Date(2025, 8, 28, 9, 0).getTime(), '28 September 2025'],
+  ] as const) {
+    await page.evaluate(
+      (at) =>
+        new Promise<void>((done, failed) => {
+          const open = indexedDB.open('elbowpatch')
+          open.onerror = () => failed(open.error)
+          open.onsuccess = () => {
+            const tx = open.result.transaction(['versions', 'outlines'], 'readwrite')
+            for (const name of ['versions', 'outlines']) {
+              const store = tx.objectStore(name)
+              store.getAll().onsuccess = (e) => {
+                for (const row of (e.target as IDBRequest).result) if (row.content !== 'After.') store.put({ ...row, createdAt: at })
+              }
+            }
+            tx.oncomplete = () => done()
+          }
+        }),
+      at,
+    )
+    await open(page)
+    const moment = machine(page).locator('.crumb').nth(1).locator('.crumb-word')
+    await expect(moment).toHaveText(name)
+    const toggle = (await machine(page).getByRole('button', { name: 'Pages' }).boundingBox())!
+    const box = (await moment.boundingBox())!
+    expect(toggle.x + toggle.width).toBeLessThanOrEqual(316)
+    expect(box.x + box.width).toBeLessThanOrEqual(toggle.x)
+    // Whole: as wide as its words, where the name beside it gives way.
+    const words = await moment.evaluate((el) => {
+      const range = document.createRange()
+      range.selectNodeContents(el)
+      return range.getBoundingClientRect().width
+    })
+    expect(box.width).toBeGreaterThanOrEqual(words - 0.5)
+    await close(page)
+  }
 })
 
 test('the tape steps by key, and says so', async ({ page }) => {
