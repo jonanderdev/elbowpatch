@@ -5,7 +5,7 @@ interface Props {
   subtitle: string
 }
 
-/** A book's title page as it was: the same page as the writing page's, its words read-only and no placeholder for what is empty but the name. */
+/** A book's or a journal's title page as it was: the same page as the writing page's, its words read-only and no placeholder for what is empty but the name. */
 export function OldTitlePage({ name, subtitle }: Props): ReactElement {
   return (
     <div className="title-page">

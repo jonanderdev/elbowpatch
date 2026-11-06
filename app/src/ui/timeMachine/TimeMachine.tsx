@@ -1,14 +1,16 @@
 import { type ReactElement, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { type Day, daysAsItWas } from '../../domain/days'
 import { type Moment, momentToOpen, readingAt, timeOf } from '../../domain/lookBack'
 import type { Piece } from '../../domain/model'
 import { momentInSentence } from '../../domain/momentInSentence'
 import type { ContentsChapter, Deps } from '../../domain/pieces'
-import { dayTitle, momentName, momentShort, pageLine } from '../../domain/words'
+import { dayTitle, isoDay, momentName, momentShort, pageLine } from '../../domain/words'
 import type { Passage } from '../../page/passage'
 import { type Crumb, Path } from '../components/Path'
 import { usePhone } from '../components/usePhone'
 import { useScrolled } from '../components/useScrolled'
 import { ContentsRail, ContentsSheet, RailToggle, RunningHeadControl } from '../page/Contents'
+import { DaysRail, DaysSheet } from '../page/Days'
 import { usePager } from '../page/usePager'
 import { usePageTurns } from '../page/usePageTurns'
 import { useRail } from '../page/useRail'
@@ -19,6 +21,7 @@ import { Part } from './PartMenu'
 import { EmptyTape, Tape } from './Tape'
 import { useContentsAsItWas } from './useContentsAsItWas'
 import { useContentsSheet } from './useContentsSheet'
+import { useDaysAsItWas } from './useDaysAsItWas'
 import { useKeepCopy } from './useKeepCopy'
 import { usePart } from './usePart'
 import { useReader } from './useReader'
@@ -101,9 +104,15 @@ export function TimeMachine({ deps, looking, onBringBack, onKeepCopy, onBack, on
   const [crossedOver, setCrossedOver] = useState<string | undefined>(undefined)
   /** Which page a section reached by a turn opens on: its first going on, its last coming back. */
   const arrive = useRef<'first' | 'last' | 'opening' | undefined>(undefined)
+  /** The page has been laid out once: a journal's first day opens on its day, not its title page. */
+  const landed = useRef(false)
   const settings = useSettings()
   const phone = usePhone()
   const book = piece.kind === 'book'
+  const journal = piece.kind === 'journal'
+  const essay = piece.kind === 'essay'
+  /** A book's Contents or a journal's Days stands beside the page, as the rail; an essay has none. */
+  const railed = (book || journal) && !phone
   const rail = useRail()
   const sheet = useContentsSheet()
   const now = deps.clock.now()
@@ -127,7 +136,8 @@ export function TimeMachine({ deps, looking, onBringBack, onKeepCopy, onBack, on
   /** Standing at a moment, so what stands beside the page is of that moment, not today's. */
   const asItWas = !!moment && !!shape
   const sectionList = shape?.sections
-  const titlePage = book && (asItWas ? sectionList?.[0]?.sectionId === sectionId : piece.sections[0]?.sectionId === sectionId)
+  /** A book or a journal opens on a title page, as on the writing page: its name, then the first chapter or day on the next. */
+  const titlePage = !essay && (asItWas ? sectionList?.[0]?.sectionId === sectionId : piece.sections[0]?.sectionId === sectionId)
   const bookName = asItWas ? shape.title : today.name
   const subtitle = (asItWas ? shape.subtitle : today.subtitle) ?? ''
 
@@ -194,6 +204,16 @@ export function TimeMachine({ deps, looking, onBringBack, onKeepCopy, onBack, on
       phone ? 'phone' : 'desktop',
       book && asItWas && (phone ? sheet.open : rail.open),
     ) ?? today.contents
+  /** A journal's days as that moment listed them, once their words are read: nothing is marked as today. */
+  const daysRead = useDaysAsItWas(deps, journal && asItWas ? sectionList : undefined, stands, journal && asItWas && (phone ? sheet.open : rail.open))
+  // Before a moment stands (while moments load, or with none earlier) Days is the journal's own, as a book's Contents is.
+  const days = asItWas ? daysRead : journal ? daysAsItWas(piece.sections, piece.words ?? {}) : undefined
+  const dayOpen = days?.find((d) => d.sectionId === sectionId)?.iso ?? ''
+  /** The last day that can be reached: the moment's own, so every later day recedes. */
+  const lastDay = isoDay(new Date(Math.min(stands ?? now, now)))
+  const openDay = (day: Day): void => {
+    if (day.sectionId) openChapter(day.sectionId)
+  }
 
   usePageTurns({
     screen,
@@ -217,7 +237,10 @@ export function TimeMachine({ deps, looking, onBringBack, onKeepCopy, onBack, on
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new title's height moves the page breaks too, and a section reached opens on its own page even when its words read the same.
   useLayoutEffect(() => {
     // Reaching a section is no page turn, and says its title instead: the page it lands on is not announced.
-    const arriving = arrive.current
+    // A journal never opens on its title page (DESIGN.md, The journal): as on the page, it opens on the day, and the title page is a turn back.
+    const landing = pager && !landed.current && journal && titlePage ? 'opening' : undefined
+    if (pager) landed.current = true
+    const arriving = arrive.current ?? landing
     if (pager && arriving) pager.opening = true
     reader?.show(content)
     pager?.measure()
@@ -323,7 +346,7 @@ export function TimeMachine({ deps, looking, onBringBack, onKeepCopy, onBack, on
       <div className="head" data-scrolled={scrolled || undefined}>
         <div className="head-path">
           <Path crumbs={crumbs} onHome={home} />
-          {book && !phone ? <RailToggle open={rail.open} onToggle={rail.toggle} buttonRef={railToggle} /> : null}
+          {railed ? <RailToggle label={journal ? 'Days' : 'Contents'} open={rail.open} onToggle={rail.toggle} buttonRef={railToggle} /> : null}
         </div>
         {/* In the head, so the toggle's next stop is what it opens. As on the page, the rail never offers to add or remove. */}
         {book && !phone && list ? (
@@ -341,12 +364,27 @@ export function TimeMachine({ deps, looking, onBringBack, onKeepCopy, onBack, on
               railToggle.current?.focus()
             }}
           />
+        ) : journal && !phone ? (
+          // Always there, as a book's rail is: its words are read as a moment stands, and the list is empty for that instant.
+          <DaysRail
+            days={days ?? []}
+            current={dayOpen}
+            open={rail.open}
+            onOpen={openDay}
+            onLeave={() => {
+              rail.letGo()
+              railToggle.current?.focus()
+            }}
+          />
         ) : null}
         {/* As on the writing page, an essay's first page has none: its title stands there, and it is no control. A book's
-            and a journal's keep theirs on every page. On a phone a book's opens Contents as it was; the book's name stands
+            and a journal's keep theirs on every page. On a phone a book's opens Contents as it was, and a journal's Days; the book's name stands
             there while the title page and the chapter's opening page carry the chapter's own. */}
         {book && phone ? (
           <RunningHeadControl title={page <= (titlePage ? 1 : 0) ? bookName : heading} label="Contents" open={sheet.open} onOpen={sheet.toggle} />
+        ) : journal && phone ? (
+          // A day's page carries its date, the title page the journal's name; either way Days is one tap away.
+          <RunningHeadControl title={titlePage && page === 0 ? bookName : heading} label="Days" open={sheet.open} onOpen={sheet.toggle} />
         ) : piece.kind !== 'essay' || page > 0 ? (
           <div className="running-head">{heading}</div>
         ) : null}
@@ -375,6 +413,10 @@ export function TimeMachine({ deps, looking, onBringBack, onKeepCopy, onBack, on
           onRemove={NOTHING}
           onDone={sheet.close}
         />
+      ) : null}
+
+      {journal && phone && sheet.open && days ? (
+        <DaysSheet days={days} current={dayOpen} last={lastDay} from="head" takeFocus={sheet.byKey} onOpen={openDay} onDone={sheet.close} />
       ) : null}
 
       {read.state === 'error' || sections.failed ? (
