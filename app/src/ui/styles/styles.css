@@ -844,6 +844,12 @@ button.count[aria-expanded='true'] {
 
 /* ——— Sheets ——— */
 
+/* iOS paints its caret above the page, so it would stand on a sheet. Only the colour goes: the focus stays
+   in the field, and the keyboard with it (DESIGN.md, Control). */
+.page-screen[data-sheet] :is(.body, .title, .book-title, .subtitle) {
+  caret-color: transparent;
+}
+
 .sheet {
   position: fixed;
   left: 12px;

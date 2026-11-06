@@ -265,6 +265,71 @@ test('Contents opens with the keyboard up, and the writer stays in the text', as
   await expect(page.locator('.writing-bar')).toBeVisible()
 })
 
+const FIELDS = '.body, .title, .book-title, .subtitle'
+/** The caret's colours in the page's fields, as the browser reads them: one, when all agree. */
+const carets = async (page: Page) => [...new Set(await page.locator(FIELDS).evaluateAll((all) => all.map((field) => getComputedStyle(field).caretColor)))]
+const NONE = 'rgba(0, 0, 0, 0)'
+
+test('a sheet over the page hides the caret and keeps the focus; closing it brings the caret back', async ({ page }) => {
+  phoneOnly(page)
+  await importBook(page, THREE)
+  // The first chapter: its page holds the title page's fields too.
+  await openChapter(page, 'One')
+  await writeHere(page)
+  await page.setViewportSize({ width: 390, height: 500 })
+  await expect(page.locator('.writing-bar')).toBeVisible()
+  await expect(page.locator(FIELDS)).toHaveCount(4)
+  const shown = await carets(page)
+  expect(shown).toHaveLength(1)
+  expect(shown).not.toContain(NONE)
+
+  // Every field, with the focus left where it was, in the text and then in the title.
+  await runningHead(page).click()
+  await expect(contents(page)).toBeVisible()
+  expect(await carets(page)).toEqual([NONE])
+  await expect(page.locator('.body')).toBeFocused()
+  await contents(page).getByRole('button', { name: 'Done' }).click()
+  await expect(contents(page)).toHaveCount(0)
+  expect(await carets(page)).toEqual(shown)
+  await expect(page.locator('.body')).toBeFocused()
+
+  await page.locator('.title').focus()
+  await runningHead(page).click()
+  await expect(contents(page)).toBeVisible()
+  await expect(page.locator('.title')).toHaveCSS('caret-color', NONE)
+  await expect(page.locator('.title')).toBeFocused()
+  // Chosen, a chapter closes the sheet as Done does.
+  await chapter(page, 'Three').click()
+  await expect(page.locator('.title')).toHaveText('Three')
+  expect(await carets(page)).toEqual(shown)
+
+  // Text settings and export take the focus into themselves, under the same rule.
+  await page.locator('.body').focus()
+  await page.locator('.page-button').click()
+  for (const sheet of ['Text settings', 'Export']) {
+    await page.locator('.tools').getByRole('button', { name: sheet }).click()
+    await expect(page.getByRole('dialog', { name: sheet })).toBeVisible()
+    expect(await carets(page)).toEqual([NONE])
+    await page.getByRole('dialog', { name: sheet }).getByRole('button', { name: 'Done' }).click()
+    await expect(page.getByRole('dialog', { name: sheet })).toHaveCount(0)
+    expect(await carets(page)).toEqual(shown)
+  }
+})
+
+test('a sheet from the desktop head leaves the caret alone, for the writer typing beside it', async ({ page }) => {
+  desktopOnly(page)
+  await importBook(page, TWO)
+  await openChapter(page, 'Two')
+  await writeHere(page)
+  const shown = await carets(page)
+  await page.locator('.head-tools').getByRole('button', { name: 'Text settings' }).click()
+  await expect(page.getByRole('dialog', { name: 'Text settings' })).toBeVisible()
+  await page.locator('.body').click()
+  await expect(page.locator('.body')).toBeFocused()
+  await expect(page.getByRole('dialog', { name: 'Text settings' })).toBeVisible()
+  expect(await carets(page)).toEqual(shown)
+})
+
 test('words typed just before a jump are there after a reload, in their own chapter', async ({ page }) => {
   await importBook(page, TWO)
   await writeHere(page)
