@@ -478,12 +478,66 @@ test('the desktop path keeps the moment whole and shortens the name', async ({ p
   await expect(moment).toHaveText('Just now')
   await expect(moment).toHaveCSS('font-style', 'italic')
   expect(await moment.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true)
-  const box = (await moment.boundingBox())!
-  expect(box.x + box.width).toBeLessThanOrEqual(316)
+  // The toggle ends where the rail's rows do, with the path inside it.
+  const toggle = (await machine(page).getByRole('button', { name: 'Pages' }).boundingBox())!
+  expect(toggle.x + toggle.width).toBeLessThanOrEqual(316)
+  expect((await moment.boundingBox())!.x + (await moment.boundingBox())!.width).toBeLessThanOrEqual(toggle.x)
   // The name goes back to now.
   await machine(page).locator('.crumb').first().getByRole('button').click()
   await expect(machine(page)).toHaveCount(0)
   await expect(page.locator('.body')).toHaveText('After.')
+})
+
+test('an essay’s rail shows the words and pages of that moment, and only on desktop', async ({ page }) => {
+  await history(page, ['One two three.', 'Four.'])
+  await open(page)
+  await expect(oldText(page)).toHaveText('One two three.')
+  const rail = machine(page).locator('.pages-rail')
+  if (phone(page)) {
+    await expect(rail).toHaveCount(0)
+    return
+  }
+  await expect(rail.locator('.rail-line')).toHaveText('3 words · 1 page')
+  await expect(rail.locator('.contents-title')).toHaveText('One two three.')
+  await expect(tape(page)).toBeFocused()
+  await page.keyboard.press('End')
+  await expect(rail.locator('.rail-line')).toHaveText('1 word · 1 page')
+  await expect(rail.locator('.contents-title')).toHaveText('Four.')
+})
+
+test('a row of the rail turns to that page of the old text, and saves no place', async ({ page }) => {
+  test.skip(phone(page), 'the rail is desktop’s')
+  const long = Array.from({ length: 40 }, (_, i) => `Paragraph ${i + 1} goes on for a while, so that the text fills more than one page.`)
+  await essay(page, long.join(' '))
+  await open(page)
+  await close(page)
+  await rewrite(page, 'Now it is short.')
+  await open(page)
+  await expect(oldText(page)).toContainText('Paragraph 40')
+  const before = await stored<{ place?: unknown }>(page, 'pieces')
+  const rows = machine(page).locator('.pages-rail .contents-row')
+  await expect(rows.nth(1)).toBeVisible()
+  await rows.nth(1).click()
+  await expect(rows.nth(1)).toHaveAttribute('aria-current', 'true')
+  expect(
+    await machine(page)
+      .locator('.pager')
+      .evaluate((el) => el.scrollLeft),
+  ).toBeGreaterThan(0)
+  await close(page)
+  expect((await stored<{ place?: unknown }>(page, 'pieces'))[0]!.place).toEqual(before[0]!.place)
+})
+
+test('Escape in the rail stays in the Time Machine, and the next one leaves', async ({ page }) => {
+  test.skip(phone(page), 'the rail is desktop’s')
+  await history(page, ['Before.', 'After.'])
+  await open(page)
+  await expect(tape(page)).toBeFocused()
+  await machine(page).locator('.pages-rail .contents-row').first().focus()
+  await page.keyboard.press('Escape')
+  await expect(machine(page).getByRole('button', { name: 'Pages' })).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(machine(page)).toHaveCount(0)
 })
 
 test('tools leave the head on desktop', async ({ page }) => {

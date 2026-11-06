@@ -2641,7 +2641,7 @@ button.count[aria-expanded='true'] {
   /* The moment stands whole, and the piece's name shortens: the path stays inside the rail, room left for its toggle. */
   .time-machine .path .crumbs {
     display: flex;
-    max-width: 240px;
+    max-width: 238px;
   }
   .time-machine .path .crumb {
     flex: none;
