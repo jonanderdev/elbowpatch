@@ -2,7 +2,7 @@ import { TextSelection } from 'prosemirror-state'
 import { type CSSProperties, type ReactElement, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { countWords } from '../../domain/markdown'
 import type { Piece } from '../../domain/model'
-import { type BookCount, bookCount, contents, type Deps, savePages } from '../../domain/pieces'
+import { type BookCount, bookCount, contents, type Deps, type Removed, removableChapters, savePages } from '../../domain/pieces'
 import { pageLine } from '../../domain/words'
 import { scrollToCaret, showCaret, toOpeningPage } from '../../page/caret'
 import { type Editor, selectionBox } from '../../page/editor'
@@ -17,6 +17,7 @@ import { useScrolled } from '../components/useScrolled'
 import { download } from '../files/download'
 import { markdownFile } from '../files/markdownFile'
 import { useSettings } from '../stores/settings'
+import { useUnsaved } from '../stores/unsaved'
 import { ContentsRail, ContentsSheet, NewChapter, RailToggle, RunningHeadControl } from './Contents'
 import { fillTitleFields, keptFor, type OpenAt, type Opened, type TitleRefs } from './fields'
 import { PageFoot, StatusLine } from './PageFoot'
@@ -32,6 +33,7 @@ import { usePager } from './usePager'
 import { usePageTurns } from './usePageTurns'
 import { useRail } from './useRail'
 import { useRejoin } from './useRejoin'
+import { heldIn, useRemoveChapter } from './useRemoveChapter'
 import { useSaving } from './useSaving'
 import { FieldBar, SelectionMenu, useKeyboard, WritingBar } from './Writing'
 
@@ -60,8 +62,15 @@ interface Props {
   onChapterStarted(piece: Piece, sectionId: string, content: string): void
   /** Undo put this chapter back: the chapter before it opens at the join, with `content` as its text. */
   onChapterRejoined(piece: Piece, sectionId: string, content: string): void
+  /** The chapter on the page left the book: the one named opens, at its opening page. */
+  onChapterRemoved(removed: Removed, writing: boolean): void
+  /** The chapter before this one left the book, and this one is now the first: the page opens again, with the title page. */
+  onReopen(): void
   onChange(piece: Piece): void
 }
+
+/** A window that is not writing removes nothing. */
+const NOTHING: ReadonlySet<string> = new Set()
 
 interface SelectionState {
   /** Where a selection is, for the selection menu; null for a caret. */
@@ -87,6 +96,8 @@ export function Page({
   onNewChapter,
   onChapterStarted,
   onChapterRejoined,
+  onChapterRemoved,
+  onReopen,
   onChange,
 }: Props): ReactElement {
   const { piece, sectionId } = opened
@@ -106,6 +117,7 @@ export function Page({
   const book = piece.kind === 'book'
   const live = useOutline(deps, piece, sectionId, counted)
   const rail = useRail()
+  const waiting = useUnsaved()
   /** On a book's page, on desktop: Contents is the rail. Essays and journals have none yet. */
   const railed = book && !phone
   const [tools, setTools] = useState(false)
@@ -114,6 +126,7 @@ export function Page({
   const [contentsFocus, setContentsFocus] = useState(false)
   const [line, setLine] = useState<string | null>(null)
   const [words, setWords] = useState(() => countWords(content))
+  const [blank, setBlank] = useState(() => !content.trim())
   const [heading, setHeading] = useState('')
   // A book's or a journal's name, as on its title page: the desktop path shows it while it is written.
   const [name, setName] = useState(piece.title)
@@ -161,6 +174,15 @@ export function Page({
     if (titles.bookTitle.current) setName(titles.bookTitle.current.textContent ?? '')
   }, [openedFirst, titles.title, titles.bookTitle, titles.subtitle])
 
+  // The chapter before this one left the book, so the title page is part of this one now, and this page, laid
+  // out without it, is about to open again: until then its count is not the chapter's.
+  const titlePageCame = book && !titlePage && live.outline.sections[0]?.sectionId === sectionId
+
+  function reported(stored: Piece): void {
+    live.stored(stored)
+    onChange(stored)
+  }
+
   // The numbers beside the page, at a page of this section: a book's are the whole book's.
   function numbers(at: number, total: number): BookCount {
     if (!book) return { page: at + 1, pages: total, words }
@@ -203,11 +225,8 @@ export function Page({
       moved.current = false
       return place
     },
-    pages: () => (pager && laidOut && screen.current ? { screen: screenOf(screen.current.clientWidth), count: pager.count } : null),
-    onStored: (stored) => {
-      live.stored(stored)
-      onChange(stored)
-    },
+    pages: () => (pager && laidOut && screen.current && !titlePageCame ? { screen: screenOf(screen.current.clientWidth), count: pager.count } : null),
+    onStored: reported,
     flushRef,
     closingRef,
   })
@@ -215,9 +234,9 @@ export function Page({
   // The count is kept with the piece whenever it changes (a turn of the text settings, a first reading
   // on this kind of screen), so the library shows a book's pages without laying it out (DESIGN.md).
   useEffect(() => {
-    if (readOnly || !pager || !laidOut || !screen.current || saving?.sealed()) return
+    if (readOnly || !pager || !laidOut || !screen.current || titlePageCame || saving?.sealed()) return
     void savePages(deps, piece.id, screenOf(screen.current.clientWidth), sectionId, count).catch(() => {})
-  }, [deps, piece.id, sectionId, count, pager, laidOut, readOnly, saving])
+  }, [deps, piece.id, sectionId, count, pager, laidOut, readOnly, saving, titlePageCame])
 
   const shown = numbers(page, count)
 
@@ -227,6 +246,7 @@ export function Page({
     onChange(markdown) {
       moved.current = true
       setWords(countWords(markdown))
+      setBlank(!markdown.trim())
       saving?.touch()
       requestAnimationFrame(() => pager?.measure())
     },
@@ -449,6 +469,38 @@ export function Page({
     onRejoined: onChapterRejoined,
   })
 
+  const removeChapter = useRemoveChapter({
+    deps,
+    pieceId: piece.id,
+    sectionId,
+    outline: () => live.outline,
+    storedHere: () => live.chapters.has(sectionId),
+    closing: () => closingRef.current,
+    editor,
+    saving,
+    keyboard,
+    onLeave: (to, writing) => leaveFor(to, writing, 'opening'),
+    onRemovedHere: onChapterRemoved,
+    onRemoved(stored) {
+      reported(stored)
+      setSaid({ text: 'Chapter removed', over: announcement })
+    },
+    onReopen,
+  })
+  // The chapters Contents offers to take out, and the rest of what it lists, on a screen's page.
+  function listed(on: 'phone' | 'desktop'): ReturnType<typeof contents> & { removable: ReadonlySet<string> } {
+    const list = contents(live.outline, on, laidOut ? { sectionId, title: heading, pages: count } : undefined)
+    const held = new Set(waiting.filter((u) => heldIn(u).some((text) => text.trim())).map((u) => u.sectionId))
+    return { ...list, removable: readOnly ? NOTHING : removableChapters(list.chapters, live.chapters, { sectionId, blank }, held) }
+  }
+  // A chapter gone from under a key press: the focus goes to the chapter on the page, not to nothing.
+  function remove(chosen: string): void {
+    const byKey = !!document.activeElement?.closest('.contents-remove')
+    void removeChapter(chosen).then(() => {
+      if (byKey) requestAnimationFrame(() => screen.current?.querySelector<HTMLElement>('.contents-row[aria-current="true"]')?.focus())
+    })
+  }
+
   // Escape closes what is open, innermost first: a sheet, then the tools. One listener reads what
   // is open now from a ref: re-attached on each change, an Escape pressed right after one (Done,
   // then Escape) would reach the listener from before it.
@@ -534,10 +586,11 @@ export function Page({
         {/* In the head, so the toggle's next stop is what it opens, then the tools. */}
         {railed ? (
           <ContentsRail
-            {...contents(live.outline, 'desktop', laidOut ? { sectionId, title: heading, pages: count } : undefined)}
+            {...listed('desktop')}
             current={sectionId}
             open={rail.open}
             onOpen={openChapter}
+            onRemove={remove}
             onLeave={() => {
               rail.letGo()
               railToggle.current?.focus()
@@ -636,11 +689,12 @@ export function Page({
 
       {sheet === 'contents' && phone ? (
         <ContentsSheet
-          {...contents(live.outline, 'phone', laidOut ? { sectionId, title: heading, pages: count } : undefined)}
+          {...listed('phone')}
           name={name}
           current={sectionId}
           takeFocus={contentsFocus}
           onOpen={openChapter}
+          onRemove={remove}
           onDone={closeSheet}
         >
           {newChapter}

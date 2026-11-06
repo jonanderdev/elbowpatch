@@ -1502,6 +1502,20 @@ button.count[aria-expanded='true'] {
   color: var(--secondary);
   font-variant-numeric: lining-nums tabular-nums;
 }
+.contents-line {
+  position: relative;
+}
+/* Where the page number would be, the word's end on its edge; the whole height of the row, 44px on a phone. */
+.contents-remove {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  padding: 0 10px;
+}
+.contents-remove:focus-visible {
+  outline-offset: -2px;
+}
 .contents-foot {
   flex: none;
   display: flex;
@@ -2389,6 +2403,9 @@ button.count[aria-expanded='true'] {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  .contents-rail .contents-remove {
+    padding: 0 12px;
   }
   /* Under the chapters, on the rail's line; it stays in reach while a long list scrolls. */
   .contents-rail .new-chapter {

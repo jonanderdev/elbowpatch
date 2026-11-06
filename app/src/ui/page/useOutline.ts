@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Piece } from '../../domain/model'
-import { type Deps, storedPiece, withOpenSection } from '../../domain/pieces'
+import { type Deps, storedChapters, storedPiece, withOpenSection } from '../../domain/pieces'
 
 export interface LiveOutline {
   /** The piece as last stored (its chapters, their titles and their page counts), with the open chapter if it is not stored yet. */
   outline: Piece
+  /** Each chapter stored, and whether its text is blank. */
+  chapters: ReadonlyMap<string, boolean>
   /** A save reported the piece. */
   stored(piece: Piece): void
   /** Reads it again: page counts are kept without a report, and another window may be writing the book. */
@@ -27,5 +29,20 @@ export function useOutline(deps: Deps, piece: Piece, sectionId: string, counted:
   // Counts kept or forgotten from outside the page.
   // biome-ignore lint/correctness/useExhaustiveDependencies: `counted` is the trigger.
   useEffect(reread, [reread, counted])
-  return { outline: withOpenSection(last, piece, sectionId), stored, reread }
+  // Read after each report: what Contents offers to remove goes by the text, which the piece does not hold.
+  const [chapters, setChapters] = useState<ReadonlyMap<string, boolean>>(() => new Map())
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `last` is the trigger.
+  useEffect(() => {
+    if (piece.kind !== 'book') return
+    let alive = true
+    void storedChapters(deps, piece.id)
+      .then((found) => {
+        if (alive) setChapters(found)
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [deps, piece.id, piece.kind, last])
+  return { outline: withOpenSection(last, piece, sectionId), chapters, stored, reread }
 }

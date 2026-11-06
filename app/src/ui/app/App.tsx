@@ -1,7 +1,20 @@
 import { type ReactElement, useCallback, useEffect, useRef, useState } from 'react'
 import { pieceAsMarkdown } from '../../domain/export'
 import type { Kind, Piece } from '../../domain/model'
-import { type Deps, library, neverStored, newPiece, openPiece, putAway, recover, rename, restore, withChapter, withDay } from '../../domain/pieces'
+import {
+  type Deps,
+  library,
+  neverStored,
+  newPiece,
+  openPiece,
+  putAway,
+  type Removed,
+  recover,
+  rename,
+  restore,
+  withChapter,
+  withDay,
+} from '../../domain/pieces'
 import type { WriterLock } from '../../domain/ports'
 import { forgetPutAway, thin } from '../../domain/thinning'
 import { isoDay } from '../../domain/words'
@@ -187,6 +200,21 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
     setOpened({ piece, sectionId, content, updatedAt: piece.updatedAt, at: 'join', writing: true, readAt: ++reads })
   }
 
+  // The chapter on the page left the book: the one named is stored and at hand, as above, and opens at its opening page.
+  const chapterRemoved = ({ piece, sectionId, content, updatedAt }: Removed, writing: boolean): void => {
+    ++chosen.current
+    going.current = ''
+    setOpened({ piece, sectionId, content, updatedAt, at: 'opening', writing, readAt: ++reads })
+  }
+
+  // The section on the page, read anew at the writer's place.
+  const reopen = async (draft: Piece, sectionId: string): Promise<void> => {
+    const turn = ++chosen.current
+    await saveFirst()
+    const next = await open(draft.id, sectionId).catch(() => undefined)
+    if (next && turn === chosen.current) setOpened(next)
+  }
+
   const startNew = (kind: Kind) => {
     raiseKeyboard()
     let piece = newPiece(deps, kind, navigator.language || 'en')
@@ -235,6 +263,8 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
           onNewChapter={(after) => void newChapter(opened.piece, after)}
           onChapterStarted={chapterStarted}
           onChapterRejoined={chapterRejoined}
+          onChapterRemoved={chapterRemoved}
+          onReopen={() => void reopen(opened.piece, opened.sectionId)}
           onChange={(piece) => {
             askToPersist()
             setPieces((all) => {

@@ -8,24 +8,36 @@ interface ContentsListProps {
   chapters: ContentsChapter[]
   /** The chapter on the page. */
   current: string
+  /** The chapters that can go, in a window that is writing. */
+  removable: ReadonlySet<string>
   onOpen(sectionId: string): void
+  onRemove(sectionId: string): void
 }
 
 /**
  * The book's chapters, each with the page it starts on once that is known, the current one tinted
  * (DESIGN.md, Books and chapters). It knows nothing of what holds it: the phone's sheet, or the rail.
  */
-export function ContentsList({ chapters, current, onOpen }: ContentsListProps): ReactElement {
+export function ContentsList({ chapters, current, removable, onOpen, onRemove }: ContentsListProps): ReactElement {
   return (
     <ol className="contents-list">
-      {chapters.map((c) => (
-        <li key={c.sectionId}>
-          <button type="button" className="contents-row" aria-current={c.sectionId === current ? 'true' : undefined} onClick={() => onOpen(c.sectionId)}>
-            <span className="contents-title">{c.title.trim() || 'Untitled'}</span>
-            {c.startPage === undefined ? null : <span className="contents-page">{number(c.startPage)}</span>}
-          </button>
-        </li>
-      ))}
+      {chapters.map((c) => {
+        const goes = removable.has(c.sectionId)
+        return (
+          <li key={c.sectionId} className="contents-line">
+            <button type="button" className="contents-row" aria-current={c.sectionId === current ? 'true' : undefined} onClick={() => onOpen(c.sectionId)}>
+              <span className="contents-title">{c.title.trim() || 'Untitled'}</span>
+              {goes || c.startPage === undefined ? null : <span className="contents-page">{number(c.startPage)}</span>}
+            </button>
+            {/* Beside the row, not in it: a button holds no other. */}
+            {goes ? (
+              <button type="button" className="text-link contents-remove" aria-label="Remove chapter" onClick={() => onRemove(c.sectionId)}>
+                Remove
+              </button>
+            ) : null}
+          </li>
+        )
+      })}
     </ol>
   )
 }
@@ -54,7 +66,7 @@ interface ContentsSheetProps extends ContentsListProps {
 }
 
 /** Contents on a phone: a sheet dropped under the head, whose list scrolls inside it. */
-export function ContentsSheet({ name, chapters, current, pages, takeFocus, onOpen, onDone, children }: ContentsSheetProps): ReactElement {
+export function ContentsSheet({ name, chapters, current, removable, pages, takeFocus, onOpen, onRemove, onDone, children }: ContentsSheetProps): ReactElement {
   const ref = useRef<HTMLDivElement>(null)
   // Once, as it opens: a long list starts at the current chapter.
   const opening = useRef(takeFocus)
@@ -69,7 +81,7 @@ export function ContentsSheet({ name, chapters, current, pages, takeFocus, onOpe
         <span className="contents-name">{name.trim() || 'Untitled'}</span>
         {pages === undefined ? null : <span className="sheet-aside contents-pages">{pagesWord(pages)}</span>}
       </div>
-      <ContentsList chapters={chapters} current={current} onOpen={onOpen} />
+      <ContentsList chapters={chapters} current={current} removable={removable} onOpen={onOpen} onRemove={onRemove} />
       <div className="contents-foot">
         {children}
         <button type="button" className="text-link" onClick={onDone}>
@@ -96,7 +108,7 @@ const RAIL_ID = 'contents-rail'
  * Contents on desktop: the rail, which folds away and never moves the text (DESIGN.md, Layout). Folded,
  * it stays out of the way of the keyboard and of a screen reader.
  */
-export function ContentsRail({ chapters, current, pages, open, onOpen, onLeave, children }: ContentsRailProps): ReactElement {
+export function ContentsRail({ chapters, current, removable, pages, open, onOpen, onRemove, onLeave, children }: ContentsRailProps): ReactElement {
   const ref = useRef<HTMLElement>(null)
   // A new page opens for each chapter, so a long list starts at the current one; and again on opening.
   useEffect(() => {
@@ -126,7 +138,7 @@ export function ContentsRail({ chapters, current, pages, open, onOpen, onLeave, 
           </>
         )}
       </p>
-      <ContentsList chapters={chapters} current={current} onOpen={onOpen} />
+      <ContentsList chapters={chapters} current={current} removable={removable} onOpen={onOpen} onRemove={onRemove} />
       {children}
     </nav>
   )
