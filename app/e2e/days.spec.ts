@@ -58,6 +58,8 @@ async function openJournal(page: Page, days: Record<string, string> = DAYS): Pro
   await page.reload()
   await page.locator('.row', { hasText: 'Journal' }).click()
   await expect(page.locator('.title')).toHaveText('Friday 30 October')
+  // Nothing can be typed until this window is the one writing: the page opens read only, for a moment.
+  await expect(page.locator('.body')).toHaveAttribute('contenteditable', 'true')
 }
 
 /** The sections stored, by date. */
