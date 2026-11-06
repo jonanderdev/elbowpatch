@@ -117,7 +117,7 @@ test('Bring part back lands the passage as its own paragraph after the one befor
   await changed(page, 'Alpha one.\nBeta has a lost sentence here. And more.\nGamma.', 'Alpha one.\nBeta has And more.\nGamma.')
   await bring(page, 'a lost sentence here.')
   await expect.poll(() => paragraphs(page)).toEqual(['Alpha one.', 'a lost sentence here.', 'Beta has And more.', 'Gamma.'])
-  await expect(page.locator('.calm-line')).toHaveText('Brought back from just now.')
+  await expect(page.locator('.line.calm')).toHaveText('Brought back from just now.')
   await expect.poll(() => selected(page)).toBe('a lost sentence here.')
   await expect(page.getByRole('toolbar', { name: 'Formatting' })).toBeVisible()
   await saved(page, 'a lost sentence here.')
@@ -228,8 +228,8 @@ test('it works from a long piece, on the page the passage lands on', async ({ pa
 test('the calm line goes after a few seconds', async ({ page }) => {
   await changed(page, 'Alpha one.\nBeta has a lost sentence here.', 'Alpha one.')
   await bring(page, 'a lost sentence here.')
-  await expect(page.locator('.calm-line')).toBeVisible()
-  await expect(page.locator('.calm-line')).toHaveCount(0, { timeout: 8000 })
+  await expect(page.locator('.line.calm')).toBeVisible()
+  await expect(page.locator('.line.calm')).toHaveCount(0, { timeout: 8000 })
 })
 
 test('the Time Machine’s history entry is gone after it, so back goes where it would have', async ({ page }) => {
@@ -244,7 +244,7 @@ for (const kind of ['book', 'journal'] as const) {
     await changed(page, 'Alpha one.\nBeta has a lost sentence here. And more.', 'Alpha one.\nBeta has And more.', kind)
     await bring(page, 'a lost sentence here.')
     await expect.poll(() => paragraphs(page)).toEqual(['Alpha one.', 'a lost sentence here.', 'Beta has And more.'])
-    await expect(page.locator('.calm-line')).toHaveText('Brought back from just now.')
+    await expect(page.locator('.line.calm')).toHaveText('Brought back from just now.')
     await expect.poll(() => selected(page)).toBe('a lost sentence here.')
     await saved(page, 'a lost sentence here.')
   })

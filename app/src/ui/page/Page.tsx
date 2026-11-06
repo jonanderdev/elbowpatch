@@ -23,7 +23,7 @@ import type { Today } from '../timeMachine/TimeMachine'
 import { ContentsRail, ContentsSheet, NewChapter, RailToggle, RunningHeadControl } from './Contents'
 import { DaysRail, DaysSheet } from './Days'
 import { fillTitleFields, keptFor, type OpenAt, type Opened, type TitleRefs } from './fields'
-import { CalmLine, PageFoot, StatusLine } from './PageFoot'
+import { PageFoot, StatusLine } from './PageFoot'
 import { SectionTitle, TitlePage } from './Titles'
 import { HeadTools, TextSettings } from './Tools'
 import { isTimeMachineKey } from './timeMachineKey'
@@ -135,9 +135,9 @@ export function Page({
   const [contentsFocus, setContentsFocus] = useState(false)
   /** Where Days was opened from, which is where it stands. */
   const [daysFrom, setDaysFrom] = useState<'head' | 'tools'>('head')
-  const [line, setLine] = useState<string | null>(null)
-  /** What was just done, said quietly at the foot (Brought back from Sunday evening.). */
-  const [calm, setCalm] = useState<string | null>(null)
+  const [line, setLine] = useState<string | null>(opened.line ?? null)
+  /** The line said after a passage was brought back (Brought back from Sunday evening.): calm, as the line a page opens with is. */
+  const [brought, setBrought] = useState<string | null>(null)
   const [words, setWords] = useState(() => countWords(content))
   const [blank, setBlank] = useState(() => !content.trim())
   const today = isoDay(new Date(deps.clock.now()))
@@ -480,7 +480,8 @@ export function Page({
       moved.current = true
       backFromLooking.current = null
       const text = `Brought back from ${from}.`
-      setCalm(text)
+      setBrought(text)
+      setLine(text)
       setSaid({ text, over: announcement })
     },
   })
@@ -595,18 +596,15 @@ export function Page({
     return () => window.removeEventListener('pointerdown', onDown)
   }, [covered, closeSheet])
 
+  /** The line the page opened with, or one said after a passage was brought back, is calm: secondary, with no surface, and the folio stands aside for it. */
+  const calm = line !== null && (line === opened.line || line === brought) && writer !== 'elsewhere' && !failed
+
   // A calm line at the foot for a few seconds.
   useEffect(() => {
     if (!line) return
     const t = setTimeout(() => setLine(null), 4000)
     return () => clearTimeout(t)
   }, [line])
-
-  useEffect(() => {
-    if (!calm) return
-    const t = setTimeout(() => setCalm(null), 4000)
-    return () => clearTimeout(t)
-  }, [calm])
 
   async function exportMarkdown(): Promise<string | undefined> {
     if (!editor) return undefined
@@ -771,6 +769,7 @@ export function Page({
         titlePage={titlePage && page === 0}
         tools={tools}
         keyboard={keyboard}
+        quiet={calm}
         pageButtonRef={pageButton}
         onOpenTools={() => setTools(true)}
         onCloseTools={closeTools}
@@ -820,8 +819,7 @@ export function Page({
       ) : null}
 
       {/* shortcut: Save a copy holds the unsaved section only, not the whole piece. */}
-      <StatusLine writer={writer} failed={failed} line={line} onWriteHere={onWriteHere} onSaveCopy={() => void exportMarkdown()} />
-      <CalmLine text={calm} />
+      <StatusLine writer={writer} failed={failed} line={line} calm={calm} onWriteHere={onWriteHere} onSaveCopy={() => void exportMarkdown()} />
 
       <div className="visually-hidden" aria-live="polite">
         {said?.over === announcement ? said.text : announcement}

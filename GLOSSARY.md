@@ -112,7 +112,7 @@ Inserting a passage from an old moment into the current text. It replaces nothin
 _Avoid_: Merge, paste
 
 **Keep a copy**:
-Making a new essay from the section being looked at, starting its own history at that moment.
+Making a new essay from the section being looked at, starting its own history now, with today's date: the text is that moment's, and the history is new.
 _Avoid_: Branch, fork, duplicate
 
 **Draft**:

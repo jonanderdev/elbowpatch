@@ -138,14 +138,6 @@ export function momentName(at: number, now: number): string {
   return time ? `${name}, ${time}` : name
 }
 
-const RELATIVE = /^(Just|This|Yesterday|Last) /
-
-/** A moment in the middle of a sentence ("from yesterday evening, 21:10"): relative words in lowercase, weekdays and dates as they are. */
-export function momentInSentence(at: number, now: number): string {
-  const name = momentName(at, now)
-  return RELATIVE.test(name) ? name.charAt(0).toLowerCase() + name.slice(1) : name
-}
-
 /** A moment without its clock time, for the desktop path, where it must stand whole in little room. */
 export function momentShort(at: number, now: number): string {
   return named(at, now).name

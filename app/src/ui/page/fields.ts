@@ -33,6 +33,8 @@ export interface Opened {
   writing?: boolean
   /** Words brought back from the Time Machine: the page puts them in once, as its own paragraph, whenever this changes. */
   bringing?: Bringing
+  /** A calm line the page opens with, at its foot for a few seconds ("A copy of Sunday evening, kept as a new essay."). */
+  line?: string
 }
 
 /** A passage brought back from a moment of the section. */
