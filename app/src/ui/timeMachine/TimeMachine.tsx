@@ -1,5 +1,5 @@
 import { type ReactElement, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { momentToOpen } from '../../domain/lookBack'
+import { momentToOpen, timeOf } from '../../domain/lookBack'
 import type { Piece } from '../../domain/model'
 import type { Deps } from '../../domain/pieces'
 import { momentName, momentShort, pageLine } from '../../domain/words'
@@ -10,8 +10,8 @@ import { usePageTurns } from '../page/usePageTurns'
 import { useSettings } from '../stores/settings'
 import { ErrorBar, LoadingBar, MomentsBar, NothingEarlierBar } from './MomentBar'
 import { EmptyTape, Tape } from './Tape'
-import { useMoments } from './useMoments'
 import { useReader } from './useReader'
+import { useSections } from './useSections'
 
 /** What the page held as the Time Machine opened: it stays on screen until moments are read, and if they cannot be. */
 export interface Today {
@@ -40,7 +40,6 @@ interface Props {
   onHome(): void
 }
 
-const NEVER = (): undefined => undefined
 const NOTHING = (): void => {}
 
 /**
@@ -48,22 +47,31 @@ const NOTHING = (): void => {}
  * It stands over the page, which stays as it was left. It writes nothing: no text, no place, no page counts.
  */
 export function TimeMachine({ deps, looking, onBack, onHome }: Props): ReactElement {
-  const { piece, sectionId, today, ready } = looking
-  const { read, again } = useMoments(deps, piece.id, sectionId, ready)
+  const { piece, today, ready } = looking
+  /** The section on screen: the page's own until a turn reaches another, at the same time. */
+  const sections = useSections(deps, piece.id, looking.sectionId, ready)
+  const { sectionId, read, again } = sections
+  const opened = sectionId === looking.sectionId
   /** The time it stands at, once the writer has moved: it opens on the most recent moment that differs from now. */
   const [chosen, setChosen] = useState<number | undefined>(undefined)
   /** The announcement a change of moment was said over: the next turn is said over it. */
   const [saidOver, setSaidOver] = useState('')
+  /** The announcement a turn into another section was said over, which says which section. */
+  const [crossedOver, setCrossedOver] = useState<string | undefined>(undefined)
+  /** Which page a section reached by a turn opens on: its first going on, its last coming back. */
+  const arrive = useRef<'first' | 'last' | undefined>(undefined)
   const settings = useSettings()
   const now = deps.clock.now()
 
   const moments = read.state === 'read' ? read.moments : []
   const stands = chosen ?? momentToOpen(moments)?.at
-  const index = stands === undefined ? -1 : moments.findLastIndex((m) => m.at <= stands)
+  const found = stands === undefined ? -1 : moments.findLastIndex((m) => m.at <= stands)
+  // A section reached by a turn was listed at this time, so it has a moment; its first is the most it can lack.
+  const index = opened ? found : Math.max(0, found)
   const moment = moments[index]
-  const nothing = read.state === 'read' && !moment
-  const content = moment?.content ?? today.content
-  const title = moment?.title ?? today.title
+  const nothing = opened && read.state === 'read' && !moment
+  const content = moment?.content ?? (opened ? today.content : '')
+  const title = moment?.title ?? (opened ? today.title : '')
 
   const screen = useRef<HTMLDivElement>(null)
   const viewport = useRef<HTMLDivElement>(null)
@@ -86,6 +94,17 @@ export function TimeMachine({ deps, looking, onBack, onHome }: Props): ReactElem
     onRelayout: NOTHING,
     say: (at, total) => pageLine(at + 1, total) || 'Page turned',
   })
+  // A turn past the section's end reaches the one next to it as it was at this time, and stays at this time.
+  function cross(dir: 1 | -1): void {
+    const to = sections.beyond(dir, stands)
+    if (to === undefined || stands === undefined) return
+    sections.reach(to, () => {
+      arrive.current = dir > 0 ? 'first' : 'last'
+      setChosen(stands)
+      setCrossedOver(announcement)
+    })
+  }
+
   usePageTurns({
     screen,
     viewport,
@@ -95,16 +114,18 @@ export function TimeMachine({ deps, looking, onBack, onHome }: Props): ReactElem
     covered: false,
     readOnly: true,
     onTurn: NOTHING,
-    beyond: NEVER,
-    onCross: NOTHING,
+    beyond: (dir) => sections.beyond(dir, stands),
+    onCross: cross,
   })
 
   // Before paint, so the words of one moment never stand on the pages of another.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: a new title's height moves the page breaks too.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new title's height moves the page breaks too, and a section reached opens on its own page even when its words read the same.
   useLayoutEffect(() => {
     reader?.show(content)
     pager?.measure()
-  }, [reader, pager, content, title])
+    if (pager && arrive.current) pager.turnTo(arrive.current === 'last' ? pager.count - 1 : 0)
+    arrive.current = undefined
+  }, [reader, pager, content, title, sectionId])
 
   // Read when a key comes; re-attached on each render, an Escape could reach the listener from before it.
   const back = useRef(onBack)
@@ -132,15 +153,16 @@ export function TimeMachine({ deps, looking, onBack, onHome }: Props): ReactElem
   }, [hasTape])
 
   const step = (next: number): void => {
-    setChosen(moments[next]?.at)
+    setChosen(timeOf(moments, next))
     setSaidOver(announcement)
+    setCrossedOver(undefined)
   }
 
   const scrolled = useScrolled()
   const word = (piece.kind === 'essay' ? title : today.name).trim() || 'Untitled'
   const crumbs: Crumb[] = moment ? [{ word, onClick: onBack }, { word: momentShort(moment.at, now) }] : [{ word, onClick: onBack }]
   const heading = title.trim() || 'Untitled'
-  const said = moment && saidOver === announcement ? momentName(moment.at, now) : announcement
+  const said = crossedOver === announcement ? heading : moment && saidOver === announcement ? momentName(moment.at, now) : announcement
 
   return (
     <div
@@ -166,7 +188,7 @@ export function TimeMachine({ deps, looking, onBack, onHome }: Props): ReactElem
         </div>
       </div>
 
-      {read.state === 'error' ? (
+      {read.state === 'error' || sections.failed ? (
         <ErrorBar line="Can’t read your moments right now. Your words are still here." onAgain={again} onBack={onBack} />
       ) : read.state === 'loading' ? (
         <LoadingBar kind={piece.kind} tape={<EmptyTape />} onBack={onBack} />
