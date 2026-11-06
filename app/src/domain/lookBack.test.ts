@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { memoryStore } from '../adapters/memory-store'
-import { momentsOf, momentToOpen } from './lookBack'
+import { listingOf, momentsOf, momentToOpen, sectionBeyond, sectionsAt } from './lookBack'
 import type { Piece } from './model'
 import { newPiece, removeChapter, rename, renameSection, takeMoment, withChapter, withDay, write } from './pieces'
 import { thin } from './thinning'
@@ -204,5 +204,115 @@ describe('the moment the Time Machine opens on', () => {
     await takeMoment(s.deps, piece.id, { kept: true })
     expect(momentToOpen(await momentsOf(s.deps, piece.id, sectionId))).toBeUndefined()
     expect(momentToOpen([])).toBeUndefined()
+  })
+})
+
+/** A book of two chapters, a minute apart: the second does not exist at the first's moment. */
+async function twoChapters(s: Setup): Promise<{ book: Piece; a: string; b: string; first: number; second: number }> {
+  const book = newPiece(s.deps, 'book', 'en')
+  const a = book.sections[0]!.sectionId
+  s.clock.set(s.clock.now() + 60_000)
+  await write(s.deps, book, a, 'chapter one')
+  await renameSection(s.deps, book, a, 'One')
+  await takeMoment(s.deps, book.id)
+  const first = s.clock.now()
+  s.clock.set(s.clock.now() + 60_000)
+  const { piece, sectionId: b } = withChapter(s.deps, book)
+  await write(s.deps, piece, b, 'chapter two')
+  await renameSection(s.deps, piece, b, 'Two')
+  await takeMoment(s.deps, book.id)
+  return { book: piece, a, b, first, second: s.clock.now() }
+}
+
+const idsAt = async (s: Setup, pieceId: string, at: number): Promise<string[]> => sectionsAt((await listingOf(s.deps, pieceId))!, at).map((x) => x.sectionId)
+
+describe('the sections a piece listed at a time', () => {
+  it('are those of the outline then: a chapter added since is absent', async () => {
+    const s = setup()
+    const { book, a, b, first, second } = await twoChapters(s)
+    expect(await idsAt(s, book.id, first)).toEqual([a])
+    expect(await idsAt(s, book.id, second)).toEqual([a, b])
+  })
+
+  it('carry the titles of that moment', async () => {
+    const s = setup()
+    const { book, a, first } = await twoChapters(s)
+    s.clock.set(s.clock.now() + 60_000)
+    await renameSection(s.deps, book, a, 'One, renamed')
+    await takeMoment(s.deps, book.id)
+    const listing = (await listingOf(s.deps, book.id))!
+    expect(sectionsAt(listing, first).map((x) => x.title)).toEqual(['One'])
+    expect(sectionsAt(listing, s.clock.now()).map((x) => x.title)).toEqual(['One, renamed', 'Two'])
+  })
+
+  it('still list a chapter removed since', async () => {
+    const s = setup()
+    const { book, a, b, second } = await twoChapters(s)
+    s.clock.set(s.clock.now() + 60_000)
+    await write(s.deps, book, b, '')
+    await renameSection(s.deps, book, b, '')
+    await removeChapter(s.deps, book.id, { sectionId: b, held: [] })
+    // Opening the Time Machine takes a moment first.
+    s.clock.set(s.clock.now() + 60_000)
+    await takeMoment(s.deps, book.id)
+    const listing = (await listingOf(s.deps, book.id))!
+    expect(sectionsAt(listing, second).map((x) => x.sectionId)).toEqual([a, b])
+    expect(sectionsAt(listing, s.clock.now()).map((x) => x.sectionId)).toEqual([a])
+  })
+
+  it('are a journal’s days in date order', async () => {
+    const s = setup()
+    let piece = newPiece(s.deps, 'journal', 'en')
+    const days: string[] = []
+    for (const iso of ['2026-10-26', '2026-10-24', '2026-10-25']) {
+      s.clock.set(s.clock.now() + 60_000)
+      const day = withDay(s.deps, piece, iso)
+      piece = day.piece
+      days.push(day.sectionId)
+      await write(s.deps, piece, day.sectionId, `rain ${iso}`)
+      await takeMoment(s.deps, piece.id)
+    }
+    expect(await idsAt(s, piece.id, s.clock.now())).toEqual([days[1], days[2], days[0]])
+  })
+})
+
+describe('turning past a section', () => {
+  const sections = [
+    { sectionId: 'a', title: 'One' },
+    { sectionId: 'b', title: 'Two' },
+  ]
+
+  it('reaches the one next to it, on or back', () => {
+    expect(sectionBeyond(sections, 'a', 1)).toBe('b')
+    expect(sectionBeyond(sections, 'b', -1)).toBe('a')
+  })
+
+  it('reaches nothing past the ends, or from a section not listed', () => {
+    expect(sectionBeyond(sections, 'a', -1)).toBeUndefined()
+    expect(sectionBeyond(sections, 'b', 1)).toBeUndefined()
+    expect(sectionBeyond(sections, 'gone', 1)).toBeUndefined()
+  })
+})
+
+describe('a section reached at a time', () => {
+  it('reads as empty when it was listed but had no version yet', async () => {
+    const s = setup()
+    const book = newPiece(s.deps, 'book', 'en')
+    const a = book.sections[0]!.sectionId
+    await write(s.deps, book, a, 'chapter one')
+    // Chapter two is listed and titled, and has no words yet.
+    s.clock.set(s.clock.now() + 60_000)
+    const { piece, sectionId: b } = withChapter(s.deps, book)
+    await renameSection(s.deps, piece, b, 'Two')
+    await takeMoment(s.deps, book.id)
+    const listed = s.clock.now()
+    s.clock.set(s.clock.now() + 60_000)
+    await write(s.deps, piece, b, 'chapter two')
+    await takeMoment(s.deps, book.id)
+
+    expect(sectionBeyond(sectionsAt((await listingOf(s.deps, book.id))!, listed), a, 1)).toBe(b)
+    const then = (await momentsOf(s.deps, book.id, b)).findLast((m) => m.at <= listed)
+    expect(then?.content).toBe('')
+    expect(then?.title).toBe('Two')
   })
 })

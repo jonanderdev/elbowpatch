@@ -1,7 +1,7 @@
 // Looking back (DESIGN.md, The Time Machine; docs/decisions/0005, 0008): the history as the writer walks
 // it. It knows the Store and the product's words, and nothing of the page.
 
-import type { Kind, Outline, OutlineSection } from './model'
+import type { Kind, Outline, OutlineSection, Piece } from './model'
 import { type Deps, history, outlineAt } from './pieces'
 import { dayTitle } from './words'
 
@@ -74,6 +74,40 @@ function walk(kind: Kind, versions: { createdAt: number; content: string; kept?:
     else moments.push({ at, content, title, kept })
   }
   return moments
+}
+
+/** What is needed to tell the sections a piece listed at any time: the piece as stored, and its outlines. */
+export interface Listing {
+  piece: Piece
+  outlines: Outline[]
+}
+
+/** The piece's listings, read once: they are small, and the sections themselves are read only as they are reached. */
+export function listingOf(deps: Pick<Deps, 'store'>, pieceId: string): Promise<Listing | undefined> {
+  return deps.store.transaction(async (tx) => {
+    const piece = await tx.piece(pieceId)
+    if (!piece) return undefined
+    return { piece, outlines: [...(await tx.outlinesOf(pieceId))].sort((a, b) => a.seq - b.seq) }
+  })
+}
+
+/**
+ * The sections the piece listed at a time, in reading order (0005): the outline in force then, so a
+ * chapter added since is absent and one removed since is there. Before its first outline, the oldest;
+ * after its last, the piece as it stands, which a window that does not write may know better.
+ * A journal's days run oldest first, whatever order they were stored in.
+ */
+export function sectionsAt(listing: Listing, at: number): OutlineSection[] {
+  const { piece, outlines } = listing
+  const newest = outlines.at(-1)
+  const sections = !newest || at > newest.createdAt ? piece.sections : (outlineAt(outlines, at) ?? outlines[0]!).sections
+  return piece.kind === 'journal' ? [...sections].sort((a, b) => a.title.localeCompare(b.title)) : sections
+}
+
+/** The section a turn reaches from this one, on (1) or back (-1), or none past the ends or from one not listed. */
+export function sectionBeyond(sections: OutlineSection[], sectionId: string, dir: 1 | -1): string | undefined {
+  const here = sections.findIndex((s) => s.sectionId === sectionId)
+  return here < 0 ? undefined : sections[here + dir]?.sectionId
 }
 
 /**
