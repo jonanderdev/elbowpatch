@@ -24,7 +24,6 @@ import { ContentsRail, ContentsSheet, NewChapter, RailToggle, RunningHeadControl
 import { DaysRail, DaysSheet } from './Days'
 import { fillTitleFields, keptFor, type OpenAt, type Opened, type TitleRefs } from './fields'
 import { PageFoot, StatusLine } from './PageFoot'
-import { PagesRail } from './PagesRail'
 import { SectionTitle, TitlePage } from './Titles'
 import { HeadTools, TextSettings } from './Tools'
 import { isTimeMachineKey } from './timeMachineKey'
@@ -34,7 +33,6 @@ import { useEditor } from './useEditor'
 import { raiseKeyboard, useFocusOnOpen } from './useFocusOnOpen'
 import { useOpenAtPlace } from './useOpenAtPlace'
 import { useOutline } from './useOutline'
-import { usePageOpenings } from './usePageOpenings'
 import { usePager } from './usePager'
 import { usePageTurns } from './usePageTurns'
 import { useRail } from './useRail'
@@ -130,8 +128,6 @@ export function Page({
   const waiting = useUnsaved()
   /** On a book's or a journal's page, on desktop: Contents or Days is the rail. */
   const railed = (book || journal) && !phone
-  /** On an essay's page, on desktop: its pages are the rail. */
-  const pagesRailed = piece.kind === 'essay' && !phone
   const [tools, setTools] = useState(false)
   const [sheet, setSheet] = useState<'text' | 'export' | 'contents' | null>(null)
   /** Contents was opened by keyboard, so it takes the focus. */
@@ -255,7 +251,6 @@ export function Page({
   }, [deps, piece.id, sectionId, count, pager, laidOut, readOnly, saving])
 
   const shown = numbers(page, count)
-  const openings = usePageOpenings(pager, mount, pagesRailed && rail.open)
 
   const caretKeys = useCaretKeys(pager, flow)
   const editor = useEditor(mount, content, piece.lang, resume, {
@@ -332,7 +327,7 @@ export function Page({
     }
   }, [editor])
   useOpenAtPlace(editor, pager, opened, covered)
-  const turnTo = usePageTurns({
+  usePageTurns({
     screen,
     viewport,
     bookTitle: titles.bookTitle,
@@ -484,14 +479,6 @@ export function Page({
       return
     }
     leaveFor(chosen, writing, 'opening')
-  }
-
-  // A page chosen in the rail. Over the text it was opened for one page, so it goes, and a keyboard's focus leaves the row with it.
-  function turnFromRail(chosen: number): void {
-    turnTo(chosen)
-    if (!rail.over) return
-    rail.letGo()
-    if (document.activeElement?.closest('.pages-rail')) railToggle.current?.focus()
   }
 
   // A new chapter opens with the caret in its title: the keyboard comes up from this tap, or not at
@@ -646,9 +633,7 @@ export function Page({
               onLibrary()
             }}
           />
-          {railed || pagesRailed ? (
-            <RailToggle label={railed ? (journal ? 'Days' : 'Contents') : 'Pages'} open={rail.open} onToggle={rail.toggle} buttonRef={railToggle} />
-          ) : null}
+          {railed ? <RailToggle label={journal ? 'Days' : 'Contents'} open={rail.open} onToggle={rail.toggle} buttonRef={railToggle} /> : null}
         </div>
         {/* In the head, so the toggle's next stop is what it opens, then the tools. */}
         {railed && journal ? (
@@ -677,19 +662,6 @@ export function Page({
           >
             {newChapter}
           </ContentsRail>
-        ) : null}
-        {pagesRailed ? (
-          <PagesRail
-            pages={laidOut ? openings : []}
-            current={page}
-            words={words}
-            open={rail.open}
-            onTurn={turnFromRail}
-            onLeave={() => {
-              rail.letGo()
-              railToggle.current?.focus()
-            }}
-          />
         ) : null}
         {phone && (book ? !(titlePage && page === 0) : journal && page > openingAt) ? (
           // A chapter's opening page carries its title already: its head names the book, and Contents stays in reach.

@@ -9,8 +9,6 @@ let roomLastSeen: boolean | undefined
 
 export interface Rail {
   open: boolean
-  /** It stands open over the text, for this page alone. */
-  over: boolean
   toggle(): void
   /** Lets go of a rail opened over the text. A rail beside the text stays. */
   letGo(): void
@@ -36,5 +34,5 @@ export function useRail(): Rail {
     roomLastSeen = side >= RAIL_WIDTH
     setRoom(roomLastSeen)
   }, [])
-  return { open: room ? !railFolded : over, over: !room && over, toggle, letGo, laidOut }
+  return { open: room ? !railFolded : over, toggle, letGo, laidOut }
 }

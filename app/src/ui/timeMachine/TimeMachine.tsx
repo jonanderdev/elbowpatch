@@ -1,18 +1,12 @@
 import { type ReactElement, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { momentToOpen } from '../../domain/lookBack'
-import { countWords } from '../../domain/markdown'
 import type { Piece } from '../../domain/model'
 import type { Deps } from '../../domain/pieces'
 import { momentName, momentShort, pageLine } from '../../domain/words'
 import { type Crumb, Path } from '../components/Path'
-import { usePhone } from '../components/usePhone'
 import { useScrolled } from '../components/useScrolled'
-import { RailToggle } from '../page/Contents'
-import { PagesRail } from '../page/PagesRail'
-import { usePageOpenings } from '../page/usePageOpenings'
 import { usePager } from '../page/usePager'
 import { usePageTurns } from '../page/usePageTurns'
-import { useRail } from '../page/useRail'
 import { useSettings } from '../stores/settings'
 import { ErrorBar, LoadingBar, MomentsBar, NothingEarlierBar } from './MomentBar'
 import { EmptyTape, Tape } from './Tape'
@@ -77,15 +71,10 @@ export function TimeMachine({ deps, looking, onBack, onHome }: Props): ReactElem
   const mount = useRef<HTMLDivElement>(null)
   const tape = useRef<HTMLDivElement>(null)
   const noBookTitle = useRef<HTMLHeadingElement>(null)
-  const railToggle = useRef<HTMLButtonElement>(null)
-  const rail = useRail()
-  const phone = usePhone()
-  /** An essay's pages are the rail on desktop, as on its page: the pages of what is on screen here. */
-  const pagesRailed = piece.kind === 'essay' && !phone
 
   // Before the pager, so its first layout already has the text.
   const reader = useReader(mount, today.content, piece.lang)
-  const { pager, page, laidOut, announcement } = usePager({
+  const { pager, page, announcement } = usePager({
     screen,
     viewport,
     flow,
@@ -94,11 +83,10 @@ export function TimeMachine({ deps, looking, onBack, onHome }: Props): ReactElem
     settings,
     keyboard: false,
     short: !nothing,
-    onRelayout: (p) => rail.laidOut(p.g.side),
+    onRelayout: NOTHING,
     say: (at, total) => pageLine(at + 1, total) || 'Page turned',
   })
-  const openings = usePageOpenings(pager, mount, pagesRailed && rail.open)
-  const turnTo = usePageTurns({
+  usePageTurns({
     screen,
     viewport,
     bookTitle: noBookTitle,
@@ -163,22 +151,9 @@ export function TimeMachine({ deps, looking, onBack, onHome }: Props): ReactElem
       <div className="head" data-scrolled={scrolled || undefined}>
         <div className="head-path">
           <Path crumbs={crumbs} onHome={onHome} />
-          {pagesRailed ? <RailToggle label="Pages" open={rail.open} onToggle={rail.toggle} buttonRef={railToggle} /> : null}
         </div>
-        {pagesRailed ? (
-          <PagesRail
-            pages={laidOut ? openings : []}
-            current={page}
-            words={countWords(content)}
-            open={rail.open}
-            onTurn={turnTo}
-            onLeave={() => {
-              rail.letGo()
-              railToggle.current?.focus()
-            }}
-          />
-        ) : null}
-        <div className="running-head">{heading}</div>
+        {/* As on the writing page, an essay's first page has none: its title stands there. A book's and a journal's keep theirs. */}
+        {piece.kind !== 'essay' || page > 0 ? <div className="running-head">{heading}</div> : null}
       </div>
 
       <div ref={viewport} className="pager">

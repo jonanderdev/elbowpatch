@@ -2571,12 +2571,6 @@ button.count[aria-expanded='true'] {
   .contents-rail .contents-row[aria-current='true'] {
     color: var(--title);
   }
-  /* An essay's pages keep to one line each; only a long first word needs cutting. */
-  .pages-rail .contents-title {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
   .contents-rail .contents-remove {
     padding: 0 12px;
   }
@@ -2635,7 +2629,8 @@ button.count[aria-expanded='true'] {
 
 /* ——— The Time Machine (DESIGN.md) ——— */
 
-/* It stands over the page, as its own screen. The running head shows on every page here, page 1 included. */
+/* It stands over the page, as its own screen. A book's and a journal's running head shows on every page here, page 1
+   included; an essay's, as on its page, from page 2 on. */
 .time-machine .head {
   z-index: 2;
 }
@@ -2801,10 +2796,11 @@ button.count[aria-expanded='true'] {
     bottom: 20px;
     width: 358px;
   }
-  /* The moment stands whole, and the piece's name shortens: the path stays inside the rail, room left for its toggle. */
+  /* The moment stands whole, and the piece's name shortens: the path ends by x316, inside the rail's width, as it does
+     with a toggle after it. An essay has none. */
   .time-machine .path .crumbs {
     display: flex;
-    max-width: 238px;
+    max-width: 284px;
   }
   .time-machine .path .crumb {
     flex: none;

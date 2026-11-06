@@ -138,8 +138,6 @@ export class Pager {
   opening = false
   /** Called when the browser scrolled on its own: the page shows the caret's page again. */
   onDrift?: () => void
-  /** Called after each count of the pages: the text or the layout may have moved what starts them. */
-  onMeasured?: () => void
 
   /** The section title's height, as the text's room for it was last set. */
   private titleHeight = -1
@@ -188,7 +186,6 @@ export class Pager {
     this.page = page
     this.viewport.scrollLeft = page * this.g.stride
     if (changed) this.onChange(this.page, this.count)
-    this.onMeasured?.()
   }
 
   /** The text's box, as wide as `count` pages: their columns, and the gaps between them. */
