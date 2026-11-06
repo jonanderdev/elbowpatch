@@ -2775,10 +2775,13 @@ button.count[aria-expanded='true'] {
   position: relative;
   height: 46px;
   overflow: hidden;
-  cursor: pointer;
+  cursor: grab;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+}
+.tape:active {
+  cursor: grabbing;
 }
 /* The ticks fade at the edges, to show the tape goes on. Only over the ticks: the labels never fade. */
 .tape::before {
@@ -2849,21 +2852,30 @@ button.count[aria-expanded='true'] {
   margin: 0 6px;
 }
 .moment-action {
+  position: relative;
+  isolation: isolate;
   flex: 1 1 0;
   height: 44px;
-  border-radius: 18px;
   font-size: 13px;
   color: var(--title);
+}
+/* The tint is 36px inside the 44px target, so it stays clear of the tape's labels above it. */
+.moment-action::before {
+  content: '';
+  position: absolute;
+  inset: 4px 0;
+  z-index: -1;
+  border-radius: 18px;
   transition: background-color 160ms;
 }
 .moment-action.leading {
   font-weight: 500;
 }
-.moment-action:active {
+.moment-action:active::before {
   background: var(--pressed);
 }
 @media (hover: hover) {
-  .moment-action:hover {
+  .moment-action:hover::before {
     background: var(--pressed);
   }
 }
@@ -2871,11 +2883,11 @@ button.count[aria-expanded='true'] {
 .moment-action[aria-disabled='true'] {
   color: var(--secondary);
 }
-.moment-action[aria-disabled='true']:active {
+.moment-action[aria-disabled='true']:active::before {
   background: none;
 }
 @media (hover: hover) {
-  .moment-action[aria-disabled='true']:hover {
+  .moment-action[aria-disabled='true']:hover::before {
     background: none;
   }
 }

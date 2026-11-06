@@ -1184,3 +1184,18 @@ test('an untitled chapter keeps the room of a title, and its placeholder stays c
   expect(titleBottom - titleTop).toBeGreaterThanOrEqual(lineHeight)
   expect(lineTop).toBeGreaterThanOrEqual(titleBottom - 1)
 })
+
+test('the tape shows it can be dragged, and a pressed action stays clear of its labels', async ({ page }) => {
+  test.skip(phone(page), 'a pointer’s')
+  await history(page, ['One.', 'Two.', 'Three.'])
+  await open(page)
+  await expect(tape(page)).toHaveCSS('cursor', 'grab')
+  const box = (await tape(page).boundingBox())!
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down()
+  await expect(tape(page)).toHaveCSS('cursor', 'grabbing')
+  await page.mouse.up()
+  const action = bar(page).locator('.moment-action').first()
+  const tint = await action.evaluate((el) => getComputedStyle(el, '::before').height)
+  expect(tint).toBe('36px')
+})
