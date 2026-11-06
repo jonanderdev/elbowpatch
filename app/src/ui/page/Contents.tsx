@@ -51,7 +51,7 @@ export function NewChapter({ onAdd }: { onAdd(): void }): ReactElement {
   )
 }
 
-const pagesWord = (pages: number): string => `${number(pages)} ${pages === 1 ? 'page' : 'pages'}`
+export const pagesWord = (pages: number): string => `${number(pages)} ${pages === 1 ? 'page' : 'pages'}`
 
 interface ContentsSheetProps extends ContentsListProps {
   /** The book's name: a phone shows it nowhere else past the title page. */
@@ -102,7 +102,7 @@ interface ContentsRailProps extends ContentsListProps {
   children?: ReactNode
 }
 
-const RAIL_ID = 'contents-rail'
+export const RAIL_ID = 'contents-rail'
 
 /**
  * Contents on desktop: the rail, which folds away and never moves the text (DESIGN.md, Layout). Folded,
@@ -145,19 +145,21 @@ export function ContentsRail({ chapters, current, removable, pages, open, onOpen
 }
 
 interface RailToggleProps {
+  /** What the rail holds: Contents, unless said otherwise. */
+  label?: string
   open: boolean
   onToggle(): void
   buttonRef: RefObject<HTMLButtonElement | null>
 }
 
 /** Folds the rail away and opens it again, from the path. Pressed, it leaves the focus in the text. */
-export function RailToggle({ open, onToggle, buttonRef }: RailToggleProps): ReactElement {
+export function RailToggle({ label = 'Contents', open, onToggle, buttonRef }: RailToggleProps): ReactElement {
   return (
     <button
       ref={buttonRef}
       type="button"
       className="icon-button quiet rail-toggle"
-      aria-label="Contents"
+      aria-label={label}
       aria-expanded={open}
       aria-controls={RAIL_ID}
       onMouseDown={(e) => e.preventDefault()}

@@ -733,6 +733,9 @@ test('a click in the margin turns the page, but not beside the text', async ({ p
   test.skip(page.viewportSize()!.width < 700, 'desktop margins')
   await newEssay(page)
   await fill(page, 12)
+  // Open, the rail stands in the left margin.
+  await page.getByRole('button', { name: 'Pages', exact: true }).click()
+  await expect(page.locator('.pages-rail')).toBeHidden()
   const before = await pageNow(page)
   const col = (await page.locator('.pager').boundingBox())!
   // On the last page: the pointer shows the way back, and nothing on; a click there is
