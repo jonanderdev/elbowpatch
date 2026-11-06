@@ -39,8 +39,8 @@ async function close(page: Page): Promise<void> {
 }
 
 /** An essay with a moment for each text, the last of them now. */
-async function history(page: Page, texts: string[]): Promise<void> {
-  await essay(page, texts[0]!)
+async function history(page: Page, texts: string[], title = 'Salt'): Promise<void> {
+  await essay(page, texts[0]!, title)
   for (const text of texts.slice(1)) {
     await open(page)
     await expect(machine(page).locator('.moment-name, .moment-note').first()).not.toHaveText('Finding your moments…')
@@ -803,6 +803,100 @@ test('a short drag that does not reach a tick comes back to it, and a tap still 
   await expect(tape(page)).toHaveAttribute('aria-valuenow', String(start - 3))
 })
 
+test('the moment changes only when the tape has landed: not during the drag, not during the glide', async ({ page }) => {
+  await longHistory(page, yearOfAges())
+  const start = (await settled(page)).tick
+  const box = (await tape(page).boundingBox())!
+  const y = box.y + 14
+  const x = box.x + box.width / 2
+  await page.mouse.move(x, y)
+  await page.mouse.down()
+  await page.mouse.move(x + 6 * 11 + 3, y, { steps: 6 })
+  // In the hand, the tape is away from where it was; the moment is not.
+  await expect(tape(page)).toHaveAttribute('aria-valuenow', String(start))
+  await expect(oldText(page)).toHaveText(`Moment ${start}.`)
+  await page.mouse.up()
+  const gliding = await settled(page)
+  expect(gliding.gliding).toBe(true)
+  expect(gliding.tick).toBe(start)
+  await expect(oldText(page)).toHaveText(`Moment ${start}.`)
+  await expect.poll(async () => (await settled(page)).gliding).toBe(false)
+  const end = await settled(page)
+  expect(end.tick).toBeLessThan(start)
+  await expect(oldText(page)).toHaveText(`Moment ${end.tick}.`)
+})
+
+test('taking the tape mid-glide changes no moment until it lands again', async ({ page }) => {
+  await longHistory(page, yearOfAges())
+  const start = (await settled(page)).tick
+  await drag(page, 12 * 11 + 3, 8)
+  expect((await settled(page)).gliding).toBe(true)
+  // Caught and held past the time the glide would have taken: still the first moment.
+  const box = (await tape(page).boundingBox())!
+  const y = box.y + 14
+  const x = box.x + box.width / 2
+  await page.mouse.move(x, y)
+  await page.mouse.down()
+  await page.mouse.move(x + 20, y, { steps: 4 })
+  await page.waitForTimeout(600)
+  await expect(tape(page)).toHaveAttribute('aria-valuenow', String(start))
+  await expect(oldText(page)).toHaveText(`Moment ${start}.`)
+  await page.mouse.up()
+  await expect.poll(async () => (await settled(page)).gliding).toBe(false)
+  const end = await settled(page)
+  expect(end.tick).toBeLessThan(start)
+  await expect(oldText(page)).toHaveText(`Moment ${end.tick}.`)
+})
+
+test('a short history of three moments is a tape too: it is dragged and snaps to a tick', async ({ page }) => {
+  await history(page, ['One.', 'Two.', 'Three.'])
+  await open(page)
+  await expect(oldText(page)).toHaveText('Two.')
+  await expect(tape(page)).toBeFocused()
+  const box = (await tape(page).boundingBox())!
+  const y = box.y + 14
+  const x = box.x + box.width / 2
+  await page.mouse.move(x, y)
+  await page.mouse.down()
+  // 30 of the 44px between ticks: it follows the hand, between ticks, and the moment waits.
+  await page.mouse.move(x + 30, y, { steps: 5 })
+  const held = await tape(page).evaluate((el) => -new DOMMatrixReadOnly(getComputedStyle(el.querySelector('.tape-ticks')!).transform).m41)
+  expect(held).toBeGreaterThan(0)
+  expect(held % 44).not.toBe(0)
+  await expect(oldText(page)).toHaveText('Two.')
+  await page.mouse.up()
+  await expect(oldText(page)).toHaveText('One.')
+  await expect(tape(page)).toHaveAttribute('aria-valuenow', '0')
+  await expect.poll(() => tape(page).evaluate((el) => el.querySelector('.tape-ticks')!.getAnimations().length)).toBe(0)
+  const landed = await tape(page).evaluate((el) => -new DOMMatrixReadOnly(getComputedStyle(el.querySelector('.tape-ticks')!).transform).m41)
+  expect(Math.abs(landed)).toBe(0)
+})
+
+test('Bring back, pressed while the tape still glides, brings back the moment still named', async ({ page }) => {
+  await history(page, ['One.', 'Two.', 'Three.'])
+  await open(page)
+  await expect(oldText(page)).toHaveText('Two.')
+  const name = await machine(page).locator('.moment-name').innerText()
+  const box = (await tape(page).boundingBox())!
+  const y = box.y + 14
+  const x = box.x + box.width / 2
+  await page.mouse.move(x, y)
+  await page.mouse.down()
+  await page.mouse.move(x + 40, y, { steps: 4 })
+  await page.mouse.up()
+  // Pressed in the same breath, while the glide is still on: the bar still names the moment it was.
+  const pressed = await machine(page).evaluate((el) => {
+    const gliding = (el.querySelector('.tape-ticks')?.getAnimations().length ?? 0) > 0
+    const named = el.querySelector('.moment-name')?.textContent
+    ;[...el.querySelectorAll('button')].find((b) => /^Bring essay back/.test(b.textContent ?? ''))?.click()
+    return { gliding, named }
+  })
+  expect(pressed.gliding).toBe(true)
+  expect(pressed.named).toBe(name)
+  await expect(machine(page)).toHaveCount(0)
+  await expect(page.locator('.body')).toHaveText('Two.')
+})
+
 test('a year of moments draws only the ticks near the hairline, and the ends are reached by key and by drag', async ({ page }) => {
   const ages = Array.from({ length: 3000 }, (_, i) => i * 2.9 * HOUR)
   await longHistory(page, ages)
@@ -1203,4 +1297,44 @@ test('a window that does not write brings nothing back', async ({ page, context 
   await expect(oldText(second)).toHaveText('One.')
   expect(await stored(second, 'versions')).toEqual(before)
   expect(await stored(second, 'working')).toEqual(working)
+})
+
+/** The title's box and the first line of the old text, as the Time Machine's page shows them. */
+async function titleAndFirstLine(page: Page) {
+  return machine(page).evaluate((screen) => {
+    const title = screen.querySelector('.title')!.getBoundingClientRect()
+    const body = screen.querySelector('.body')!
+    const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT)
+    const range = document.createRange()
+    range.selectNodeContents(walker.nextNode()!)
+    const line = range.getClientRects()[0]!
+    const lineHeight = Number.parseFloat(getComputedStyle(screen.querySelector('.title')!).lineHeight)
+    return { titleTop: title.top, titleBottom: title.bottom, lineTop: line.top, lineHeight }
+  })
+}
+
+test('an untitled chapter keeps the room of a title, and its placeholder stays clear of the text', async ({ page }) => {
+  await history(page, ['One.', 'Two.'], '')
+  await open(page)
+  await expect(machine(page).locator('.title')).toHaveAttribute('data-empty', 'true')
+  await expect(oldText(page)).toHaveText('One.')
+  const { titleTop, titleBottom, lineTop, lineHeight } = await titleAndFirstLine(page)
+  // The empty title is as tall as one line of it (and its padding), as on the writing page, so the text starts below it.
+  expect(titleBottom - titleTop).toBeGreaterThanOrEqual(lineHeight)
+  expect(lineTop).toBeGreaterThanOrEqual(titleBottom - 1)
+})
+
+test('the tape shows it can be dragged, and a pressed action stays clear of its labels', async ({ page }) => {
+  test.skip(phone(page), 'a pointer’s')
+  await history(page, ['One.', 'Two.', 'Three.'])
+  await open(page)
+  await expect(tape(page)).toHaveCSS('cursor', 'grab')
+  const box = (await tape(page).boundingBox())!
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down()
+  await expect(tape(page)).toHaveCSS('cursor', 'grabbing')
+  await page.mouse.up()
+  const action = bar(page).locator('.moment-action').first()
+  const tint = await action.evaluate((el) => getComputedStyle(el, '::before').height)
+  expect(tint).toBe('36px')
 })
