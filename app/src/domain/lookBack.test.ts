@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { memoryStore } from '../adapters/memory-store'
-import { listingOf, momentsOf, momentToOpen, sectionBeyond, sectionsAt, timeOf } from './lookBack'
+import { listingOf, momentsOf, momentToOpen, readingAt, sectionBeyond, sectionsAt, shapeAt, textAt, timeOf } from './lookBack'
 import type { Piece } from './model'
-import { newPiece, removeChapter, rename, renameSection, takeMoment, withChapter, withDay, write } from './pieces'
+import { newPiece, removeChapter, rename, renameSection, setSubtitle, takeMoment, withChapter, withDay, write } from './pieces'
 import { thin } from './thinning'
 
 const DAY = 86_400_000
@@ -335,5 +335,80 @@ describe('a section reached at a time', () => {
     const then = (await momentsOf(s.deps, book.id, b)).findLast((m) => m.at <= listed)
     expect(then?.content).toBe('')
     expect(then?.title).toBe('Two')
+  })
+})
+
+describe('the outline a piece had at a time', () => {
+  it('carries the title and subtitle of that moment', async () => {
+    const s = setup()
+    const { book, first } = await twoChapters(s)
+    s.clock.set(s.clock.now() + 60_000)
+    await rename(s.deps, book, 'The harbour')
+    await setSubtitle(s.deps, book, 'In winter')
+    await takeMoment(s.deps, book.id)
+    const listing = (await listingOf(s.deps, book.id))!
+    expect(shapeAt(listing, first).title).toBe('')
+    expect(shapeAt(listing, first).subtitle).toBeUndefined()
+    expect(shapeAt(listing, s.clock.now())).toMatchObject({ title: 'The harbour', subtitle: 'In winter' })
+  })
+
+  it('marks a chapter removed since, and none that are still there', async () => {
+    const s = setup()
+    const { book, a, b, second } = await twoChapters(s)
+    s.clock.set(s.clock.now() + 60_000)
+    await write(s.deps, book, b, '')
+    await renameSection(s.deps, book, b, '')
+    await removeChapter(s.deps, book.id, { sectionId: b, held: [] })
+    s.clock.set(s.clock.now() + 60_000)
+    await takeMoment(s.deps, book.id)
+    const listing = (await listingOf(s.deps, book.id))!
+    expect(shapeAt(listing, second).sections.map((x) => [x.sectionId, x.removed])).toEqual([
+      [a, false],
+      [b, true],
+    ])
+    expect(shapeAt(listing, s.clock.now()).sections.map((x) => x.removed)).toEqual([false])
+  })
+})
+
+describe('a section read at a time', () => {
+  const moments = [
+    { at: 10, content: 'one', title: 'A', kept: false },
+    { at: 20, content: 'two', title: 'B', kept: false },
+  ]
+
+  it('is the latest moment at or before it', () => {
+    expect(readingAt(moments, 15, 'X')).toEqual({ index: 0, content: 'one', title: 'A' })
+    expect(readingAt(moments, 20, 'X')).toEqual({ index: 1, content: 'two', title: 'B' })
+    expect(readingAt(moments, Number.POSITIVE_INFINITY, 'X').content).toBe('two')
+  })
+
+  it('is empty, under the title it was listed with, before its first moment, standing on the first', () => {
+    expect(readingAt(moments, 5, 'Listed')).toEqual({ index: 0, content: '', title: 'Listed' })
+  })
+
+  it('is nowhere with no moment at all', () => {
+    expect(readingAt([], 5, 'Listed')).toEqual({ index: -1, content: '', title: 'Listed' })
+    expect(readingAt(moments, undefined, 'Listed').index).toBe(0)
+  })
+})
+
+describe('a section’s text at a time, read alone', () => {
+  it('is its version then, empty before the first, and the working copy now', async () => {
+    const s = setup()
+    const { book, a, b, first, second } = await twoChapters(s)
+    expect(await textAt(s.deps, a, first)).toBe('chapter one')
+    expect(await textAt(s.deps, b, first)).toBe('')
+    expect(await textAt(s.deps, b, second)).toBe('chapter two')
+    s.clock.set(s.clock.now() + 60_000)
+    await write(s.deps, book, b, 'chapter two, longer')
+    expect(await textAt(s.deps, b, Number.POSITIVE_INFINITY)).toBe('chapter two, longer')
+    expect(await textAt(s.deps, b, second)).toBe('chapter two')
+  })
+
+  it('agrees with the section’s moments', async () => {
+    const s = setup()
+    const { book, a, first, second } = await twoChapters(s)
+    const moments = await momentsOf(s.deps, book.id, a)
+    for (const at of [first, second, Number.POSITIVE_INFINITY]) expect(await textAt(s.deps, a, at)).toBe(readingAt(moments, at, '').content)
   })
 })

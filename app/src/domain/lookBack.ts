@@ -91,17 +91,42 @@ export function listingOf(deps: Pick<Deps, 'store'>, pieceId: string): Promise<L
   })
 }
 
+/** A section as a piece listed it at a time. */
+export interface Listed extends OutlineSection {
+  /** It is not in the piece now: removed since. */
+  removed: boolean
+}
+
+/** The piece's outline as it stood at a time: what a title page and Contents show of it. */
+export interface Shape {
+  title: string
+  /** A book's subtitle. */
+  subtitle?: string
+  /** In reading order. A journal's days run oldest first, whatever order they were stored in. */
+  sections: Listed[]
+}
+
 /**
- * The sections the piece listed at a time, in reading order (0005): the outline in force then, so a
- * chapter added since is absent and one removed since is there. Before its first outline, the oldest;
- * after its last, the piece as it stands, which a window that does not write may know better.
- * A journal's days run oldest first, whatever order they were stored in.
+ * The piece's outline in force at a time (0005): its title, subtitle and sections then, so a chapter added
+ * since is absent and one removed since is there, marked. Before its first outline, the oldest; after its
+ * last, the piece as it stands, which a window that does not write may know better.
  */
-export function sectionsAt(listing: Listing, at: number): OutlineSection[] {
+export function shapeAt(listing: Listing, at: number): Shape {
   const { piece, outlines } = listing
   const newest = outlines.at(-1)
-  const sections = !newest || at > newest.createdAt ? piece.sections : (outlineAt(outlines, at) ?? outlines[0]!).sections
-  return piece.kind === 'journal' ? [...sections].sort((a, b) => a.title.localeCompare(b.title)) : sections
+  const from = !newest || at > newest.createdAt ? piece : (outlineAt(outlines, at) ?? outlines[0]!)
+  const now = new Set(piece.sections.map((s) => s.sectionId))
+  const sections = from.sections.map((s): Listed => ({ ...s, removed: !now.has(s.sectionId) }))
+  return {
+    title: from.title,
+    ...(from.subtitle !== undefined && { subtitle: from.subtitle }),
+    sections: piece.kind === 'journal' ? sections.sort((a, b) => a.title.localeCompare(b.title)) : sections,
+  }
+}
+
+/** The sections the piece listed at a time, in reading order. */
+export function sectionsAt(listing: Listing, at: number): Listed[] {
+  return shapeAt(listing, at).sections
 }
 
 /**
@@ -115,9 +140,45 @@ export function timeOf(moments: Moment[], index: number): number | undefined {
 }
 
 /** The section a turn reaches from this one, on (1) or back (-1), or none past the ends or from one not listed. */
-export function sectionBeyond(sections: OutlineSection[], sectionId: string, dir: 1 | -1): string | undefined {
+export function sectionBeyond(sections: readonly OutlineSection[], sectionId: string, dir: 1 | -1): string | undefined {
   const here = sections.findIndex((s) => s.sectionId === sectionId)
   return here < 0 ? undefined : sections[here + dir]?.sectionId
+}
+
+/** What a section reads as at a time. */
+export interface Reading {
+  /** The moment under the hairline, or -1 where the section has none. */
+  index: number
+  content: string
+  title: string
+}
+
+/**
+ * A section at a time: the latest of its moments at or before it. A section the piece listed then with
+ * no moment yet reads as empty, under the title it was listed with; the tape stands on its first moment,
+ * the nearest it has.
+ */
+export function readingAt(moments: Moment[], at: number | undefined, listedTitle: string): Reading {
+  const found = at === undefined ? -1 : moments.findLastIndex((m) => m.at <= at)
+  const moment = moments[found]
+  if (moment) return { index: found, content: moment.content, title: moment.title }
+  return { index: moments.length > 0 ? 0 : -1, content: '', title: listedTitle }
+}
+
+/**
+ * A section's text at a time, read alone: Contents lays each chapter out to count its pages, and a chapter
+ * is not worth its whole tape for that. As `momentsOf` reads it: a time past every version, now, is the
+ * working copy; a time before the first version is empty.
+ */
+export function textAt(deps: Pick<Deps, 'store'>, sectionId: string, at: number): Promise<string> {
+  return deps.store.transaction(async (tx) => {
+    const versions = history(await tx.versionsOf(sectionId))
+    if (at === Number.POSITIVE_INFINITY) {
+      const working = await tx.working(sectionId)
+      return working?.content ?? versions.at(-1)?.content ?? ''
+    }
+    return versions.findLast((v) => v.createdAt <= at)?.content ?? ''
+  })
 }
 
 /**
