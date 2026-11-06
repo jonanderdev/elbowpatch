@@ -2408,6 +2408,12 @@ button.count[aria-expanded='true'] {
   .contents-rail .contents-row[aria-current='true'] {
     color: var(--title);
   }
+  /* An essay's pages keep to one line each; only a long first word needs cutting. */
+  .pages-rail .contents-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .contents-rail .contents-remove {
     padding: 0 12px;
   }
