@@ -386,11 +386,12 @@ export function Page({
     if (railed && rail.open) live.reread()
   }, [railed, rail.open, live.reread])
 
-  // Closing the tools closes what was opened from them; the focus goes back to the page button.
+  // Closing the tools closes what was opened from them; the focus goes back to the page button, unless it is in the text:
+  // looked at again a frame later, as a sheet's is, so a caret there stays and the keyboard with it.
   const closeTools = useCallback((): void => {
     setSheet(null)
     setTools(false)
-    requestAnimationFrame(() => pageButton.current?.focus())
+    if (fromTools()) requestAnimationFrame(() => (fromTools() ? pageButton.current?.focus() : undefined))
   }, [])
 
   // A sheet from the phone's tools bar sits above it; one from the desktop head drops under the control
@@ -859,6 +860,11 @@ export function Page({
 function fromSheet(): boolean {
   const active = document.activeElement
   return !active || active === document.body || !!active.closest('.sheet')
+}
+
+function fromTools(): boolean {
+  const active = document.activeElement
+  return fromSheet() || !!active?.closest('.tools')
 }
 
 function below(control: HTMLElement): CSSProperties {
