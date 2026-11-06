@@ -1121,6 +1121,30 @@ test('a failed bring back leaves everything as it was, says so with Try again, a
   expect((await versionsOf(page)).at(-1)!.content).toBe('One.')
 })
 
+test('a failed bring back stops asking to be tried again once another window writes the piece', async ({ page, context }) => {
+  await history(page, ['One.', 'Two.'])
+  await open(page)
+  await expect(oldText(page)).toHaveText('One.')
+  await page.evaluate(() => {
+    const put = IDBObjectStore.prototype.put
+    IDBObjectStore.prototype.put = function (...args) {
+      if (this.name === 'versions') throw new Error('No room')
+      return put.apply(this, args)
+    }
+  })
+  await machine(page).getByRole('button', { name: 'Bring essay back' }).click()
+  await expect(machine(page).getByRole('button', { name: 'Try again' })).toBeVisible()
+
+  const second = await context.newPage()
+  await second.goto(page.url())
+  await expect(second.getByText('Open in another window')).toBeVisible()
+  await second.getByRole('button', { name: 'Write here' }).click()
+  await expect(second.locator('.body')).toHaveAttribute('contenteditable', 'true')
+
+  await expect(machine(page).getByRole('button', { name: 'Try again' })).toHaveCount(0)
+  await expect(machine(page).getByRole('button', { name: 'Bring essay back' })).toHaveAttribute('aria-disabled', 'true')
+})
+
 test('after a failure, ✕ goes back to a page that was never sealed: what is typed there is saved and stays through a reload', async ({ page }) => {
   await history(page, ['One.', 'Two.'])
   await open(page)

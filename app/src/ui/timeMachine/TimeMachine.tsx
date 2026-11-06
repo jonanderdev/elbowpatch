@@ -167,6 +167,10 @@ export function TimeMachine({ deps, looking, writes, onBringBack, onKeepCopy, le
   const chosenWords = selected.part?.passage.markdown
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new selection starts afresh.
   useEffect(() => setCopied(false), [chosenWords])
+  // Another window took the piece: a failed bring back cannot be tried again here, so the bar says what it can.
+  useEffect(() => {
+    if (!writes) setBringFailed(false)
+  }, [writes])
   const reader = useReader(mount, today.content, piece.lang, selected.follow)
   const { pager, page, announcement } = usePager({
     screen,
