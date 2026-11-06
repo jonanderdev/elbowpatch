@@ -555,7 +555,7 @@ test('a window that is not writing can still open chapters, and stays there on W
   await expect(second.locator('.title')).toHaveText('Two')
 })
 
-test('journals and essays are unchanged: no control on the running head, and the count opens nothing', async ({ page }) => {
+test('an essay is unchanged: no control on the running head, and the count opens nothing', async ({ page }) => {
   phoneOnly(page)
   await page.goto('./')
   await page.locator('.start.essay').click()
@@ -568,12 +568,6 @@ test('journals and essays are unchanged: no control on the running head, and the
   await expect(runningHead(page)).toHaveCount(0)
   await page.locator('.page-button').click()
   await expect(page.locator('.tools span.count')).toBeVisible()
-  await expect(page.locator('.tools button.count')).toHaveCount(0)
-
-  await page.goto('./#/')
-  await write(page, 'Journal')
-  await expect(page.locator('.book-title')).toBeFocused()
-  await page.locator('.page-button').click()
   await expect(page.locator('.tools button.count')).toHaveCount(0)
 })
 
@@ -734,17 +728,11 @@ test('just wide enough for the rail, a chapter opens with the rail standing stil
   await expect(page.locator('body')).not.toHaveAttribute('data-rail-slid')
 })
 
-test('an essay and a journal have no rail and no toggle', async ({ page }) => {
+test('an essay has no rail and no toggle', async ({ page }) => {
   desktopOnly(page)
   await page.goto('./')
   await page.locator('.start.essay').click()
   await expect(page.locator('.title')).toBeFocused()
-  await expect(contents(page)).toHaveCount(0)
-  await expect(toggle(page)).toHaveCount(0)
-
-  await page.goto('./#/')
-  await write(page, 'Journal')
-  await expect(page.locator('.book-title')).toBeFocused()
   await expect(contents(page)).toHaveCount(0)
   await expect(toggle(page)).toHaveCount(0)
 })

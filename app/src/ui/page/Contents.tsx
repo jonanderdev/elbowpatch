@@ -102,7 +102,7 @@ interface ContentsRailProps extends ContentsListProps {
   children?: ReactNode
 }
 
-const RAIL_ID = 'contents-rail'
+export const RAIL_ID = 'contents-rail'
 
 /**
  * Contents on desktop: the rail, which folds away and never moves the text (DESIGN.md, Layout). Folded,
@@ -145,19 +145,21 @@ export function ContentsRail({ chapters, current, removable, pages, open, onOpen
 }
 
 interface RailToggleProps {
+  /** What the rail holds. */
+  label: 'Contents' | 'Days'
   open: boolean
   onToggle(): void
   buttonRef: RefObject<HTMLButtonElement | null>
 }
 
 /** Folds the rail away and opens it again, from the path. Pressed, it leaves the focus in the text. */
-export function RailToggle({ open, onToggle, buttonRef }: RailToggleProps): ReactElement {
+export function RailToggle({ label, open, onToggle, buttonRef }: RailToggleProps): ReactElement {
   return (
     <button
       ref={buttonRef}
       type="button"
       className="icon-button quiet rail-toggle"
-      aria-label="Contents"
+      aria-label={label}
       aria-expanded={open}
       aria-controls={RAIL_ID}
       onMouseDown={(e) => e.preventDefault()}
@@ -170,21 +172,23 @@ export function RailToggle({ open, onToggle, buttonRef }: RailToggleProps): Reac
 
 interface RunningHeadControlProps {
   title: string
+  /** What it drops. */
+  label: 'Contents' | 'Days'
   open: boolean
   onOpen(from: HTMLElement): void
 }
 
-/** A book's running head on a phone: a control with ⌄ that drops Contents (DESIGN.md, Control). */
-export function RunningHeadControl({ title, open, onOpen }: RunningHeadControlProps): ReactElement {
+/** The running head on a phone: a control with ⌄ that drops a book's Contents or a journal's Days (DESIGN.md, Control). */
+export function RunningHeadControl({ title, label, open, onOpen }: RunningHeadControlProps): ReactElement {
   const name = title.trim() || 'Untitled'
   return (
     <button
       type="button"
       className="running-control"
-      aria-label={`${name}. Contents`}
+      aria-label={`${name}. ${label}`}
       aria-haspopup="dialog"
       aria-expanded={open}
-      // Pressed, it leaves the focus in the text: Contents opens with the keyboard up.
+      // Pressed, it leaves the focus in the text: the sheet opens with the keyboard up.
       onMouseDown={(e) => e.preventDefault()}
       onClick={(e) => onOpen(e.currentTarget)}
     >

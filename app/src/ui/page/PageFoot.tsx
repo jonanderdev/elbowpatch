@@ -8,6 +8,8 @@ interface PageFootProps {
   page?: number
   count?: number
   words: number
+  /** The day on the page, in a journal: its count goes by it. */
+  day?: string
   journal: boolean
   /** A book's or a journal's title page, which carries no folio. */
   titlePage: boolean
@@ -19,7 +21,7 @@ interface PageFootProps {
   onCloseTools(): void
   onTextSettings(): void
   onExport(): void
-  /** A book's count opens Contents. */
+  /** A book's count opens Contents, and a journal's Days. */
   onContents?(from: HTMLElement): void
   contentsOpen: boolean
 }
@@ -32,6 +34,7 @@ export function PageFoot({
   page,
   count,
   words,
+  day,
   journal,
   titlePage,
   tools,
@@ -62,6 +65,7 @@ export function PageFoot({
             page={page}
             count={count}
             words={words}
+            {...(day ? { day } : {})}
             onContents={onContents}
             contentsOpen={contentsOpen}
             onClose={onCloseTools}

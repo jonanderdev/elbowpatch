@@ -1,9 +1,10 @@
 import { TextSelection } from 'prosemirror-state'
 import { type CSSProperties, type ReactElement, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { type Day, dayBeyond, journalDays } from '../../domain/days'
 import { countWords } from '../../domain/markdown'
 import type { Piece } from '../../domain/model'
 import { type BookCount, bookCount, contents, type Deps, type Removed, removableChapters, savePages, withOpenSection } from '../../domain/pieces'
-import { pageLine } from '../../domain/words'
+import { dayShort, isoDay, pageLine } from '../../domain/words'
 import { scrollToCaret, showCaret, toOpeningPage } from '../../page/caret'
 import { type Editor, selectionBox } from '../../page/editor'
 import { screenOf } from '../../page/pager'
@@ -19,6 +20,7 @@ import { markdownFile } from '../files/markdownFile'
 import { useSettings } from '../stores/settings'
 import { useUnsaved } from '../stores/unsaved'
 import { ContentsRail, ContentsSheet, NewChapter, RailToggle, RunningHeadControl } from './Contents'
+import { DaysRail, DaysSheet } from './Days'
 import { fillTitleFields, keptFor, type OpenAt, type Opened, type TitleRefs } from './fields'
 import { PageFoot, StatusLine } from './PageFoot'
 import { SectionTitle, TitlePage } from './Titles'
@@ -115,11 +117,12 @@ export function Page({
   const keyboard = useKeyboard()
   const phone = usePhone()
   const book = piece.kind === 'book'
+  const journal = piece.kind === 'journal'
   const live = useOutline(deps, piece, sectionId, counted)
   const rail = useRail()
   const waiting = useUnsaved()
-  /** On a book's page, on desktop: Contents is the rail. Essays and journals have none yet. */
-  const railed = book && !phone
+  /** On a book's or a journal's page, on desktop: Contents or Days is the rail. Essays have none yet. */
+  const railed = (book || journal) && !phone
   const [tools, setTools] = useState(false)
   const [sheet, setSheet] = useState<'text' | 'export' | 'contents' | null>(null)
   /** Contents was opened by keyboard, so it takes the focus. */
@@ -127,6 +130,10 @@ export function Page({
   const [line, setLine] = useState<string | null>(null)
   const [words, setWords] = useState(() => countWords(content))
   const [blank, setBlank] = useState(() => !content.trim())
+  const today = isoDay(new Date(deps.clock.now()))
+  const days = journal ? journalDays(live.outline, today, { sectionId, words }) : []
+  /** The day on the page, in a journal. */
+  const dayOpen = days.find((d) => d.sectionId === sectionId)?.iso ?? today
   const [heading, setHeading] = useState('')
   // A book's or a journal's name, as on its title page: the desktop path shows it while it is written.
   const [name, setName] = useState(piece.title)
@@ -400,8 +407,15 @@ export function Page({
     live.reread()
   }
 
-  // The chapter before or after this one in the book as it stands now.
+  // A day not begun has no section yet: the app opens it by its date.
+  const dayId = (day: Day): string => day.sectionId ?? day.iso
+
+  // The chapter before or after this one in the book as it stands now, or the day in the journal.
   function chapterBeyond(dir: 1 | -1): string | undefined {
+    if (journal) {
+      const day = dayBeyond(days, dayOpen, dir)
+      return day && dayId(day)
+    }
     if (!book) return undefined
     const { sections } = live.outline
     const here = sections.findIndex((s) => s.sectionId === sectionId)
@@ -558,11 +572,13 @@ export function Page({
   // to keep the keyboard up, and iOS paints its caret above the sheet, so the page's fields hide it (styles.css).
   // A sheet from the desktop head stands beside the page while the writer types, and leaves the caret alone.
   const sheetOver = sheet === 'contents' ? phone : sheet !== null && !anchor
+  // A journal's count goes by the day on the page.
+  const dayShown = journal ? { day: dayShort(dayOpen, deps.clock.now()) } : {}
 
   return (
     <div
       ref={screen}
-      className={piece.kind === 'journal' ? 'page-screen journal' : 'page-screen'}
+      className={journal ? 'page-screen journal' : 'page-screen'}
       data-keyboard={keyboard || undefined}
       data-tools={tools || undefined}
       data-sheet={sheetOver || undefined}
@@ -581,10 +597,22 @@ export function Page({
               onLibrary()
             }}
           />
-          {railed ? <RailToggle open={rail.open} onToggle={rail.toggle} buttonRef={railToggle} /> : null}
+          {railed ? <RailToggle label={journal ? 'Days' : 'Contents'} open={rail.open} onToggle={rail.toggle} buttonRef={railToggle} /> : null}
         </div>
         {/* In the head, so the toggle's next stop is what it opens, then the tools. */}
-        {railed ? (
+        {railed && journal ? (
+          <DaysRail
+            days={days}
+            current={dayOpen}
+            today={today}
+            open={rail.open}
+            onOpen={(day) => openChapter(dayId(day))}
+            onLeave={() => {
+              rail.letGo()
+              railToggle.current?.focus()
+            }}
+          />
+        ) : railed ? (
           <ContentsRail
             {...listed('desktop')}
             current={sectionId}
@@ -599,9 +627,10 @@ export function Page({
             {newChapter}
           </ContentsRail>
         ) : null}
-        {book && phone && !(titlePage && page === 0) ? (
+        {phone && (book ? !(titlePage && page === 0) : journal && page > openingAt) ? (
           // A chapter's opening page carries its title already: its head names the book, and Contents stays in reach.
-          <RunningHeadControl title={openingPage ? name : heading} open={sheet === 'contents'} onOpen={openContents} />
+          // A day's has no head: its date is on the page, and the count opens Days (DESIGN.md, The journal).
+          <RunningHeadControl title={openingPage ? name : heading} label={journal ? 'Days' : 'Contents'} open={sheet === 'contents'} onOpen={openContents} />
         ) : page > openingAt ? (
           <div className="running-head">{heading}</div>
         ) : null}
@@ -609,6 +638,7 @@ export function Page({
           page={shown.page}
           count={shown.pages}
           words={shown.words}
+          {...dayShown}
           sheet={anchor && sheet !== 'contents' ? sheet : null}
           onTextSettings={(from) => openSheet('text', from)}
           onExport={(from) => openSheet('export', from)}
@@ -674,7 +704,8 @@ export function Page({
         page={shown.page}
         count={shown.pages}
         words={shown.words}
-        journal={piece.kind === 'journal'}
+        {...dayShown}
+        journal={journal}
         titlePage={titlePage && page === 0}
         tools={tools}
         keyboard={keyboard}
@@ -683,11 +714,22 @@ export function Page({
         onCloseTools={closeTools}
         onTextSettings={() => openSheet('text')}
         onExport={() => openSheet('export')}
-        onContents={book ? openContents : undefined}
+        onContents={book || journal ? openContents : undefined}
         contentsOpen={sheet === 'contents'}
       />
 
-      {sheet === 'contents' && phone ? (
+      {sheet === 'contents' && phone && journal ? (
+        <DaysSheet
+          days={days}
+          current={dayOpen}
+          today={today}
+          last={today}
+          from={tools ? 'tools' : 'head'}
+          takeFocus={contentsFocus}
+          onOpen={(day) => openChapter(dayId(day))}
+          onDone={closeSheet}
+        />
+      ) : sheet === 'contents' && phone ? (
         <ContentsSheet
           {...listed('phone')}
           name={name}
@@ -703,7 +745,7 @@ export function Page({
       {sheet === 'text' ? <TextSettings onDone={closeSheet} style={anchor} /> : null}
       {sheet === 'export' ? (
         <ExportSheet
-          title={heading || (piece.kind === 'journal' ? piece.title : 'Untitled')}
+          title={heading || (journal ? piece.title : 'Untitled')}
           style={anchor}
           onMarkdown={async () => {
             const name = await exportMarkdown()

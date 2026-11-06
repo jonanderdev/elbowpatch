@@ -808,6 +808,10 @@ button.count:active,
 button.count[aria-expanded='true'] {
   background: var(--pressed);
 }
+/* The month stands right above it, and is tint enough (Figma, days open as a month). */
+.journal button.count[aria-expanded='true']:not(:active) {
+  background: none;
+}
 @media (min-width: 700px) {
   .count {
     padding: 0 10px 0 12px;
@@ -1521,6 +1525,103 @@ button.count[aria-expanded='true'] {
   right: 0;
   bottom: 0;
   padding: 0 10px;
+}
+/* Days on a phone: a month. Above the tools bar it opened from, as any sheet; from the running head, under the head. */
+.sheet.days {
+  gap: 0;
+  padding: 14px 12px 16px;
+}
+.sheet.days[data-from='head'] {
+  top: 56px;
+  bottom: auto;
+  max-height: calc(var(--visible-height, 100dvh) - 136px - var(--rise));
+}
+.month-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+}
+.month-title {
+  font-size: 17px;
+  line-height: 1.4;
+}
+.month-arrow.before .icon {
+  transform: rotate(90deg);
+}
+.month-arrow.after .icon {
+  transform: rotate(-90deg);
+}
+.month-weekdays,
+.month-grid {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  justify-items: center;
+}
+.month-weekdays {
+  padding-bottom: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--secondary);
+}
+.month-grid {
+  row-gap: 2px;
+}
+.month-day {
+  width: 40px;
+  height: 40px;
+  border: 1px solid transparent;
+  border-radius: 20px;
+  font-size: 15px;
+  line-height: 1;
+  font-variant-numeric: lining-nums tabular-nums;
+  color: var(--title);
+}
+.month-day[data-state='written'] {
+  font-weight: 560;
+}
+.month-day[data-state='empty'] {
+  color: var(--secondary);
+}
+/* Disabled and meant to recede: the contrast floor does not apply (DESIGN.md, Colour). */
+.month-day[data-state='future'] {
+  color: var(--surface-line);
+}
+.month-day[data-state='today'] {
+  background: var(--pressed);
+  border-color: var(--surface-line);
+}
+.month-day:not(:disabled):active {
+  background: var(--pressed);
+}
+@media (hover: hover) {
+  .month-day:not(:disabled):hover {
+    background: var(--pressed);
+  }
+}
+.month-foot {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 14px;
+  padding: 12px 8px 0;
+  border-top: 1px solid var(--surface-line);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--secondary);
+}
+.month-foot .text-link {
+  margin: -4px 0;
+  position: relative;
+}
+/* The word stays small; the finger gets 44px. */
+.month-foot .text-link::after {
+  content: '';
+  position: absolute;
+  inset: -9px 0;
 }
 .contents-foot {
   flex: none;
@@ -2376,6 +2477,33 @@ button.count[aria-expanded='true'] {
   .contents-rail {
     z-index: 0;
     padding: 76px 12px 24px 20px;
+  }
+  /* The journal's margin rule is its edge (DESIGN.md, Layout). */
+  .days-rail {
+    border-right: 0;
+  }
+  .days-month {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .days-month + .days-month {
+    margin-top: 16px;
+  }
+  .days-month-name {
+    margin: 0 0 4px;
+    font-size: 13px;
+    font-style: italic;
+    font-weight: 400;
+    color: var(--secondary);
+  }
+  .days-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
   }
   .contents-rail[data-folded] {
     visibility: hidden;
