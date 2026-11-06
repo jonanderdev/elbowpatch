@@ -295,3 +295,32 @@ test('words kept for an unsaved journal day are not written over what is brought
   await expect.poll(() => paragraphs(page)).toEqual(['Alpha one.', 'a lost sentence here.', 'Beta has And more.', 'Kept, not stored.'])
   expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('elbowpatch.unsaved.')))).toEqual([])
 })
+
+test('a passage whose window loses the piece on the way back says it did not come back', async ({ page, context }) => {
+  await changed(page, 'Old words here.', 'New words.')
+  const second = await context.newPage()
+  await second.goto(page.url())
+  await expect(second.getByText('Open in another window')).toBeVisible()
+  await open(page)
+  await select(page, 'Old words')
+  // The Time Machine is slow to close, so another window can take the piece between the press and the page.
+  await page.evaluate(() => {
+    const back = window.history.back.bind(window.history)
+    const later = window as unknown as { closeNow: () => void }
+    later.closeNow = () => void 0
+    window.history.back = () => {
+      later.closeNow = back
+    }
+  })
+  await menu(page).getByRole('button', { name: 'Bring part back' }).click()
+
+  await second.getByRole('button', { name: 'Write here' }).click()
+  await expect(second.locator('.body')).toHaveAttribute('contenteditable', 'true')
+  await expect(machine(page).getByRole('toolbar', { name: 'Selected words' }).getByRole('button', { name: 'Bring part back' })).toHaveCount(0)
+  await page.evaluate(() => (window as unknown as { closeNow: () => void }).closeNow())
+
+  await expect(machine(page)).toHaveCount(0)
+  await expect(page.locator('.line')).toContainText('Couldn’t bring that back just now. Nothing has changed.')
+  await expect(page.locator('.line')).toContainText('Open in another window')
+  expect(await paragraphs(page)).toEqual(['New words.'])
+})

@@ -10,7 +10,7 @@ export interface KeepCopy {
 
 /**
  * Keeping a copy of the moment on screen. `make` opens the copy and leaves the Time Machine, or rejects
- * with nothing made. A press while one is under way does nothing, so a double press makes one copy.
+ * with nothing made. A press while one is under way, or after one was made, does nothing, so a double press makes one copy.
  */
 export function useKeepCopy(make: (moment: Moment) => Promise<void>): KeepCopy {
   const [failed, setFailed] = useState<Moment | null>(null)
@@ -20,11 +20,11 @@ export function useKeepCopy(make: (moment: Moment) => Promise<void>): KeepCopy {
   const keep = (moment: Moment): void => {
     if (busy.current) return
     busy.current = true
-    make(moment)
-      .catch(() => setFailed(moment))
-      .finally(() => {
-        busy.current = false
-      })
+    // Once made, it stays busy: the screen is on its way out, and a press in that gap would make a second copy.
+    make(moment).catch(() => {
+      busy.current = false
+      setFailed(moment)
+    })
   }
 
   return { failed, keep }

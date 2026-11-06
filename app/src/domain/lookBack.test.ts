@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { memoryStore } from '../adapters/memory-store'
-import { listingOf, momentsOf, momentToOpen, readingAt, sectionBeyond, sectionsAt, shapeAt, textAt, textIndexOf, timeOf, wordsAt } from './lookBack'
+import { listingOf, momentsOf, momentToOpen, readingAt, sectionBeyond, sectionsAt, shapeAt, textAt, textIndexOf, timeOf, wordsReader } from './lookBack'
 import type { Piece } from './model'
 import { newPiece, removeChapter, rename, renameSection, setSubtitle, takeMoment, withChapter, withDay, write } from './pieces'
 import { thin } from './thinning'
@@ -474,17 +474,39 @@ describe('the words of several sections at a time', () => {
   it('are each one’s words then, none before its first version, and the working copy now', async () => {
     const s = setup()
     const { book, a, b, first, second } = await twoChapters(s)
-    expect(await wordsAt(s.deps, [a, b], first)).toEqual({ [a]: 2, [b]: 0 })
-    expect(await wordsAt(s.deps, [a, b], second)).toEqual({ [a]: 2, [b]: 2 })
+    expect(await wordsReader(s.deps)([a, b], first)).toEqual({ [a]: 2, [b]: 0 })
+    expect(await wordsReader(s.deps)([a, b], second)).toEqual({ [a]: 2, [b]: 2 })
     s.clock.set(s.clock.now() + 60_000)
     await write(s.deps, book, b, 'chapter two, longer')
-    expect(await wordsAt(s.deps, [a, b], Number.POSITIVE_INFINITY)).toEqual({ [a]: 2, [b]: 3 })
-    expect(await wordsAt(s.deps, [a, b], second)).toEqual({ [a]: 2, [b]: 2 })
+    expect(await wordsReader(s.deps)([a, b], Number.POSITIVE_INFINITY)).toEqual({ [a]: 2, [b]: 3 })
+    expect(await wordsReader(s.deps)([a, b], second)).toEqual({ [a]: 2, [b]: 2 })
+  })
+
+  it('are read once: a time at which a section held a text already counted reads nothing', async () => {
+    const s = setup()
+    const { piece, sectionId } = await essay(s, ['one', 'two words'])
+    const [one, two] = (await momentsOf(s.deps, piece.id, sectionId)).map((m) => m.at)
+    let reads = 0
+    const transaction = ((work: never) => {
+      reads++
+      return s.store.transaction(work)
+    }) as typeof s.store.transaction
+    const store = { ...s.store, transaction }
+    const read = wordsReader({ store })
+    expect(await read([sectionId], one!)).toEqual({ [sectionId]: 1 })
+    const first = reads
+    expect(await read([sectionId], two!)).toEqual({ [sectionId]: 2 })
+    expect(reads - first).toBe(1)
+    // Both texts are known now.
+    expect(await read([sectionId], one!)).toEqual({ [sectionId]: 1 })
+    expect(await read([sectionId], two! + 1)).toEqual({ [sectionId]: 2 })
+    expect(reads - first).toBe(1)
   })
 
   it('agree with each section’s text', async () => {
     const s = setup()
     const { a, b, second } = await twoChapters(s)
-    for (const id of [a, b]) expect((await wordsAt(s.deps, [a, b], second))[id]).toBe((await textAt(s.deps, id, second)).split(/\s+/).filter(Boolean).length)
+    for (const id of [a, b])
+      expect((await wordsReader(s.deps)([a, b], second))[id]).toBe((await textAt(s.deps, id, second)).split(/\s+/).filter(Boolean).length)
   })
 })

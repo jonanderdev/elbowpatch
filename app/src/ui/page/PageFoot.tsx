@@ -101,16 +101,18 @@ interface StatusLineProps {
   line: string | null
   /** The line is a calm one after an action: secondary, with no surface. */
   calm?: boolean
+  /** Said ahead of "Open in another window", when what the writer asked for was not done because of it. */
+  note?: string | null
   onWriteHere(): void
   onSaveCopy(): void
 }
 
 /** One line at the foot, most important first: another window writes, a save failed, or a calm note. */
-export function StatusLine({ writer, failed, line, calm = false, onWriteHere, onSaveCopy }: StatusLineProps): ReactElement | null {
+export function StatusLine({ writer, failed, line, calm = false, note, onWriteHere, onSaveCopy }: StatusLineProps): ReactElement | null {
   if (writer === 'elsewhere')
     return (
       <div className="line surface" role="status">
-        Open in another window ·
+        {note ? `${note} ` : null}Open in another window ·
         <button type="button" onClick={onWriteHere}>
           Write here
         </button>

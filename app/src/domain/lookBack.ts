@@ -188,15 +188,36 @@ async function textIn(tx: Tx, sectionId: string, at: number): Promise<string> {
 }
 
 /**
- * Several sections' words at a time, read in one go as `textAt` reads their text: a journal's Days as it was lists
- * each day with the words it held then. A section with no version yet has none.
+ * Several sections' words at a time, as `textAt` reads their text: a journal's Days as it was lists each day with the
+ * words it held then. A section with no version yet has none. The reader remembers what it has read: a section is
+ * indexed once, and a text counted once, so moving to another time reads only the days whose words are new there.
+ * What a section held is fixed while the Time Machine is open (nothing is written), so the memory is for that long.
  */
-export function wordsAt(deps: Pick<Deps, 'store'>, sectionIds: readonly string[], at: number): Promise<Record<string, number>> {
-  return deps.store.transaction(async (tx) => {
+export function wordsReader(deps: Pick<Deps, 'store'>): (sectionIds: readonly string[], at: number) => Promise<Record<string, number>> {
+  const indexes = new Map<string, Promise<TextIndex>>()
+  /** Words by the name of the text they were counted from. */
+  const counted = new Map<string, number>()
+  return async (sectionIds, at) => {
     const words: Record<string, number> = {}
-    for (const id of sectionIds) words[id] = countWords(await textIn(tx, id, at))
+    await Promise.all(
+      sectionIds.map(async (id) => {
+        let found = indexes.get(id)
+        if (!found) {
+          found = textIndexOf(deps, id)
+          indexes.set(id, found)
+        }
+        const index = await found
+        const key = index.keyAt(at)
+        let n = counted.get(key)
+        if (n === undefined) {
+          n = countWords(await index.read(key))
+          counted.set(key, n)
+        }
+        words[id] = n
+      }),
+    )
     return words
-  })
+  }
 }
 
 /** What a section's text rests on over time, read once: which text it held at a time, named, and the words each name stands for. */

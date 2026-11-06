@@ -693,6 +693,19 @@ test('Escape closes a sheet first, and only the next one leaves the page', async
   await expect(page.getByRole('navigation', { name: 'Library' })).toBeVisible()
 })
 
+test('Escape closes the tools and leaves the caret in the text', async ({ page }) => {
+  phoneOnly(page)
+  await importBook(page, THREE)
+  await page.locator('.page-button').click()
+  await expect(page.locator('.tools')).toBeVisible()
+  await page.locator('.body').click()
+  await expect(page.locator('.body')).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(page.locator('.tools')).toBeHidden()
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))
+  await expect(page.locator('.body')).toBeFocused()
+})
+
 test('Escape with words selected stays on the page', async ({ page }) => {
   desktopOnly(page)
   await importBook(page, THREE)

@@ -141,6 +141,8 @@ export function Page({
   const [line, setLine] = useState<string | null>(opened.line ?? null)
   /** The line said after a passage was brought back (Brought back from Sunday evening.): calm, as the line a page opens with is. */
   const [brought, setBrought] = useState<string | null>(null)
+  /** Said at the foot when a passage could not come back because another window writes the piece now. */
+  const [refused, setRefused] = useState<string | null>(null)
   const [words, setWords] = useState(() => countWords(content))
   const [blank, setBlank] = useState(() => !content.trim())
   const today = isoDay(new Date(deps.clock.now()))
@@ -384,11 +386,12 @@ export function Page({
     if (railed && rail.open) live.reread()
   }, [railed, rail.open, live.reread])
 
-  // Closing the tools closes what was opened from them; the focus goes back to the page button.
+  // Closing the tools closes what was opened from them; the focus goes back to the page button, unless it is in the text:
+  // looked at again a frame later, as a sheet's is, so a caret there stays and the keyboard with it.
   const closeTools = useCallback((): void => {
     setSheet(null)
     setTools(false)
-    requestAnimationFrame(() => pageButton.current?.focus())
+    if (fromTools()) requestAnimationFrame(() => (fromTools() ? pageButton.current?.focus() : undefined))
   }, [])
 
   // A sheet from the phone's tools bar sits above it; one from the desktop head drops under the control
@@ -495,6 +498,9 @@ export function Page({
       setBrought(text)
       setLine(text)
       setSaid({ text, over: announcement })
+    },
+    onRefused() {
+      setRefused('Couldn’t bring that back just now. Nothing has changed.')
     },
   })
 
@@ -620,6 +626,13 @@ export function Page({
 
   /** The line the page opened with, or one said after a passage was brought back, is calm: secondary, with no surface, and the folio stands aside for it. */
   const calm = line !== null && (line === opened.line || line === brought) && writer !== 'elsewhere' && !failed
+
+  // What was said of a passage that did not come back stays a few seconds, as any line does.
+  useEffect(() => {
+    if (!refused) return
+    const t = setTimeout(() => setRefused(null), 8000)
+    return () => clearTimeout(t)
+  }, [refused])
 
   // A calm line at the foot for a few seconds.
   useEffect(() => {
@@ -833,7 +846,7 @@ export function Page({
       ) : null}
 
       {/* shortcut: Save a copy holds the unsaved section only, not the whole piece. */}
-      <StatusLine writer={writer} failed={failed} line={line} calm={calm} onWriteHere={onWriteHere} onSaveCopy={() => void exportMarkdown()} />
+      <StatusLine writer={writer} failed={failed} line={line} note={refused} calm={calm} onWriteHere={onWriteHere} onSaveCopy={() => void exportMarkdown()} />
 
       <div className="visually-hidden" aria-live="polite">
         {said?.over === announcement ? said.text : announcement}
@@ -847,6 +860,11 @@ export function Page({
 function fromSheet(): boolean {
   const active = document.activeElement
   return !active || active === document.body || !!active.closest('.sheet')
+}
+
+function fromTools(): boolean {
+  const active = document.activeElement
+  return fromSheet() || !!active?.closest('.tools')
 }
 
 function below(control: HTMLElement): CSSProperties {

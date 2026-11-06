@@ -2620,12 +2620,14 @@ button.count[aria-expanded='true'] {
     max-width: 296px;
     overflow-wrap: anywhere;
   }
-  /* A calm line stands under the text column, where the folio does, and keeps to its width. */
+  /* A calm line stands under the text column, where the folio does, and keeps to its width. Its text starts 54px
+     above the bottom edge, as the frames draw it (the line is 44px tall, its text centred). */
   .page-screen .line.calm {
     max-width: var(--measure-px);
+    bottom: 23px;
   }
-  /* It stands 12px above *+ New chapter*, which a long book holds at the rail's foot (24px up, 31px tall). */
-  .page-screen:has(.contents-rail:not([data-folded]) .new-chapter) .line {
+  /* A line in the rail stands 12px above *+ New chapter*, which a long book holds at the rail's foot (24px up, 31px tall). */
+  .page-screen:has(.contents-rail:not([data-folded]) .new-chapter) .line:not(.calm) {
     bottom: calc(24px + 31px + 12px);
   }
   /* A long list can still scroll its last rows clear of the line. The room is out of flow, so nothing in

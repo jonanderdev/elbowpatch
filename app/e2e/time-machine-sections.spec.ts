@@ -130,6 +130,48 @@ test('a chapter added since is not there at an earlier moment, and is there at n
   await expect(oldText(page)).toHaveText('Third.')
 })
 
+test('a chapter listed at that time with no words yet reads empty, and nothing can be brought back from it', async ({ page }) => {
+  await importBook(page, '# One\n\nFirst chapter.\n\n# Two\n\nSecond.\n')
+  await keepMoment(page)
+  await typeAtEnd(page, ' Then more.')
+  await keepMoment(page)
+  await openContents(page)
+  await contents(page).getByRole('button', { name: '+ New chapter' }).click()
+  await expect(page.locator('.title')).toBeFocused()
+  await page.keyboard.type('Three')
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('Third.')
+  await saved(page, 'Third.')
+  await goTo(page, 'One')
+  await typeAtEnd(page, ' And more.')
+  // Thinning has taken the listings: the book lists chapter three as it stands, and nothing of its own is older than its words.
+  await page.evaluate(
+    () =>
+      new Promise<void>((done) => {
+        const opened = indexedDB.open('elbowpatch')
+        opened.onsuccess = () => {
+          const store = opened.result.transaction('outlines', 'readwrite').objectStore('outlines')
+          store.clear()
+          store.transaction.oncomplete = () => {
+            opened.result.close()
+            done()
+          }
+        }
+      }),
+  )
+  await open(page)
+  await expect(tape(page)).toBeVisible()
+  await openMachineContents(page)
+  await rowsOf(page).nth(2).click()
+  await expect(machine(page).locator('.title')).toHaveText('Three')
+  await expect(oldText(page)).toHaveText('')
+  const action = machine(page).getByRole('button', { name: 'Bring chapter back' })
+  await expect(action).toHaveAttribute('aria-disabled', 'true')
+  await action.click({ force: true })
+  await expect(machine(page)).toBeVisible()
+  await expect(machine(page).getByRole('button', { name: 'Keep a copy' })).toBeVisible()
+})
+
 test('the tape is the chapter on screen’s own, and the time it stands at goes with a turn', async ({ page }) => {
   await importBook(page, '# One\n\nFirst chapter.\n\n# Two\n\nSecond.\n')
   await keepMoment(page)
