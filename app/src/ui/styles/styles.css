@@ -1464,8 +1464,11 @@ button.count[aria-expanded='true'] {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  margin: 0;
-  padding: 0;
+  /* Room for the focus ring (2px, offset 2px), which the scrolling list would clip; the margin keeps the
+     rows where they stood. A row the keyboard scrolls to stops short of the edge by the same room. */
+  margin: -4px;
+  padding: 4px;
+  scroll-padding-block: 4px;
   list-style: none;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -1483,10 +1486,6 @@ button.count[aria-expanded='true'] {
   line-height: 1.4;
   color: var(--title);
   transition: background-color 160ms;
-}
-/* Inside the row: the list clips what stands outside it. */
-.contents-row:focus-visible {
-  outline-offset: -2px;
 }
 .contents-row:active,
 .contents-row[aria-current='true'] {
@@ -1511,6 +1510,10 @@ button.count[aria-expanded='true'] {
 .contents-line {
   position: relative;
 }
+/* Each line paints over the one before it: the ring stays over its neighbour's tint. */
+.contents-line:focus-within {
+  z-index: 1;
+}
 /* Where the page number would be, the word's end on its edge; the whole height of the row, 44px on a phone. */
 .contents-remove {
   position: absolute;
@@ -1518,9 +1521,6 @@ button.count[aria-expanded='true'] {
   right: 0;
   bottom: 0;
   padding: 0 10px;
-}
-.contents-remove:focus-visible {
-  outline-offset: -2px;
 }
 .contents-foot {
   flex: none;
@@ -2390,7 +2390,8 @@ button.count[aria-expanded='true'] {
   /* One line, 36px tall, as the library's places; 4px apart, so two tints never touch. */
   .contents-rail .contents-list {
     gap: 4px;
-    width: 296px;
+    /* 296px of rows, and the room for the ring either side. */
+    width: 304px;
   }
   .contents-rail .contents-row {
     align-items: center;

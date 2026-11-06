@@ -330,6 +330,43 @@ test('a sheet from the desktop head leaves the caret alone, for the writer typin
   expect(await carets(page)).toEqual(shown)
 })
 
+/** More chapters than a list shows at once. */
+const MANY = Array.from({ length: 40 }, (_, i) => `# Chapter ${i + 1}\n\nWords.\n`).join('\n')
+
+test('the focus ring on a Contents row stands whole outside it, at the top, the sides and the end of a long list', async ({ page, browserName }) => {
+  await importBook(page, MANY)
+  await contentsFromCount(page)
+  const list = contents(page).locator('.contents-list')
+  /** How far the focused row's ring, 4px round the row, stands inside what the list shows. Never less than 0. */
+  const room = () =>
+    list.evaluate((el) => {
+      const row = document.activeElement!.getBoundingClientRect()
+      const box = el.getBoundingClientRect()
+      return Math.min(row.top - 4 - box.top, box.bottom - row.bottom - 4, row.left - 4 - box.left, box.right - row.right - 4)
+    })
+  await list.evaluate((el) => {
+    el.scrollTop = 0
+  })
+  // A key first, so the ring shows. (Not in WebKit, whose Tab passes over buttons: there the room alone is read.)
+  await page.keyboard.press('Shift')
+  await rows(page).nth(1).focus()
+  await rows(page).first().focus()
+  if (browserName !== 'webkit') {
+    await expect(rows(page).first()).toHaveCSS('outline-offset', '2px')
+    await expect(rows(page).first()).toHaveCSS('outline-width', '2px')
+  }
+  expect(await room()).toBeGreaterThanOrEqual(-0.5)
+  // A row below the fold: the list scrolls to it, and the ring stays whole.
+  await rows(page).nth(25).focus()
+  expect(await list.evaluate((el) => el.scrollTop)).toBeGreaterThan(0)
+  expect(await room()).toBeGreaterThanOrEqual(-0.5)
+  await rows(page).last().focus()
+  await list.evaluate((el) => {
+    el.scrollTop = el.scrollHeight
+  })
+  expect(await room()).toBeGreaterThanOrEqual(-0.5)
+})
+
 test('words typed just before a jump are there after a reload, in their own chapter', async ({ page }) => {
   await importBook(page, TWO)
   await writeHere(page)
