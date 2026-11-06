@@ -152,6 +152,22 @@ test('a chapter opens at its opening page, the one on screen too', async ({ page
   await expect(runningHead(page)).toHaveCount(0)
 })
 
+test('the running head’s arrow points down when Contents is closed, up while it is open, and tapped again it closes', async ({ page }) => {
+  phoneOnly(page)
+  await importBook(page, THREE)
+  await openChapter(page, 'Two')
+  await page.keyboard.press('PageDown')
+  await expect(runningHead(page)).toContainText('Two')
+  const arrow = () => runningHead(page).locator('.icon').evaluate((el) => (getComputedStyle(el).transform === 'none' ? 'down' : 'up'))
+  expect(await arrow()).toBe('down')
+  await runningHead(page).click()
+  await expect(contents(page)).toBeVisible()
+  expect(await arrow()).toBe('up')
+  await runningHead(page).click()
+  await expect(contents(page)).toHaveCount(0)
+  expect(await arrow()).toBe('down')
+})
+
 test('Contents lists each chapter, says Untitled for one with no title, and marks the current one', async ({ page }) => {
   await importBook(page, 'Before any heading.\n\n# Two\n\nSecond.\n\n# Three\n\nThird.\n')
   await contentsFromCount(page)

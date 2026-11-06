@@ -616,6 +616,10 @@ button {
 .running-control .icon {
   flex: none;
 }
+/* While its sheet is open the arrow points up: tapped again it closes (DESIGN.md, Control). It turns at once. */
+.running-control[aria-expanded='true'] .icon {
+  transform: scaleY(-1);
+}
 
 .pager {
   position: absolute;
