@@ -178,13 +178,14 @@ test('the rail folds and opens and the text never moves, and it stays folded', a
   expect(await box()).toEqual(open)
 })
 
-test('the keyboard reaches every page, and Escape goes back to the toggle', async ({ page }) => {
+test('the keyboard reaches every page, and Escape goes back to the toggle', async ({ page, browserName }) => {
   desktopOnly(page)
   await importEssay(page)
   await toggle(page).focus()
   const count = await rows(page).count()
   for (let n = 1; n <= count; n++) {
-    await page.keyboard.press('Tab')
+    // Safari on a Mac tabs to buttons with Option held, unless the writer has turned on full keyboard access.
+    await page.keyboard.press(browserName === 'webkit' ? 'Alt+Tab' : 'Tab')
     await expect(row(page, n)).toBeFocused()
     await expect(row(page, n)).toHaveAccessibleName(new RegExp(`^Page ${n}: `))
   }
