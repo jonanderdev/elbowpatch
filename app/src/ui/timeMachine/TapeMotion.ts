@@ -6,6 +6,9 @@ import { glideTime, MAX_THROW, RECENTER, settleOn } from './ruler'
 const SLOP = 4
 /** How far back, in ms, the speed it was let go at is read. */
 const SPEED_OVER = 100
+/** Less time than this between the first and last reading, or less distance than MIN_FLICK, is a nudge, not a speed: a few pixels in a blink would throw the tape. */
+const LEAST_TIME = 24
+const MIN_FLICK = 12
 
 type PointerOn = ReactPointerEvent<HTMLElement>
 
@@ -126,7 +129,7 @@ export class TapeMotion {
     // The way it was going, over its last moments; stopped before it was let go, it is still.
     const last = drag.samples.at(-1)!
     const first = drag.samples.find((s) => last.t - s.t <= SPEED_OVER) ?? last
-    const still = e.timeStamp - last.t > SPEED_OVER || last.t === first.t
+    const still = e.timeStamp - last.t > SPEED_OVER || last.t - first.t < LEAST_TIME || Math.abs(last.x - first.x) < MIN_FLICK
     const velocity = still ? 0 : -(last.x - first.x) / (last.t - first.t)
     const tick = settleOn(this.where(), velocity, this.spacing, this.count)
     this.moveTo(tick * this.spacing)

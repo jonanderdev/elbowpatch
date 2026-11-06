@@ -759,6 +759,7 @@ async function longHistory(page: Page, ages: number[], kept = 0): Promise<void> 
   await seed(page, ages, kept)
   await open(page)
   await expect(ticks(page).first()).toBeVisible()
+  await expect(tape(page)).toBeFocused()
 }
 
 /** Where the tape stands: its tick, and whether its layer is at that tick's place and still. */
@@ -795,7 +796,7 @@ test('dragging the tape moves it, and it settles on a tick', async ({ page }) =>
   await expect(tape(page)).toHaveAttribute('aria-valuenow', String(end.tick))
   await expect(oldText(page)).toHaveText(`Moment ${end.tick}.`)
   // Dragged back past now, it stops at the last moment.
-  await drag(page, -2000, 12)
+  await drag(page, -170, 12)
   await expect.poll(async () => (await settled(page)).gliding).toBe(false)
   expect((await settled(page)).tick).toBe(count - 1)
   // A drag is not a tap: it goes nowhere else when the pointer is let go.
@@ -826,11 +827,11 @@ test('a year of moments draws only the ticks near the hairline, and the ends are
   await page.keyboard.press('End')
   await expect(oldText(page)).toHaveText('Words now.')
   // Thrown hard to the left, a drag goes a good way but never past what is drawn.
-  await drag(page, 300, 5)
+  await drag(page, 170, 5)
   await expect.poll(async () => (await settled(page)).gliding).toBe(false)
   const thrown = (await settled(page)).tick
   expect(thrown).toBeLessThan(3000 - 1)
-  expect(ticks(page).count()).resolves.toBeLessThan(260)
+  expect(await ticks(page).count()).toBeLessThan(260)
   expect((await settled(page)).x).toBe(thrown * 11)
 })
 
@@ -966,6 +967,7 @@ test('with reduced motion nothing glides or fades, and it is gone at once', asyn
   await seed(page, yearOfAges())
   await open(page)
   await expect(ticks(page).first()).toBeVisible()
+  await expect(tape(page)).toBeFocused()
   await page.keyboard.press('ArrowLeft')
   await expect(tape(page)).toHaveAttribute('aria-valuenow', String(yearOfAges().length - 3))
   await drag(page, 100, 6)
