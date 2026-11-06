@@ -27,17 +27,23 @@ import { raiseKeyboard } from '../page/useFocusOnOpen'
 import { waiting } from '../settings/PutAway'
 import { type Area, Settings } from '../settings/Settings'
 import { readLast, writeLast } from '../stores/last'
+import { TimeMachine } from '../timeMachine/TimeMachine'
 import { askToPersist } from './persist'
 import { replayJournal } from './replay'
 import { settled } from './settled'
+import { thinningGate } from './thinningGate'
 import { useBookNumbers } from './useBookNumbers'
 import { useRoute } from './useRoute'
+import { useTimeMachine } from './useTimeMachine'
 import { useWriterLock } from './useWriterLock'
 
 /** Counts the sections read from storage, so each reading opens a new page. */
 let reads = 0
 /** The least time the launch screen shows, from its first frame, in ms. */
 const MIN_LAUNCH = 1000
+
+/** When the app has a moment to spare. */
+const whenIdle = (f: () => void): void => void (window.requestIdleCallback ?? ((g: () => void) => setTimeout(g, 3000)))(() => f())
 
 const AREAS: Record<string, Area> = {
   '/settings/export': 'export',
@@ -53,6 +59,8 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
   const [pieces, setPieces] = useState<Piece[]>([])
   const [opened, setOpened] = useState<Opened | null>(null)
   const today = isoDay(new Date())
+  // Thinning and the end of put-away pieces' 30 days, which wait while the Time Machine is open.
+  const [thinning] = useState(() => thinningGate((held) => forgetPutAway(deps).then(() => thin(deps, held)), whenIdle))
 
   const [everything, setEverything] = useState<Piece[]>([])
   const refresh = useCallback(async () => {
@@ -104,13 +112,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
       setReady(true)
       document.getElementById('launch')?.setAttribute('hidden', '')
       // Thinning and the end of put-away pieces' 30 days run afterwards, when idle (0010).
-      const idle = window.requestIdleCallback ?? ((f: () => void) => setTimeout(f, 3000))
-      idle(
-        () =>
-          void forgetPutAway(deps)
-            .then(() => thin(deps))
-            .catch(() => {}),
-      )
+      whenIdle(thinning.start)
     })()
   }, [])
 
@@ -154,6 +156,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
 
   /** The open page saved, and the last one's closing save done; never waiting long for either. */
   const saveFirst = () => Promise.race([Promise.all([flushPage.current?.(), settled(closing.current)]), new Promise((r) => setTimeout(r, 1500))])
+  const timeMachine = useTimeMachine(thinning, saveFirst)
 
   // Another section of the open piece. The lock is the piece's, so it stays. The last chapter chosen
   // wins, should the writer choose again while a save runs.
@@ -214,6 +217,14 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
     setOpened({ piece, sectionId, content, updatedAt: piece.updatedAt, readAt: ++reads })
   }
 
+  // Save first, so the library already lists what was just written; never wait long for it.
+  // The first save also opens the database; a stuck one never holds the writer on the page for long.
+  const toLibrary = async (): Promise<void> => {
+    await saveFirst()
+    await refresh().catch(() => {})
+    go('/')
+  }
+
   const startNew = (kind: Kind) => {
     raiseKeyboard()
     let piece = newPiece(deps, kind, navigator.language || 'en')
@@ -249,21 +260,16 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
           }
           flushRef={flushPage}
           closingRef={closing}
-          covered={inLibrary || inSettings}
+          covered={inLibrary || inSettings || !!timeMachine.looking}
           counted={counted}
-          onLibrary={async () => {
-            // Save first, so the library already lists what was just written; never wait long for it.
-            // The first save also opens the database; a stuck one never holds the writer on the page for long.
-            await saveFirst()
-            await refresh().catch(() => {})
-            go('/')
-          }}
+          onLibrary={() => void toLibrary()}
           onOpenSection={(sectionId, writing, at) => void openSection(opened.piece, sectionId, writing, at)}
           onNewChapter={(after) => void newChapter(opened.piece, after)}
           onChapterStarted={chapterStarted}
           onChapterRejoined={chapterRejoined}
           onChapterRemoved={chapterRemoved}
           onReopen={(piece, content) => chapterReopened(piece, opened.sectionId, content)}
+          onTimeMachine={(now) => timeMachine.open(opened.piece, opened.sectionId, now)}
           onChange={(piece) => {
             askToPersist()
             setPieces((all) => {
@@ -273,6 +279,9 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
             })
           }}
         />
+      )}
+      {timeMachine.looking && (
+        <TimeMachine deps={deps} looking={timeMachine.looking} onBack={() => timeMachine.leave()} onHome={() => timeMachine.leave(() => void toLibrary())} />
       )}
       {/* The page changed under a screen reader: it hears which chapter it is in. Here, for a live region
           must stand before its words do, and the page is new for each chapter. */}

@@ -15,6 +15,7 @@ export function ToolsBar(props: {
   onClose(): void
   onTextSettings(): void
   onExport(): void
+  onTimeMachine(): void
 }): ReactElement {
   const settings = useSettings()
   const night = theme(settings) === 'night'
@@ -26,8 +27,9 @@ export function ToolsBar(props: {
     ref.current?.querySelector<HTMLElement>('button:not(.count)')?.focus()
   }, [])
 
-  // On a narrow phone a long count drops its last word; the label still says it in full.
-  const short = typeof window !== 'undefined' && window.innerWidth < 400 && full.length > 22
+  // On a narrow phone a long count drops its last word; the label still says it in full. The buttons
+  // and the bar's edges take about 256px with the screen's margins, and a character about 5.2px.
+  const short = typeof window !== 'undefined' && window.innerWidth < 400 && full.length > Math.min(22, (window.innerWidth - 256) / 5.2)
   const said = countSaid(props.page, props.count, props.words)
   const shown = short ? countLine(props.page, props.count, number(props.words)) : full
   const { onContents } = props
@@ -52,6 +54,7 @@ export function ToolsBar(props: {
       )}
       <span className="bar-separator" />
       <IconButton icon="export" label="Export" onClick={props.onExport} />
+      <IconButton icon="history" label="Time Machine" onClick={props.onTimeMachine} />
       <button type="button" className="icon-button" aria-label="Text settings" onClick={props.onTextSettings}>
         <span className="aa" aria-hidden="true">
           Aa
@@ -75,6 +78,7 @@ export function HeadTools(props: {
   sheet: 'text' | 'export' | null
   onTextSettings(from: HTMLElement): void
   onExport(from: HTMLElement): void
+  onTimeMachine(): void
 }): ReactElement {
   return (
     <div className="head-tools" role="toolbar" aria-label="Tools">
@@ -92,6 +96,7 @@ export function HeadTools(props: {
       >
         <Icon name="export" />
       </button>
+      <IconButton icon="history" label="Time Machine" quiet onClick={props.onTimeMachine} />
       <button
         type="button"
         className="icon-button quiet"

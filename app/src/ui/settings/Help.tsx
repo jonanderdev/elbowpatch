@@ -3,8 +3,6 @@ import { safariOutsideHomeScreen } from '../library/Notes'
 import { Answer } from './parts'
 
 // Help (DESIGN.md, Settings): short answers, inside the app so it works offline.
-// shortcut: Going back and the Time Machine's keys wait for the Time Machine, so Help never describes what isn't there.
-const TIME_MACHINE = false
 // shortcut: the line on exported pages waits for PDF export, the only export with pages.
 const PDF = false
 
@@ -12,7 +10,7 @@ const KEYS: [string, string][] = [
   ['Turn the page', 'Page Up / Page Down, or Alt + Left / Right'],
   ['Undo', '⌘/Ctrl + Z'],
   ['Redo', '⌘/Ctrl + Shift + Z'],
-  ...(TIME_MACHINE ? ([['Time Machine', '⌘/Ctrl + Alt + Z']] as [string, string][]) : []),
+  ['Time Machine', '⌘/Ctrl + Alt + Z'],
   ['Piece menu', 'Menu key, or Shift + F10'],
 ]
 
@@ -23,14 +21,12 @@ export function Help(): ReactElement {
       <Answer heading="Where your writing lives">
         <p>
           In this browser, on this device. There is no save button: your words are saved as you write. Clearing the browser's data clears your writing too, so
-          keep a copy: <a href="#/settings/export">Export &amp; import</a>.
+          export it now and then: <a href="#/settings/export">Export &amp; import</a>.
         </p>
       </Answer>
-      {TIME_MACHINE && (
-        <Answer heading="Going back">
-          <p>The Time Machine shows a piece as it was at any moment kept, and brings back a chapter, a day or a passage. Nothing later is lost.</p>
-        </Answer>
-      )}
+      <Answer heading="Going back">
+        <p>The Time Machine shows a piece as it was at any moment kept, and brings back a chapter, a day or a passage. Nothing later is lost.</p>
+      </Answer>
       <Answer heading="Page numbers">
         <p>
           A phone's page holds fewer words than a desktop's, so a piece has more pages on a phone. Find your way by chapter or by date.

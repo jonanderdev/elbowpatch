@@ -22,7 +22,7 @@ export function About(): ReactElement {
       </Answer>
       <Answer heading="No warranty">
         <p>
-          Elbowpatch is provided as-is, with no warranty. Keep a copy of what matters: <a href="#/settings/export">Export &amp; import</a>.
+          Elbowpatch is provided as-is, with no warranty. Export what matters: <a href="#/settings/export">Export &amp; import</a>.
         </p>
       </Answer>
       <Answer heading="The project">

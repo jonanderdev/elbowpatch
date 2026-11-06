@@ -18,12 +18,14 @@ import { download } from '../files/download'
 import { markdownFile } from '../files/markdownFile'
 import { useSettings } from '../stores/settings'
 import { useUnsaved } from '../stores/unsaved'
+import type { Today } from '../timeMachine/TimeMachine'
 import { ContentsRail, ContentsSheet, NewChapter, RailToggle, RunningHeadControl } from './Contents'
 import { fillTitleFields, keptFor, type OpenAt, type Opened, type TitleRefs } from './fields'
 import { PageFoot, StatusLine } from './PageFoot'
 import { PagesRail } from './PagesRail'
 import { SectionTitle, TitlePage } from './Titles'
 import { HeadTools, TextSettings } from './Tools'
+import { isTimeMachineKey } from './timeMachineKey'
 import { useCaretFollowing, useCaretKeys } from './useCaret'
 import { useChapterStart } from './useChapterStart'
 import { useEditor } from './useEditor'
@@ -68,6 +70,8 @@ interface Props {
   onChapterRemoved(removed: Removed, writing: boolean): void
   /** The chapter before this one left the book, and this one is now the first: its page opens again, with the title page. */
   onReopen(piece: Piece, content: string): void
+  /** Opens the Time Machine on this section, from what the page holds now. */
+  onTimeMachine(today: Today): void
   onChange(piece: Piece): void
 }
 
@@ -100,6 +104,7 @@ export function Page({
   onChapterRejoined,
   onChapterRemoved,
   onReopen,
+  onTimeMachine,
   onChange,
 }: Props): ReactElement {
   const { piece, sectionId } = opened
@@ -161,6 +166,8 @@ export function Page({
   const scrolled = windowScrolled || (keyboard && pageScrolled)
   /** The head's control that opened the sheet: the focus goes back to it when the sheet closes. */
   const opener = useRef<HTMLElement | null>(null)
+  /** What held the focus when the Time Machine opened, if not the text. */
+  const backFromLooking = useRef<HTMLElement | null>(null)
   const titles: TitleRefs = {
     title: useRef<HTMLHeadingElement>(null),
     bookTitle: useRef<HTMLHeadingElement>(null),
@@ -421,6 +428,32 @@ export function Page({
     onOpenSection(chosen, writing, at)
   }
 
+  // The Time Machine stands over the page, which stays as it is: only the tools fold, and the focus is
+  // remembered for the way back. In the text, the caret comes back by itself (useFocusOnOpen).
+  function lookBack(): void {
+    if (!editor) return
+    focus.leaving()
+    const active = document.activeElement as HTMLElement | null
+    if (!editor.view.hasFocus()) backFromLooking.current = active?.closest('.tools') ? pageButton.current : active
+    setTools(false)
+    setSheet(null)
+    onTimeMachine({ content: editor.markdown(), title: titles.title.current?.textContent ?? '', name })
+  }
+  const lookBackNow = useRef(lookBack)
+  lookBackNow.current = lookBack
+  useEffect(() => {
+    if (covered) return
+    backFromLooking.current?.focus()
+    backFromLooking.current = null
+    const onKey = (e: KeyboardEvent): void => {
+      if (!isTimeMachineKey(e)) return
+      e.preventDefault()
+      lookBackNow.current()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [covered])
+
   // A chapter chosen in Contents opens at its opening page.
   function openChapter(chosen: string): void {
     if (!editor || !pager) return
@@ -638,6 +671,7 @@ export function Page({
           sheet={anchor && sheet !== 'contents' ? sheet : null}
           onTextSettings={(from) => openSheet('text', from)}
           onExport={(from) => openSheet('export', from)}
+          onTimeMachine={lookBack}
         />
       </div>
 
@@ -709,6 +743,7 @@ export function Page({
         onCloseTools={closeTools}
         onTextSettings={() => openSheet('text')}
         onExport={() => openSheet('export')}
+        onTimeMachine={lookBack}
         onContents={book ? openContents : undefined}
         contentsOpen={sheet === 'contents'}
       />
