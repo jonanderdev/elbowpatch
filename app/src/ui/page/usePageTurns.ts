@@ -1,4 +1,4 @@
-import { type RefObject, useEffect, useRef } from 'react'
+import { type RefObject, useCallback, useEffect, useRef } from 'react'
 import { caretToEnd } from '../../page/caret'
 import type { Editor } from '../../page/editor'
 import type { Pager } from '../../page/pager'
@@ -32,10 +32,15 @@ interface Options {
   onCross(dir: 1 | -1): void
 }
 
-export function usePageTurns({ screen, viewport, bookTitle, editor, pager, covered, readOnly, onTurn, beyond, onCross }: Options): void {
+/** Turns to a page chosen by name, as a turn by hand does, the caret going along. */
+export type TurnTo = (page: number) => void
+
+export function usePageTurns({ screen, viewport, bookTitle, editor, pager, covered, readOnly, onTurn, beyond, onCross }: Options): TurnTo {
   // Read when a turn happens.
   const now = useRef({ covered, readOnly, onTurn, beyond, onCross })
   now.current = { covered, readOnly, onTurn, beyond, onCross }
+  /** The caret after a turn, once the listeners are on. */
+  const follow = useRef<(() => void) | null>(null)
 
   // The listeners stay on behind the library, and the keys ask `now` whether it is there: effects run
   // after paint, so listeners put on as it leaves would miss a key pressed on the page's first frames.
@@ -46,12 +51,9 @@ export function usePageTurns({ screen, viewport, bookTitle, editor, pager, cover
     if (!editor || !pager || !el || !viewportEl) return
 
     /**
-     * A page on or back. It takes the caret along, to the end of the text on the new page, where
-     * words are added next: always while writing, and on desktop also while reading, so a turn
-     * leaves the page ready to type (DESIGN.md, Behaviour). Not taken from the tools or a sheet;
-     * on a phone a swipe does not raise the keyboard, and a tap places it. With `extend` (Shift +
-     * Page Up / Down while writing), the selection grows there instead, and stops at the chapter's
-     * end: it never crosses into the next one.
+     * A page on or back, and the caret with it. With `extend` (Shift + Page Up / Down while
+     * writing), the selection grows there instead, and stops at the chapter's end: it never
+     * crosses into the next one.
      */
     const turn = (dir: 1 | -1, extend = false): void => {
       now.current.onTurn()
@@ -64,6 +66,17 @@ export function usePageTurns({ screen, viewport, bookTitle, editor, pager, cover
         if (!extend) now.current.onCross(dir)
         return
       }
+      takeCaret(extend)
+    }
+
+    /**
+     * The caret after a turn: to the end of the text on the new page, where words are added next:
+     * always while writing, and on desktop also while reading, so a turn leaves the page ready to
+     * type (DESIGN.md, Behaviour). Not taken from the tools, a sheet or the head, so a row of the
+     * rail pressed by keyboard keeps the focus; on a phone a swipe does not raise the keyboard, and
+     * a tap places it.
+     */
+    const takeCaret = (extend = false): void => {
       if (now.current.readOnly) return
       const view = editor.view
       const writing = view.hasFocus()
@@ -155,6 +168,7 @@ export function usePageTurns({ screen, viewport, bookTitle, editor, pager, cover
 
     if (crossedBy) onMouseMove(crossedBy)
     crossedBy = undefined
+    follow.current = takeCaret
 
     window.addEventListener('keydown', onKey)
     viewportEl.addEventListener('click', onPagerClick)
@@ -164,6 +178,7 @@ export function usePageTurns({ screen, viewport, bookTitle, editor, pager, cover
     el.addEventListener('mousemove', onMouseMove)
     el.addEventListener('click', onClick)
     return () => {
+      follow.current = null
       el.dataset.turn = ''
       window.removeEventListener('keydown', onKey)
       viewportEl.removeEventListener('click', onPagerClick)
@@ -179,4 +194,14 @@ export function usePageTurns({ screen, viewport, bookTitle, editor, pager, cover
   useEffect(() => {
     if (covered && screen.current) screen.current.dataset.turn = ''
   }, [screen, covered])
+
+  return useCallback(
+    (page) => {
+      if (!pager || page === pager.page) return
+      now.current.onTurn()
+      pager.turnTo(page)
+      follow.current?.()
+    },
+    [pager],
+  )
 }
