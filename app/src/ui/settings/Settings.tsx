@@ -5,6 +5,7 @@ import { longDate, number } from '../../domain/words'
 import { Path } from '../components/Path'
 import { APP_VERSION } from '../components/project'
 import { ScrollMark } from '../components/ScrollMark'
+import { usePhone } from '../components/usePhone'
 import { useScrolled } from '../components/useScrolled'
 import { lastExport } from '../files/everything'
 import { About } from './About'
@@ -50,6 +51,22 @@ export function Settings(props: Props): ReactElement {
   }, [props.area])
   const back =
     props.area === 'home-screen' ? { word: 'Help', onClick: () => props.go('/settings/help') } : { word: 'Settings', onClick: () => props.go('/settings') }
+  // On desktop Escape goes back one place: an area to Settings, Settings to the library. It reads where it
+  // is from a ref: re-attached on each change, an Escape could reach the listener from before it.
+  const phone = usePhone()
+  const up = useRef(back.onClick)
+  up.current = props.area === 'list' ? () => props.go('/') : back.onClick
+  useEffect(() => {
+    if (phone) return
+    const onKey = (e: KeyboardEvent): void => {
+      // Already answered: a sheet in the area closes first.
+      if (e.key !== 'Escape' || e.defaultPrevented || e.repeat || e.isComposing) return
+      e.preventDefault()
+      up.current()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [phone])
   return (
     <main ref={scroller} className="settings">
       <div className="settings-head" data-scrolled={scrolled || undefined}>
