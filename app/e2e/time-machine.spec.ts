@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-import { caretToEnd, openTools, saved } from './helpers'
+import { caretToEnd, openTools, saved, write } from './helpers'
 
 const machine = (page: Page) => page.locator('.time-machine')
 const oldText = (page: Page) => machine(page).locator('.body')
@@ -381,6 +381,25 @@ test('old text keeps the type, never runs under the bar, turns by key, and saves
   const after = await stored<{ place?: unknown; pages?: unknown }>(page, 'pieces')
   expect(after[0]!.place).toEqual(before[0]!.place)
   expect(after[0]!.pages).toEqual(before[0]!.pages)
+})
+
+test('a book’s and a journal’s page 1 keep the running head here, which an essay’s lacks', async ({ page }) => {
+  for (const kind of ['Book', 'Journal'] as const) {
+    await page.goto('./#/')
+    await write(page, kind)
+    await expect(page.locator('.book-title')).toBeFocused()
+    await page.keyboard.type('Thoughts')
+    // A book's words are in its first chapter, past the title page; a journal's go in today's page.
+    if (kind === 'Book') await page.locator('.title').click()
+    await page.keyboard.press('Enter')
+    await page.keyboard.type('Some words.')
+    await saved(page, 'Some words.')
+    await page.keyboard.press('Control+Alt+z')
+    await expect(machine(page)).toBeVisible()
+    await expect(machine(page).locator('.running-head')).toHaveCount(1)
+    await page.keyboard.press('Escape')
+    await expect(machine(page)).toHaveCount(0)
+  }
 })
 
 test('old text can be selected but not changed, and has no caret', async ({ page }) => {
