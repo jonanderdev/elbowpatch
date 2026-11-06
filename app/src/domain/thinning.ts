@@ -49,12 +49,16 @@ function lastListings(outlines: Outline[]): Set<string> {
   return new Set(last.values())
 }
 
-/** Thins every piece's history, one piece per transaction. Safe to run twice; runs when the app is idle (0010). */
-export async function thin(deps: Pick<Deps, 'store' | 'clock'>): Promise<number> {
+/**
+ * Thins every piece's history, one piece per transaction. Safe to run twice; runs when the app is idle (0010).
+ * `held` is asked before each piece: once it says yes, the run stops there, and the rest wait for the next.
+ */
+export async function thin(deps: Pick<Deps, 'store' | 'clock'>, held: () => boolean = () => false): Promise<number> {
   const now = deps.clock.now()
   const pieces = await deps.store.transaction((tx) => tx.pieces())
   let removed = 0
   for (const { id } of pieces) {
+    if (held()) break
     removed += await deps.store.transaction(async (tx) => {
       const piece = await tx.piece(id)
       if (!piece) return 0

@@ -21,6 +21,7 @@ interface PageFootProps {
   onCloseTools(): void
   onTextSettings(): void
   onExport(): void
+  onTimeMachine(): void
   /** A book's count opens Contents, and a journal's Days. */
   onContents?(from: HTMLElement): void
   contentsOpen: boolean
@@ -44,6 +45,7 @@ export function PageFoot({
   onCloseTools,
   onTextSettings,
   onExport,
+  onTimeMachine,
   onContents,
   contentsOpen,
 }: PageFootProps): ReactElement {
@@ -71,6 +73,7 @@ export function PageFoot({
             onClose={onCloseTools}
             onTextSettings={onTextSettings}
             onExport={onExport}
+            onTimeMachine={onTimeMachine}
           />
         ) : (
           <button
