@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { Editor } from '../../page/editor'
-import type { Opened, TitleRefs } from './fields'
+import { caretToFieldEnd, type Opened, type TitleRefs } from './fields'
 import type { Saving } from './saving'
 
 /**
@@ -33,19 +33,22 @@ interface Options {
   readOnly: boolean
   titlePage: boolean
   titleEditable: boolean
+  /** What takes the focus when a chapter opens with no caret, so a keyboard is not left on nothing. */
+  noCaret(): HTMLElement | null
 }
 
 /**
  * Where the caret goes when the page shows (DESIGN.md, Behaviour):
  * - a new piece: its title (its name on a title page; the text, in a journal);
  * - a piece left while writing, reopened or back from the library: the caret where it was;
- * - a piece left while reading: nowhere, the page opens on their place.
+ * - a piece left while reading: nowhere, the page opens on their place;
+ * - a chapter chosen in Contents or turned to: the text, as a turn does; on a phone only if they were writing.
  * On a phone the caret waits for a tap, so the keyboard does not cover the page unasked.
  *
  * Going to the library keeps a moment. Returns `leaving()`, for the Library button to call first:
  * it remembers whether the writer was writing, since the library takes the focus away.
  */
-export function useFocusOnOpen({ opened, editor, saving, titles, covered, readOnly, titlePage, titleEditable }: Options): { leaving(): void } {
+export function useFocusOnOpen({ opened, editor, saving, titles, covered, readOnly, titlePage, titleEditable, noCaret }: Options): { leaving(): void } {
   const firstCover = useRef(true)
   const writingWhenCovered = useRef(false)
   // The caret was placed for this opening (the page is remounted per section, so once per mount).
@@ -64,6 +67,12 @@ export function useFocusOnOpen({ opened, editor, saving, titles, covered, readOn
       if (!first) void saving.flush()
       return
     }
+    if (opened.at && !placed.current) {
+      placed.current = true
+      if (!readOnly && (opened.writing || desktop)) editor.focus()
+      else noCaret()?.focus()
+      return
+    }
     if (readOnly) return
     if (writingWhenCovered.current) {
       writingWhenCovered.current = false
@@ -78,8 +87,12 @@ export function useFocusOnOpen({ opened, editor, saving, titles, covered, readOn
         name?.focus()
         // A new journal is called "Journal": selected, so typing names it.
         if (name && opened.piece.kind === 'journal') getSelection()?.selectAllChildren(name)
-      } else if (titleEditable) titles.title.current?.focus()
-      else editor.focus()
+      } else if (titleEditable) {
+        const title = titles.title.current
+        title?.focus()
+        // A title from a `# ` line: the caret after its words.
+        if (title?.textContent) caretToFieldEnd(title)
+      } else editor.focus()
       return
     }
     const place = opened.piece.place

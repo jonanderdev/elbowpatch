@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { Piece, Place, Screen } from '../../domain/model'
 import type { Deps } from '../../domain/pieces'
 import type { Editor } from '../../page/editor'
+import { closingAfter } from '../app/settled'
 import { keptFor, type Opened, type TitleRefs, titleOf } from './fields'
 import { createSaving, type Held, type Saving } from './saving'
 
@@ -19,7 +20,7 @@ interface Options {
   onStored(piece: Piece): void
   /** Lets the app ask the page to save now, before another window takes the piece. */
   flushRef: { current: (() => Promise<void>) | null }
-  /** The closing page's last save, so the app lets go of the piece only after it. */
+  /** The closing pages' last saves, so the app lets go of the piece, and the text is reshaped, only after them. */
   closingRef: { current: Promise<void> }
 }
 
@@ -63,6 +64,7 @@ export function useSaving({ deps, opened, editor, titles, readOnly, place, pages
       pages: () => now.current.pages(),
       onStored: (p) => now.current.onStored(p),
       onFailed: setFailed,
+      closing: () => closingRef.current,
     })
     // Words kept for this section and newer than what is stored start the page: save them.
     if (keptFor(opened)) s.touch()
@@ -70,7 +72,7 @@ export function useSaving({ deps, opened, editor, titles, readOnly, place, pages
     flushRef.current = () => s.flush()
     return () => {
       flushRef.current = null
-      closingRef.current = s.close()
+      closingRef.current = closingAfter(closingRef.current, s.close())
     }
     // One saving per page, made when it opens: the page is remounted for each section.
   }, [])

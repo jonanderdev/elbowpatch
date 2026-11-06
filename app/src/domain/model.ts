@@ -41,8 +41,10 @@ export interface Place {
   offset: number
   /** The paragraph's opening words: finds the place again after edits, and is the library's excerpt. */
   snippet: string
-  /** The page it was on: for orientation only, it differs between a phone's page and a desktop's. */
-  page: number
+  /** The page in its section, from 1, for orientation only. Not known after a rejoin or a change to the text settings. */
+  page?: number
+  /** Whose page that is: pages break differently on each. Without it, only page 1 is known, a section's opening page on both. */
+  screen?: Screen
   /** True when the caret was there; otherwise it is the first line on screen. */
   caret: boolean
   at: number

@@ -1,17 +1,17 @@
 import type { Piece } from '../../domain/model'
-import { type Deps, rename, renameSection, setSubtitle, write } from '../../domain/pieces'
+import { type Deps, rename, renameSection, setSubtitle, storedSection, write } from '../../domain/pieces'
 import type { WriterLock } from '../../domain/ports'
 import { unsaved } from '../stores/unsaved'
 
 /**
  * Words the last session could not store before it closed (see page/saving.ts, journal)
  * go into the database first, under the piece's lock (one writer, 0010). An
- * entry already stored is dropped. One older than its section's stored copy
- * was overtaken elsewhere: it is not applied, and waits for Save a copy.
+ * entry already stored is dropped. One no newer than its section's stored copy
+ * was overtaken: it is not applied, and waits for Save a copy.
  */
 export async function replayJournal(deps: Deps, lock: WriterLock): Promise<void> {
   for (const u of unsaved.all()) {
-    const stored = await deps.store.transaction(async (tx) => ({ working: await tx.working(u.sectionId), piece: await tx.piece(u.pieceId) }))
+    const stored = await storedSection(deps, u.pieceId, u.sectionId)
     const sameText = stored.working?.content === u.markdown
     const sameTitle =
       (u.title === null || titleIn(stored.piece, u.sectionId) === u.title) &&
@@ -21,18 +21,21 @@ export async function replayJournal(deps: Deps, lock: WriterLock): Promise<void>
       unsaved.saved(u.sectionId)
       continue
     }
-    if (stored.working && stored.working.updatedAt > u.at) continue
+    if (stored.working && stored.working.updatedAt >= u.at) continue
     const held = await lock.hold(u.pieceId, async () => {})
     if (!held) continue // another window writes it now; the words wait for Save a copy
     try {
       // The journal's piece is only a draft: write() keeps what is stored and adds a section it lacks.
       await write(deps, u.piece, u.sectionId, u.markdown)
-      // A title only if it changed here and nothing renamed the piece since.
-      if (!stored.piece || stored.piece.updatedAt <= u.at) {
-        if (u.title !== null) {
-          if (u.piece.kind === 'essay') await rename(deps, u.piece, u.title)
-          else await renameSection(deps, u.piece, u.sectionId, u.title)
-        }
+      // A title only if it changed here and nothing renamed the piece since. A chapter never stored
+      // has no other title, and may be stored by this one alone; one that left the book stays out.
+      const quiet = !stored.piece || stored.piece.updatedAt <= u.at
+      const newChapter = titleIn(stored.piece, u.sectionId) === undefined && !stored.working && !stored.hasVersions
+      if (u.title !== null && (quiet || newChapter)) {
+        if (u.piece.kind === 'essay') await rename(deps, u.piece, u.title)
+        else await renameSection(deps, u.piece, u.sectionId, u.title)
+      }
+      if (quiet) {
         if (u.bookTitle) await rename(deps, u.piece, u.bookTitle)
         if (u.subtitle != null) await setSubtitle(deps, u.piece, u.subtitle)
       }

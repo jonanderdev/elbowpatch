@@ -8,6 +8,13 @@ import { dayTitle } from '../../domain/words'
 import { type Unsaved, unsaved } from '../stores/unsaved'
 import { type FieldHistory, fieldHistory } from './fieldHistory'
 
+/**
+ * Where a section opens when the writer goes to it: its opening page, from Contents; its opening
+ * page turned on to, which takes the caret along as any turn does; its last page, turned back to; or
+ * the join, where undo has just put the next chapter back onto its end.
+ */
+export type OpenAt = 'opening' | 'turned-on' | 'last' | 'join'
+
 /** A section of a piece, open on the page. */
 export interface Opened {
   piece: Piece
@@ -19,6 +26,10 @@ export interface Opened {
   fresh?: boolean
   /** Which reading from storage this is: the page starts over for each. */
   readAt: number
+  /** Chosen, not returned to: it opens here rather than at the writer's place, and their place follows. */
+  at?: OpenAt
+  /** The writer was in the text when they went there: the caret goes with them. */
+  writing?: boolean
 }
 
 export interface TitleFields {
@@ -82,23 +93,35 @@ export function fieldChanged(el: HTMLElement, at: number): void {
   histories.get(el)?.note(el.textContent ?? '', at)
 }
 
-/**
- * Takes a field a step back or on, and leaves the caret at its end. The change goes through the
- * field's own input, so the page sees and saves it as if it were typed.
- */
-export function stepField(el: HTMLElement, way: 'undo' | 'redo'): void {
-  const text = histories.get(el)?.[way]()
-  if (text === null || text === undefined) return
-  el.textContent = text
-  el.dispatchEvent(new InputEvent('input', { bubbles: true }))
+/** The caret at the end of a field that has the focus. */
+export function caretToFieldEnd(el: HTMLElement): void {
   const selection = getSelection()
   selection?.selectAllChildren(el)
   selection?.collapseToEnd()
 }
 
+/** Writes a field's text as if it were typed, so the page sees and saves it. */
+export function fillField(el: HTMLElement, text: string): void {
+  el.textContent = text
+  el.dispatchEvent(new InputEvent('input', { bubbles: true }))
+}
+
+/**
+ * Takes a field a step back or on, and leaves the caret at its end. The change goes through the
+ * field's own input, so the page sees and saves it as if it were typed. False with no step left.
+ */
+export function stepField(el: HTMLElement, way: 'undo' | 'redo'): boolean {
+  const text = histories.get(el)?.[way]()
+  if (text === null || text === undefined) return false
+  fillField(el, text)
+  caretToFieldEnd(el)
+  return true
+}
+
 /** ⌘/Ctrl + Z and ⌘/Ctrl + Shift + Z in a field, as in the text. ⌘/Ctrl + Alt + Z is the Time Machine's. */
-export function fieldUndoKeys(e: KeyboardEvent): void {
+export function fieldUndoKeys(e: KeyboardEvent, onUndoPast?: () => void): void {
   if (!(e.metaKey || e.ctrlKey) || e.altKey || e.key.toLowerCase() !== 'z') return
   e.preventDefault()
-  stepField(e.currentTarget as HTMLElement, e.shiftKey ? 'redo' : 'undo')
+  const stepped = stepField(e.currentTarget as HTMLElement, e.shiftKey ? 'redo' : 'undo')
+  if (!stepped && !e.shiftKey) onUndoPast?.()
 }

@@ -80,10 +80,12 @@ interface SectionTitleProps {
   onInput(text: string): void
   /** Return: on to the text. */
   onDone(): void
+  /** Undo with no step left in the title. */
+  onUndoPast(): void
 }
 
 /** An essay's title, a chapter's, or a journal day's date, at the top of its first page. */
-export function SectionTitle({ titleRef, editable, placeholder, afterTitlePage, onFocus, onInput, onDone }: SectionTitleProps): ReactElement {
+export function SectionTitle({ titleRef, editable, placeholder, afterTitlePage, onFocus, onInput, onDone, onUndoPast }: SectionTitleProps): ReactElement {
   return (
     <h1
       ref={titleRef}
@@ -98,7 +100,7 @@ export function SectionTitle({ titleRef, editable, placeholder, afterTitlePage, 
         onInput(e.currentTarget.textContent ?? '')
       }}
       onKeyDown={(e) => {
-        fieldUndoKeys(e)
+        fieldUndoKeys(e, onUndoPast)
         if (e.key !== 'Enter') return
         e.preventDefault()
         onDone()

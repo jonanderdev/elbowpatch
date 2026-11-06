@@ -1,11 +1,12 @@
 import type { ReactElement, RefObject } from 'react'
-import { words as wordsLine } from '../../domain/words'
+import { pageLine, words as wordsLine } from '../../domain/words'
 import { Icon } from '../components/Icon'
 import { ToolsBar } from './Tools'
 
 interface PageFootProps {
-  page: number
-  count: number
+  /** The page shown, from 1, and the pages; in a book, the book's, each once it is known. */
+  page?: number
+  count?: number
   words: number
   journal: boolean
   /** A book's or a journal's title page, which carries no folio. */
@@ -18,6 +19,9 @@ interface PageFootProps {
   onCloseTools(): void
   onTextSettings(): void
   onExport(): void
+  /** A book's count opens Contents. */
+  onContents?(from: HTMLElement): void
+  contentsOpen: boolean
 }
 
 /**
@@ -37,13 +41,16 @@ export function PageFoot({
   onCloseTools,
   onTextSettings,
   onExport,
+  onContents,
+  contentsOpen,
 }: PageFootProps): ReactElement {
-  const folio = !journal && !titlePage && !tools && !keyboard
+  const folio = page !== undefined && !journal && !titlePage && !tools && !keyboard
+  const said = pageLine(page, count)
   return (
     <>
       {folio && (
         <div className="folio" aria-hidden="true">
-          {page + 1}
+          {page}
         </div>
       )}
       <div className={keyboard ? 'foot raised' : 'foot'}>
@@ -51,13 +58,22 @@ export function PageFoot({
             while the keyboard is up, so they never sit over the text. */}
         {journal && !tools && !keyboard && <span className="day-words">{wordsLine(words)}</span>}
         {tools ? (
-          <ToolsBar page={page + 1} count={count} words={words} onClose={onCloseTools} onTextSettings={onTextSettings} onExport={onExport} />
+          <ToolsBar
+            page={page}
+            count={count}
+            words={words}
+            onContents={onContents}
+            contentsOpen={contentsOpen}
+            onClose={onCloseTools}
+            onTextSettings={onTextSettings}
+            onExport={onExport}
+          />
         ) : (
           <button
             ref={pageButtonRef}
             type="button"
             className="page-button surface"
-            aria-label={`Page ${page + 1} of ${count}. Open tools`}
+            aria-label={said ? `${said}. Open tools` : 'Open tools'}
             onClick={onOpenTools}
           >
             <Icon name="asterisk" />

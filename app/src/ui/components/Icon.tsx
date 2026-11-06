@@ -2,6 +2,7 @@ import type { CSSProperties, ReactElement } from 'react'
 import add from './icons/add.svg'
 import alignLeft from './icons/align-left.svg'
 import asterisk from './icons/asterisk.svg'
+import chevronDown from './icons/chevron-down.svg'
 import close from './icons/close.svg'
 import exportIcon from './icons/export.svg'
 import history from './icons/history.svg'
@@ -10,6 +11,7 @@ import keep from './icons/keep.svg'
 import keyboard from './icons/keyboard.svg'
 import moon from './icons/moon.svg'
 import quote from './icons/quote.svg'
+import rail from './icons/rail.svg'
 import redo from './icons/redo.svg'
 import section from './icons/section.svg'
 import settings from './icons/settings.svg'
@@ -22,6 +24,7 @@ export type IconName =
   | 'add'
   | 'alignLeft'
   | 'asterisk'
+  | 'chevronDown'
   | 'close'
   | 'export'
   | 'history'
@@ -30,6 +33,7 @@ export type IconName =
   | 'keyboard'
   | 'moon'
   | 'quote'
+  | 'rail'
   | 'redo'
   | 'section'
   | 'settings'
@@ -42,6 +46,7 @@ const icons: Record<IconName, string> = {
   add,
   alignLeft,
   asterisk,
+  chevronDown,
   close,
   export: exportIcon,
   history,
@@ -50,6 +55,7 @@ const icons: Record<IconName, string> = {
   keyboard,
   moon,
   quote,
+  rail,
   redo,
   section,
   settings,

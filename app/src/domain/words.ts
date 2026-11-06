@@ -9,6 +9,23 @@ export function words(n: number): string {
   return `${number(n)} ${n === 1 ? 'word' : 'words'}`
 }
 
+/** "Page 3 of 9", or as much of it as is known; a number that is not known stands aside. */
+export function pageLine(page: number | undefined, count: number | undefined): string {
+  if (page === undefined) return ''
+  return count === undefined ? `Page ${number(page)}` : `Page ${number(page)} of ${number(count)}`
+}
+
+/** The count in the tools: the page and the pages once known, then the words. */
+export function countLine(page: number | undefined, count: number | undefined, wordsShown: string): string {
+  if (page === undefined) return wordsShown
+  return `${number(page)}${count === undefined ? '' : ` of ${number(count)}`}  ·  ${wordsShown}`
+}
+
+/** What a screen reader hears of the count. */
+export function countSaid(page: number | undefined, count: number | undefined, wordCount: number): string {
+  return [pageLine(page, count), `${number(wordCount)} words`].filter(Boolean).join(', ')
+}
+
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 

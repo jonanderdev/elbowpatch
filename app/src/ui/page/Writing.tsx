@@ -36,18 +36,21 @@ function Formatting({ editor, active }: { editor: Editor; active: ReturnType<Edi
 
 /**
  * The selection menu: the same rounded bar, floating over the selected words
- * (DESIGN.md, Control). § waits for chapters.
+ * (DESIGN.md, Control).
  */
 export function SelectionMenu({
   editor,
   rect,
   active,
   onKeep,
+  onChapter,
 }: {
   editor: Editor
   rect: DOMRect
   active: ReturnType<Editor['active']>
   onKeep(): void
+  /** In a book: § starts a chapter where the selection starts. */
+  onChapter?: () => void
 }): ReactElement {
   const ref = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
@@ -71,6 +74,7 @@ export function SelectionMenu({
       style={pos ? { left: pos.left, top: pos.top } : { visibility: 'hidden' }}
     >
       <Formatting editor={editor} active={active} />
+      {onChapter ? <IconButton icon="section" label="Start chapter here" onClick={onChapter} keepFocus /> : null}
       <span className="bar-separator" />
       <IconButton icon="keep" label="Keep this moment" onClick={onKeep} keepFocus />
     </div>
@@ -112,23 +116,48 @@ export function WritingBar({
   editor,
   active,
   barRef,
+  onChapter,
 }: {
   editor: Editor
   active: ReturnType<Editor['active']>
   barRef: RefObject<HTMLDivElement | null>
+  /** In a book: § starts a chapter at the caret. */
+  onChapter?: () => void
 }): ReactElement {
   return (
     <KeyboardBar onUndo={() => editor.run('undo')} onRedo={() => editor.run('redo')} onHide={() => editor.view.dom.blur()} barRef={barRef}>
       <Formatting editor={editor} active={active} />
+      {onChapter ? <IconButton icon="section" label="New chapter" onClick={onChapter} /> : null}
       <span className="bar-separator" />
     </KeyboardBar>
   )
 }
 
 /** The bar in a title field, which takes no formatting. */
-export function FieldBar({ field, barRef }: { field: HTMLElement; barRef: RefObject<HTMLDivElement | null> }): ReactElement {
-  return <KeyboardBar onUndo={() => stepField(field, 'undo')} onRedo={() => stepField(field, 'redo')} onHide={() => field.blur()} barRef={barRef} />
+export function FieldBar({
+  field,
+  barRef,
+  onUndoPast,
+}: {
+  field: HTMLElement
+  barRef: RefObject<HTMLDivElement | null>
+  /** Undo with no step left in the field. */
+  onUndoPast(): void
+}): ReactElement {
+  return (
+    <KeyboardBar
+      onUndo={() => {
+        if (!stepField(field, 'undo')) onUndoPast()
+      }}
+      onRedo={() => stepField(field, 'redo')}
+      onHide={() => field.blur()}
+      barRef={barRef}
+    />
+  )
 }
+
+/** The tallest the visible height has been at this width. Outlives a page: a chapter can open with the keyboard up. */
+let tallest = { width: 0, height: 0 }
 
 /**
  * Whether the on-screen keyboard is up. The keyboard may shrink the window itself (a phone's browser, and
@@ -144,7 +173,6 @@ export function useKeyboard(): boolean {
     const vv = window.visualViewport
     if (!vv) return
     const root = document.documentElement
-    let tallest = { width: 0, height: 0 }
     let wasUp = false
     // Installed on iPhone, iOS slides the view up to show the caret behind the keyboard; the screen
     // already ends above it, so it is slid back. A scroll inside the page never moves the view. Only

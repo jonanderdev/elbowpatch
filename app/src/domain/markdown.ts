@@ -30,10 +30,79 @@ export function serialize(blocks: Block[]): string {
 export function countWords(markdown: string): number {
   let count = 0
   for (const block of parse(markdown)) {
-    const text = block.type === 'raw' ? block.text : block.spans.map((s) => s.text).join('')
-    count += text.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length
+    count += wordsIn(block)
+      .split(/\s+/)
+      .filter((w) => /[\p{L}\p{N}]/u.test(w)).length
   }
   return count
+}
+
+/** How two texts met: as separate blocks, inside one block, or inside one with a line break between them. */
+export type Meeting = 'apart' | 'inside' | 'line'
+
+/** What a split took out of the text, so the halves can go back as they were. Kept for the session only. */
+export interface Seam {
+  /** How what stayed met what followed it. */
+  front: Meeting
+  /** The last block of what stayed, as the split left it: only that block meets what comes back. */
+  ending: string
+  /** The title came from a `# ` line: how that line met what moved. */
+  back?: Meeting
+  /** That line as written, marks and all: a title holds only its words. */
+  line?: string
+  /** The point was inside Markdown kept as written, which only its own characters can put back. */
+  raw: boolean
+  /** A backslash was added to what moved, so it would not read as a heading. */
+  escaped: boolean
+}
+
+/**
+ * The two halves of a split as one text again, with the title between them if it has one. Blocks that
+ * met inside a paragraph are one block again: their spans meet, so a mark cut in two is one mark. If the
+ * earlier text no longer ends as the split left it, new words stand there, and what comes back stands apart.
+ */
+export function joinHalves(before: string, after: string, seam: Seam, title: string): string {
+  const moved = seam.escaped && after.startsWith('\\# ') ? after.slice(1) : after
+  const front = lastBlock(before) === seam.ending ? seam.front : 'apart'
+  if (seam.back === undefined && !title.trim()) return meet(before, moved, front, seam.raw)
+  const line = lineOf(title, seam.line)
+  return meet(meet(before, line, seam.back === undefined ? 'apart' : front), moved, seam.back ?? 'apart')
+}
+
+/** The `# ` line a title goes back as: the line it came from, while the title still reads the same. */
+function lineOf(title: string, written: string | undefined): string {
+  const words = `# ${title}`
+  const block = written === undefined ? undefined : parse(written)[0]
+  if (written !== undefined && block && wordsIn(block).trim() === words.trim()) return written
+  return serialize([{ type: 'paragraph', spans: [{ text: words, marks: [] }] }])
+}
+
+/** A block's words as the page shows them. */
+export const wordsIn = (block: Block): string => (block.type === 'raw' ? block.text : block.spans.map((s) => s.text).join(''))
+
+/** A text's last block, as it is written. */
+export function lastBlock(markdown: string): string {
+  const block = parse(markdown).at(-1)
+  return block ? serializeBlock(block) : ''
+}
+
+function meet(before: string, after: string, how: Meeting, raw = false): string {
+  if (!before.trim()) return after
+  if (!after.trim()) return before
+  const apart = `${before}\n\n${after}`
+  if (how === 'apart') return apart
+  const gap = how === 'line' ? BREAK : ''
+  if (raw) return before + gap + after
+  const left = parse(before)
+  const right = parse(after)
+  const a = left.at(-1)!
+  const b = right[0]!
+  // Changed since the split: a pull quote and a paragraph are not one block.
+  if (a.type === 'raw' || b.type === 'raw' || a.type !== b.type) return apart
+  // A break carries only the marks open on both sides of it: a mark that ends at the line ends there.
+  const open = (a.spans.at(-1)?.marks ?? []).filter((m) => b.spans[0]?.marks.includes(m))
+  const between: Span[] = gap ? [{ text: gap, marks: open }] : []
+  return serialize([...left.slice(0, -1), { type: a.type, spans: [...a.spans, ...between, ...b.spans] }, ...right.slice(1)])
 }
 
 function parseBlock(source: string): Block {

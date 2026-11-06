@@ -1,0 +1,60 @@
+import { useRef } from 'react'
+import type { Piece } from '../../domain/model'
+import { type Deps, type Rejoined, rejoinChapter } from '../../domain/pieces'
+import type { Editor } from '../../page/editor'
+import { forgetSplit, type Split, splitOf } from '../../page/undoMemory'
+import { unsaved } from '../stores/unsaved'
+import { reshapeHeld } from './reshapeHeld'
+import type { Saving } from './saving'
+
+interface Options {
+  deps: Deps
+  pieceId: string
+  sectionId: string
+  /** A book, in the window that writes it. */
+  writes: boolean
+  /** The chapter right before this one, as the book stands now. */
+  chapterBefore(): string | undefined
+  editor: Editor | null
+  saving: Saving | null
+  keyboard: boolean
+  onRejoined(piece: Piece, sectionId: string, content: string): void
+}
+
+/**
+ * Undo past the start of a chapter born of a split (0003). The function it returns is called when undo
+ * has no step left, in the text or in the title; true when that puts the chapter back onto the one before it.
+ */
+export function useRejoin({ deps, pieceId, sectionId, writes, chapterBefore, editor, saving, keyboard, onRejoined }: Options): () => boolean {
+  /** A rejoin is running: a second undo waits for nothing and does nothing. */
+  const running = useRef(false)
+
+  async function rejoin(split: Split): Promise<void> {
+    if (!editor || !saving) return
+    running.current = true
+    const inText = editor.view.hasFocus()
+    let back: Rejoined | undefined
+    const done = await reshapeHeld(editor, saving, keyboard, async (whole) => {
+      // Read here, past the wait: a closing save that failed keeps its words as it ends.
+      back = await rejoinChapter(deps, pieceId, { sectionId, into: split.into, whole, seam: split.seam, keptAt: unsaved.get(split.into)?.at })
+      return back.piece
+    })
+    if (done && back) {
+      forgetSplit(sectionId)
+      onRejoined(back.piece, back.sectionId, back.content)
+      return
+    }
+    // The text stays as it is, and the writer stays in it.
+    running.current = false
+    if (inText) editor.focus()
+  }
+
+  return () => {
+    if (!writes || !editor || !saving) return false
+    const split = splitOf(sectionId, editor.markdown())
+    // A chapter added between them since: the words have nowhere that is theirs to go back to.
+    if (!split || chapterBefore() !== split.into) return false
+    if (!running.current) void rejoin(split)
+    return true
+  }
+}

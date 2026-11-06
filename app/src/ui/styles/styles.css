@@ -62,7 +62,7 @@
   --foot: 92px;
   /* Installed on a phone, the app draws to the screen's foot. What sits at the foot (the page's end, the
      tools bar, the sheet above it) rises by half the home bar's inset: clear of it, without floating. */
-  --lift: calc(env(safe-area-inset-bottom, 0px) / 2);
+  --rise: calc(env(safe-area-inset-bottom, 0px) / 2);
 }
 [data-size='s'] {
   --type: 14px;
@@ -290,8 +290,8 @@ button {
 .page-screen {
   position: absolute;
   inset: 0;
-  /* Installed on a phone, the page ends --lift above the screen's foot, as the foot does. */
-  bottom: var(--lift);
+  /* Installed on a phone, the page ends --rise above the screen's foot, as the foot does. */
+  bottom: var(--rise);
   /* On a touch screen, the height it was laid out at (--page-height, from the pager). */
   min-height: var(--page-height, 658px);
   /* What sits at its edges (the foot, 20px from the bottom on desktop) never makes the window scroll. */
@@ -536,6 +536,52 @@ button {
   pointer-events: none;
 }
 
+/* A book's running head on a phone: a control that drops Contents (DESIGN.md, Control). Level with §,
+   centred on the screen and clear of § on both sides. */
+.running-control {
+  position: absolute;
+  top: calc(var(--head) / 2 - 16px);
+  left: 0;
+  right: 0;
+  width: fit-content;
+  max-width: calc(100% - 144px);
+  height: 32px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 6px 0 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--secondary);
+  transition: background-color 160ms;
+}
+/* A 44px tap area round the 32px pill. */
+.running-control::after {
+  content: '';
+  position: absolute;
+  inset: -6px 0;
+}
+.running-control:active,
+.running-control[aria-expanded='true'] {
+  background: var(--pressed);
+}
+@media (hover: hover) {
+  .running-control:hover {
+    background: var(--pressed);
+  }
+}
+.running-title {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.running-control .icon {
+  flex: none;
+}
+
 .pager {
   position: absolute;
   top: var(--top);
@@ -585,9 +631,12 @@ button {
 [data-title-page] .title {
   left: var(--stride);
 }
+/* Out of the line, at the text's start: in the line, it pushed the caret to its end. */
 .title[data-empty]::before {
   content: attr(data-placeholder);
+  position: absolute;
   color: var(--secondary);
+  pointer-events: none;
 }
 
 .body {
@@ -700,7 +749,7 @@ button {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: var(--lift);
+  bottom: var(--rise);
   height: var(--foot);
   display: flex;
   align-items: center;
@@ -750,6 +799,15 @@ button {
   color: var(--secondary);
   font-variant-numeric: lining-nums tabular-nums;
 }
+/* A book's count opens Contents on a phone. */
+button.count {
+  border-radius: 14px;
+  transition: background-color 160ms;
+}
+button.count:active,
+button.count[aria-expanded='true'] {
+  background: var(--pressed);
+}
 @media (min-width: 700px) {
   .count {
     padding: 0 10px 0 12px;
@@ -760,7 +818,7 @@ button {
 .line {
   position: fixed;
   left: calc(var(--frame) + var(--edge));
-  bottom: calc(var(--lift) + (var(--foot) - 44px) / 2);
+  bottom: calc(var(--rise) + (var(--foot) - 44px) / 2);
   max-width: calc(100% - 2 * var(--edge) - 56px);
   min-height: 44px;
   display: flex;
@@ -772,6 +830,10 @@ button {
   line-height: 1.4;
   color: var(--title);
   z-index: 3;
+}
+/* The tools bar stands where the line does: the line waits above it, so the bar can still be pressed. */
+.page-screen[data-tools] .line {
+  bottom: calc(var(--rise) + (var(--foot) - 44px) / 2 + 44px + 12px);
 }
 .line button {
   color: var(--title);
@@ -787,8 +849,8 @@ button {
   left: 12px;
   right: 12px;
   /* Above the tools bar, which stays in view beneath it (Figma, Text settings). */
-  bottom: calc(var(--lift) + (var(--foot) - 44px) / 2 + 44px + 12px);
-  max-height: calc(100dvh - var(--lift) - var(--foot) - 24px);
+  bottom: calc(var(--rise) + (var(--foot) - 44px) / 2 + 44px + 12px);
+  max-height: calc(100dvh - var(--rise) - var(--foot) - 24px);
   overflow-y: auto;
   z-index: 5;
   display: flex;
@@ -906,6 +968,12 @@ button {
   left: 20px;
 }
 @media (prefers-reduced-motion: no-preference) {
+  /* The rail folds under the path. It stays until it has gone, then leaves the tab order. */
+  .contents-rail {
+    transition:
+      transform 200ms ease,
+      visibility 200ms;
+  }
   .switch,
   .switch::after {
     transition:
@@ -1364,6 +1432,113 @@ button {
   text-underline-offset: 3px;
 }
 
+/* Contents on a phone: dropped under the head, its list scrolling inside it, so its head and foot
+   stay in reach. It ends 12px above the bar at the foot, the tools or the writing bar. */
+.sheet.contents {
+  top: 56px;
+  bottom: auto;
+  max-height: calc(var(--visible-height, 100dvh) - 136px - var(--rise));
+  overflow: hidden;
+  gap: 0;
+  padding: 18px 10px 16px;
+}
+.contents .sheet-title {
+  flex: none;
+  padding: 0 10px 10px;
+}
+.contents-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.contents .sheet-aside {
+  flex: none;
+}
+.contents-list {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.contents-row {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  /* 44px for a thumb, from one line of 21px. */
+  padding: 11.5px 10px;
+  border-radius: 10px;
+  text-align: left;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--title);
+  transition: background-color 160ms;
+}
+/* Inside the row: the list clips what stands outside it. */
+.contents-row:focus-visible {
+  outline-offset: -2px;
+}
+.contents-row:active,
+.contents-row[aria-current='true'] {
+  background: var(--pressed);
+}
+@media (hover: hover) {
+  .contents-row:hover {
+    background: var(--pressed);
+  }
+}
+.contents-title {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.contents-page {
+  flex: none;
+  font-size: 13px;
+  color: var(--secondary);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.contents-line {
+  position: relative;
+}
+/* Where the page number would be, the word's end on its edge; the whole height of the row, 44px on a phone. */
+.contents-remove {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  padding: 0 10px;
+}
+.contents-remove:focus-visible {
+  outline-offset: -2px;
+}
+.contents-foot {
+  flex: none;
+  display: flex;
+  justify-content: space-between;
+  margin: 18px 10px 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--surface-line);
+}
+.contents-foot .text-link {
+  margin: -4px 0;
+  position: relative;
+}
+/* The word stays small; the finger gets 44px. */
+.contents-foot .text-link::after {
+  content: '';
+  position: absolute;
+  inset: -9px 0;
+}
+/* Done keeps its side when + New chapter is absent. */
+.contents-foot .text-link:last-child {
+  margin-left: auto;
+}
+
 /* The library's foot is not reserved: the + floats over the last rows. */
 .library-foot {
   position: fixed;
@@ -1372,7 +1547,7 @@ button {
 .library-lines {
   position: fixed;
   left: calc(var(--frame) + var(--edge));
-  bottom: calc(var(--lift) + (var(--foot) - 44px) / 2);
+  bottom: calc(var(--rise) + (var(--foot) - 44px) / 2);
   max-width: calc(100% - 2 * var(--edge) - 56px);
   display: flex;
   flex-direction: column;
@@ -1811,7 +1986,7 @@ button {
 .colophon-links.at-foot {
   position: fixed;
   left: calc(var(--frame) + 24px);
-  bottom: var(--lift);
+  bottom: var(--rise);
   height: var(--foot);
   margin: 0;
 }
@@ -2178,6 +2353,70 @@ button {
     font-size: 13px;
     color: var(--secondary);
     font-variant-numeric: lining-nums tabular-nums;
+  }
+  /* The path and its toggle, on the head's line (DESIGN.md, Layout). Above the rail, which starts under
+     them, so the rail never covers its own toggle. */
+  .head-path {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .rail-toggle {
+    margin-top: 1.5px;
+  }
+  /* Contents on a book's page. It stands in the head, under the path, and starts under the head's line. */
+  .contents-rail {
+    z-index: 0;
+    padding: 76px 12px 24px 20px;
+  }
+  .contents-rail[data-folded] {
+    visibility: hidden;
+    transform: translateX(-100%);
+  }
+  .rail-line {
+    flex: none;
+    margin: 0 0 20px;
+    font-size: 13px;
+    color: var(--secondary);
+  }
+  /* One line, 36px tall, as the library's places; 4px apart, so two tints never touch. */
+  .contents-rail .contents-list {
+    gap: 4px;
+    width: 296px;
+  }
+  .contents-rail .contents-row {
+    align-items: center;
+    gap: 12px;
+    height: 36px;
+    padding: 0 12px;
+    border-radius: 18px;
+    line-height: normal;
+    color: var(--text);
+  }
+  .contents-rail .contents-row:hover,
+  .contents-rail .contents-row[aria-current='true'] {
+    color: var(--title);
+  }
+  .contents-rail .contents-title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .contents-rail .contents-remove {
+    padding: 0 12px;
+  }
+  /* Under the chapters, on the rail's line; it stays in reach while a long list scrolls. */
+  .contents-rail .new-chapter {
+    flex: none;
+    align-self: flex-start;
+    margin-top: 8px;
+    font-size: 15px;
+    line-height: normal;
+  }
+  .contents-rail .new-chapter-mark {
+    margin-right: 0.25em;
   }
   /* Write's menu drops under it, right-aligned to it, never over it. */
   .write-menu-anchor {

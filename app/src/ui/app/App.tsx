@@ -1,20 +1,36 @@
 import { type ReactElement, useCallback, useEffect, useRef, useState } from 'react'
 import { pieceAsMarkdown } from '../../domain/export'
 import type { Kind, Piece } from '../../domain/model'
-import { type Deps, library, newPiece, openPiece, putAway, recover, rename, restore, withDay } from '../../domain/pieces'
+import {
+  type Deps,
+  library,
+  neverStored,
+  newPiece,
+  openPiece,
+  putAway,
+  type Removed,
+  recover,
+  rename,
+  restore,
+  withChapter,
+  withDay,
+} from '../../domain/pieces'
 import type { WriterLock } from '../../domain/ports'
 import { forgetPutAway, thin } from '../../domain/thinning'
 import { isoDay } from '../../domain/words'
 import { download } from '../files/download'
 import { downloadEverything } from '../files/everything'
 import { Library } from '../library/Library'
-import { type Opened, Page } from '../page/Page'
+import { titleOf } from '../page/fields'
+import { type OpenAt, type Opened, Page } from '../page/Page'
 import { raiseKeyboard } from '../page/useFocusOnOpen'
 import { waiting } from '../settings/PutAway'
 import { type Area, Settings } from '../settings/Settings'
 import { readLast, writeLast } from '../stores/last'
 import { askToPersist } from './persist'
 import { replayJournal } from './replay'
+import { settled } from './settled'
+import { useBookNumbers } from './useBookNumbers'
 import { useRoute } from './useRoute'
 import { useWriterLock } from './useWriterLock'
 
@@ -45,7 +61,8 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
   }, [deps])
 
   const open = useCallback(
-    async (pieceId: string): Promise<Opened | null> => {
+    /** Opens a piece: at the section asked for, else the writer's place, else the first chapter. A journal opens on today. */
+    async (pieceId: string, wanted?: string): Promise<Opened | null> => {
       const found = await openPiece(deps, pieceId)
       // A put-away piece waits in Settings; a URL or the Back button does not open it.
       if (!found || found.piece.putAwayAt !== undefined) return null
@@ -55,10 +72,9 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
         // The journal opens on today.
         ;({ piece, sectionId } = withDay(deps, piece, isoDay(new Date())))
       } else {
-        // At the writer's place, if its section is still there; else the first chapter.
-        const place = piece.place
-        const placed = place !== undefined && piece.sections.some((s) => s.sectionId === place.sectionId)
-        sectionId = placed ? place.sectionId : piece.sections[0]!.sectionId
+        const sections = piece.sections
+        const there = (id: string | undefined): boolean => sections.some((s) => s.sectionId === id)
+        sectionId = [wanted, piece.place?.sectionId].find(there) ?? sections[0]!.sectionId
       }
       const section = found.sections.find((s) => s.sectionId === sectionId)
       return { piece, sectionId, content: section?.content ?? '', updatedAt: section?.updatedAt, readAt: ++reads }
@@ -120,9 +136,83 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
 
   // The open page's save, for whoever needs it first (another window, an export, the library);
   // and its last save as it closes, which the lock is let go only after.
+  const [counted, setCounted] = useState(0)
+  useBookNumbers({
+    deps,
+    ready,
+    openId: openedId,
+    pieces,
+    onCounted() {
+      setCounted((n) => n + 1)
+      void refresh().catch(() => {})
+    },
+  })
+
   const flushPage = useRef<(() => Promise<void>) | null>(null)
   const closing = useRef<Promise<void>>(Promise.resolve())
   const { writer, writeHere } = useWriterLock(lock, opened?.piece.id, flushPage, closing)
+
+  /** The open page saved, and the last one's closing save done; never waiting long for either. */
+  const saveFirst = () => Promise.race([Promise.all([flushPage.current?.(), settled(closing.current)]), new Promise((r) => setTimeout(r, 1500))])
+
+  // Another section of the open piece. The lock is the piece's, so it stays. The last chapter chosen
+  // wins, should the writer choose again while a save runs.
+  const chosen = useRef(0)
+  /** Where the opening under way is going: a key held down asks again and again, and if each asking replaced the last, none would finish. */
+  const going = useRef('')
+  const openSection = async (draft: Piece, sectionId: string, writing: boolean, at: OpenAt): Promise<void> => {
+    const where = `${sectionId}:${at}`
+    if (going.current === where) return
+    going.current = where
+    const turn = ++chosen.current
+    await saveFirst()
+    const next = await open(draft.id, sectionId).catch(() => undefined)
+    if (going.current === where) going.current = ''
+    if (next === undefined || turn !== chosen.current) return
+    const there = next ?? { piece: neverStored(draft), sectionId, content: '', readAt: ++reads }
+    setOpened({ ...there, at, writing })
+  }
+
+  // A new chapter at the end of the book or right after a chapter, read from what is stored once the
+  // section left is saved. It is not stored yet: it joins the piece with its first words or title, so one
+  // left empty is gone.
+  const newChapter = async (draft: Piece, after?: string): Promise<void> => {
+    const turn = ++chosen.current
+    await saveFirst()
+    const next = await open(draft.id).catch(() => undefined)
+    if (next === undefined || turn !== chosen.current) return
+    const { piece, sectionId } = withChapter(deps, next?.piece ?? neverStored(draft), after)
+    setOpened({ piece, sectionId, content: '', fresh: true, readAt: ++reads })
+  }
+
+  // A chapter started in the text is already stored, and everything it opens with is at hand: reading
+  // it back could fail, and leave the writer on a page that no longer writes.
+  const chapterStarted = (piece: Piece, sectionId: string, content: string): void => {
+    ++chosen.current
+    going.current = ''
+    setOpened({ piece, sectionId, content, updatedAt: piece.updatedAt, fresh: true, readAt: ++reads })
+  }
+
+  // Undo put a chapter back: the chapter before it is stored and at hand, as above, and opens at the join.
+  const chapterRejoined = (piece: Piece, sectionId: string, content: string): void => {
+    ++chosen.current
+    going.current = ''
+    setOpened({ piece, sectionId, content, updatedAt: piece.updatedAt, at: 'join', writing: true, readAt: ++reads })
+  }
+
+  // The chapter on the page left the book: the one named is stored and at hand, as above, and opens at its opening page.
+  const chapterRemoved = ({ piece, sectionId, content, updatedAt }: Removed, writing: boolean): void => {
+    ++chosen.current
+    going.current = ''
+    setOpened({ piece, sectionId, content, updatedAt, at: 'opening', writing, readAt: ++reads })
+  }
+
+  // The chapter on the page became the first: stored and at hand, as above, it opens again at the writer's place.
+  const chapterReopened = (piece: Piece, sectionId: string, content: string): void => {
+    ++chosen.current
+    going.current = ''
+    setOpened({ piece, sectionId, content, updatedAt: piece.updatedAt, readAt: ++reads })
+  }
 
   const startNew = (kind: Kind) => {
     raiseKeyboard()
@@ -153,20 +243,27 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
           onWriteHere={() =>
             // The other window has saved: start from what it left.
             void writeHere(async () => {
-              const fresh = opened && (await open(opened.piece.id))
+              const fresh = opened && (await open(opened.piece.id, opened.sectionId))
               if (fresh) setOpened(fresh)
             })
           }
           flushRef={flushPage}
           closingRef={closing}
           covered={inLibrary || inSettings}
+          counted={counted}
           onLibrary={async () => {
             // Save first, so the library already lists what was just written; never wait long for it.
             // The first save also opens the database; a stuck one never holds the writer on the page for long.
-            await Promise.race([flushPage.current?.(), new Promise((r) => setTimeout(r, 1500))])
+            await saveFirst()
             await refresh().catch(() => {})
             go('/')
           }}
+          onOpenSection={(sectionId, writing, at) => void openSection(opened.piece, sectionId, writing, at)}
+          onNewChapter={(after) => void newChapter(opened.piece, after)}
+          onChapterStarted={chapterStarted}
+          onChapterRejoined={chapterRejoined}
+          onChapterRemoved={chapterRemoved}
+          onReopen={(piece, content) => chapterReopened(piece, opened.sectionId, content)}
           onChange={(piece) => {
             askToPersist()
             setPieces((all) => {
@@ -177,6 +274,11 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
           }}
         />
       )}
+      {/* The page changed under a screen reader: it hears which chapter it is in. Here, for a live region
+          must stand before its words do, and the page is new for each chapter. */}
+      <div className="visually-hidden chapter-said" aria-live="polite">
+        {opened?.at ? titleOf(opened).trim() || 'Untitled' : ''}
+      </div>
       {inSettings && (
         <Settings
           deps={deps}
@@ -201,7 +303,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
             // The page behind holds the old title: open it again, or its next save would put it back.
             if (opened?.piece.id === piece.id) {
               await flushPage.current?.()
-              const fresh = await open(piece.id)
+              const fresh = await open(piece.id, opened.sectionId)
               if (fresh) setOpened(fresh)
             }
           }}

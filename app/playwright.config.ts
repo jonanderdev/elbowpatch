@@ -3,6 +3,9 @@ import { defineConfig, devices, type PlaywrightTestConfig } from '@playwright/te
 // Real layout, in Chromium, WebKit and Firefox at phone and desktop sizes (docs/decisions/0007).
 const phone = { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: false }
 const desktop = { viewport: { width: 1440, height: 900 } }
+// Worktrees running side by side each take their own port.
+declare const process: { env: Record<string, string | undefined> }
+const port = process.env.E2E_PORT ?? '5198'
 
 const config: PlaywrightTestConfig = defineConfig({
   testDir: 'e2e',
@@ -13,10 +16,10 @@ const config: PlaywrightTestConfig = defineConfig({
   workers: 4,
   reporter: 'list',
   // The built app, service worker included.
-  use: { baseURL: 'http://localhost:5198/' },
+  use: { baseURL: `http://localhost:${port}/` },
   webServer: {
-    command: 'npx vite build && npx vite preview --port 5198 --strictPort',
-    url: 'http://localhost:5198/',
+    command: `npx vite build && npx vite preview --port ${port} --strictPort`,
+    url: `http://localhost:${port}/`,
     reuseExistingServer: false,
     timeout: 120_000,
   },

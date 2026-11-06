@@ -1,28 +1,55 @@
 import { type CSSProperties, type ReactElement, type ReactNode, useEffect, useRef } from 'react'
-import { number } from '../../domain/words'
+import { countLine, countSaid, number } from '../../domain/words'
 import { Icon, IconButton } from '../components/Icon'
 import { ThemeButton } from '../components/ThemeButton'
 import { type Settings, theme, update, useSettings } from '../stores/settings'
 
-export function ToolsBar(props: { page: number; count: number; words: number; onClose(): void; onTextSettings(): void; onExport(): void }): ReactElement {
+export function ToolsBar(props: {
+  page?: number
+  count?: number
+  words: number
+  /** A book's count opens Contents, from a page with no running head. */
+  onContents?(from: HTMLElement): void
+  /** Contents is open. */
+  contentsOpen?: boolean
+  onClose(): void
+  onTextSettings(): void
+  onExport(): void
+}): ReactElement {
   const settings = useSettings()
   const night = theme(settings) === 'night'
   const ref = useRef<HTMLDivElement>(null)
-  const full = `${props.page} of ${props.count}  ·  ${number(props.words)} words`
+  const full = countLine(props.page, props.count, `${number(props.words)} words`)
 
   // Opened from the page button: focus moves into the bar, and Escape folds it back.
   useEffect(() => {
-    ref.current?.querySelector('button')?.focus()
+    ref.current?.querySelector<HTMLElement>('button:not(.count)')?.focus()
   }, [])
 
   // On a narrow phone a long count drops its last word; the label still says it in full.
   const short = typeof window !== 'undefined' && window.innerWidth < 400 && full.length > 22
+  const said = countSaid(props.page, props.count, props.words)
+  const shown = short ? countLine(props.page, props.count, number(props.words)) : full
+  const { onContents } = props
   return (
     <div ref={ref} className="bar surface tools" role="toolbar" aria-label="Tools">
-      <span className="count">
-        <span aria-hidden="true">{short ? `${props.page} of ${props.count}  ·  ${number(props.words)}` : full}</span>
-        <span className="visually-hidden">{`Page ${props.page} of ${props.count}, ${number(props.words)} words`}</span>
-      </span>
+      {onContents ? (
+        <button
+          type="button"
+          className="count"
+          aria-label={`${said}. Open Contents`}
+          aria-haspopup="dialog"
+          aria-expanded={!!props.contentsOpen}
+          onClick={(e) => onContents(e.currentTarget)}
+        >
+          {shown}
+        </button>
+      ) : (
+        <span className="count">
+          <span aria-hidden="true">{shown}</span>
+          <span className="visually-hidden">{said}</span>
+        </span>
+      )}
       <span className="bar-separator" />
       <IconButton icon="export" label="Export" onClick={props.onExport} />
       <button type="button" className="icon-button" aria-label="Text settings" onClick={props.onTextSettings}>
@@ -42,8 +69,8 @@ export function ToolsBar(props: { page: number; count: number; words: number; on
  * resting in secondary grey. The one whose sheet is open keeps the pressed tint.
  */
 export function HeadTools(props: {
-  page: number
-  count: number
+  page?: number
+  count?: number
   words: number
   sheet: 'text' | 'export' | null
   onTextSettings(from: HTMLElement): void
@@ -52,8 +79,8 @@ export function HeadTools(props: {
   return (
     <div className="head-tools" role="toolbar" aria-label="Tools">
       <span className="count">
-        <span aria-hidden="true">{`${props.page} of ${props.count}  ·  ${number(props.words)} words`}</span>
-        <span className="visually-hidden">{`Page ${props.page} of ${props.count}, ${number(props.words)} words`}</span>
+        <span aria-hidden="true">{countLine(props.page, props.count, `${number(props.words)} words`)}</span>
+        <span className="visually-hidden">{countSaid(props.page, props.count, props.words)}</span>
       </span>
       <span className="bar-separator" />
       <button

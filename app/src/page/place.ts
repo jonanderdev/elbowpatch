@@ -4,10 +4,10 @@
 
 import { TextSelection } from 'prosemirror-state'
 import type { EditorView } from 'prosemirror-view'
-import type { Place } from '../domain/model'
+import type { Place, Screen } from '../domain/model'
 
 /** Where the writer is: the caret if writing, else the first line on screen. */
-export function placeOf(view: EditorView, sectionId: string, page: number, viewport: HTMLElement | null): Place | undefined {
+export function placeOf(view: EditorView, sectionId: string, page: number, screen: Screen, viewport: HTMLElement | null): Place | undefined {
   let pos = view.state.selection.head
   if (!view.hasFocus() && viewport) {
     const r = viewport.getBoundingClientRect()
@@ -23,6 +23,7 @@ export function placeOf(view: EditorView, sectionId: string, page: number, viewp
     offset: $head.parentOffset,
     snippet: node.textContent.slice(0, 160),
     page: page + 1,
+    screen,
     caret: view.hasFocus(),
     at: Date.now(),
   }
