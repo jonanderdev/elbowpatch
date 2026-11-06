@@ -9,7 +9,7 @@ import { scrollToCaret, showCaret, toOpeningPage } from '../../page/caret'
 import { type Editor, selectionBox } from '../../page/editor'
 import { screenOf } from '../../page/pager'
 import { placeOf } from '../../page/place'
-import { keepUndo, takeUndo } from '../../page/undoMemory'
+import { closeUndo, takeUndo } from '../../page/undoMemory'
 import { settled } from '../app/settled'
 import { ExportSheet } from '../components/ExportSheet'
 import { Path } from '../components/Path'
@@ -281,7 +281,7 @@ export function Page({
     onUndoPast: () => undoPast(),
     onClose(state) {
       // A page split or rejoined holds text that is no longer the section's: its history goes with it.
-      if (!saving?.sealed()) keepUndo(sectionId, state)
+      closeUndo(sectionId, state, !!saving?.sealed())
     },
     onSelection(view, tr) {
       const e = editorNow.current
