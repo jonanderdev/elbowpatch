@@ -16,6 +16,8 @@ interface PageFootProps {
   tools: boolean
   /** The phone keyboard is up: the foot stands on it, at the screen's foot (see Page). */
   keyboard: boolean
+  /** A calm line stands at the foot, where the folio would: the folio stands aside. */
+  quiet?: boolean
   pageButtonRef: RefObject<HTMLButtonElement | null>
   onOpenTools(): void
   onCloseTools(): void
@@ -40,6 +42,7 @@ export function PageFoot({
   titlePage,
   tools,
   keyboard,
+  quiet = false,
   pageButtonRef,
   onOpenTools,
   onCloseTools,
@@ -49,7 +52,7 @@ export function PageFoot({
   onContents,
   contentsOpen,
 }: PageFootProps): ReactElement {
-  const folio = page !== undefined && !journal && !titlePage && !tools && !keyboard
+  const folio = page !== undefined && !journal && !titlePage && !tools && !keyboard && !quiet
   const said = pageLine(page, count)
   return (
     <>
@@ -96,12 +99,14 @@ interface StatusLineProps {
   failed: boolean
   /** A calm line for a few seconds ("Saved as …"). */
   line: string | null
+  /** The line is a calm one after an action: secondary, with no surface. */
+  calm?: boolean
   onWriteHere(): void
   onSaveCopy(): void
 }
 
 /** One line at the foot, most important first: another window writes, a save failed, or a calm note. */
-export function StatusLine({ writer, failed, line, onWriteHere, onSaveCopy }: StatusLineProps): ReactElement | null {
+export function StatusLine({ writer, failed, line, calm = false, onWriteHere, onSaveCopy }: StatusLineProps): ReactElement | null {
   if (writer === 'elsewhere')
     return (
       <div className="line surface" role="status">
@@ -122,7 +127,7 @@ export function StatusLine({ writer, failed, line, onWriteHere, onSaveCopy }: St
     )
   if (!line) return null
   return (
-    <div className="line surface" role="status">
+    <div className={calm ? 'line calm' : 'line surface'} role="status">
       {line}
     </div>
   )
