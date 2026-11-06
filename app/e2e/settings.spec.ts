@@ -292,7 +292,7 @@ test('on a phone, the scroll mark shows while a long list moves, and not when th
   await expect(mark).toHaveAttribute('data-moving')
   await expect(mark).toHaveCSS('opacity', '1')
   const box = (await mark.boundingBox())!
-  expect(box.x + box.width).toBeCloseTo(390 - 4.5, 0)
+  expect(box.x + box.width).toBeCloseTo(390 - 10.5, 0)
   expect(box.y + box.height / 2).toBeCloseTo(250, 0)
   // The thumb has moved down the track with the scroll.
   const thumb = await mark.evaluate((el) => new DOMMatrix(getComputedStyle(el, '::before').transform).m42)
@@ -303,11 +303,14 @@ test('on a phone, the scroll mark shows while a long list moves, and not when th
   await phone.goto('./#/')
   const library = phone.locator('.library')
   await expect(library).toBeVisible()
-  await library.evaluate((el) => {
-    el.dispatchEvent(new Event('touchmove'))
-    el.scrollTo(0, 40)
-  })
-  await expect(library.locator('.scroll-mark-list')).toHaveCSS('opacity', '1')
+  // The mark listens once the screen has painted, so the finger moves until it is heard.
+  await expect(async () => {
+    await library.evaluate((el) => {
+      el.dispatchEvent(new Event('touchmove'))
+      el.scrollTo(0, el.scrollTop === 40 ? 20 : 40)
+    })
+    await expect(library.locator('.scroll-mark-list')).toHaveCSS('opacity', '1', { timeout: 300 })
+  }).toPass()
   await touch.close()
 })
 

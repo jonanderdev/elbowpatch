@@ -391,8 +391,8 @@ button {
     .scroll-mark-list {
       display: block;
       position: fixed;
-      /* Centred in the list's 12px margin. */
-      right: 4.5px;
+      /* Centred in the 24px margin beside the text, where it stands on the page. */
+      right: 10.5px;
       opacity: 0;
     }
     .scroll-mark-list[data-moving] {
