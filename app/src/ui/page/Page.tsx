@@ -456,7 +456,14 @@ export function Page({
     if (!editor.view.hasFocus()) backFromLooking.current = active?.closest('.tools') ? pageButton.current : active
     setTools(false)
     setSheet(null)
-    onTimeMachine({ content: editor.markdown(), title: titles.title.current?.textContent ?? '', name })
+    const { chapters, pages } = listed(phone ? 'phone' : 'desktop')
+    onTimeMachine({
+      content: editor.markdown(),
+      title: titles.title.current?.textContent ?? '',
+      name,
+      subtitle: titles.subtitle.current?.textContent ?? '',
+      ...(book && { contents: { chapters, ...(pages !== undefined && { pages }) } }),
+    })
   }
   const lookBackNow = useRef(lookBack)
   lookBackNow.current = lookBack

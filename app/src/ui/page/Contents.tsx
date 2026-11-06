@@ -12,22 +12,31 @@ interface ContentsListProps {
   removable: ReadonlySet<string>
   onOpen(sectionId: string): void
   onRemove(sectionId: string): void
+  /** The list answers no press: what it lists is not known yet, or is not the moment on screen. */
+  still?: boolean
 }
+
+/** Where a removed chapter's page number would be, in Contents as it was. */
+const REMOVED = 'removed since'
 
 /**
  * The book's chapters, each with the page it starts on once that is known, the current one tinted
  * (DESIGN.md, Books and chapters). It knows nothing of what holds it: the phone's sheet, or the rail.
  */
-export function ContentsList({ chapters, current, removable, onOpen, onRemove }: ContentsListProps): ReactElement {
+export function ContentsList({ chapters, current, removable, still, onOpen, onRemove }: ContentsListProps): ReactElement {
   return (
-    <ol className="contents-list">
+    <ol className="contents-list" inert={still}>
       {chapters.map((c) => {
         const goes = removable.has(c.sectionId)
         return (
           <li key={c.sectionId} className="contents-line">
             <button type="button" className="contents-row" aria-current={c.sectionId === current ? 'true' : undefined} onClick={() => onOpen(c.sectionId)}>
               <span className="contents-title">{c.title.trim() || 'Untitled'}</span>
-              {goes || c.startPage === undefined ? null : <span className="contents-page">{number(c.startPage)}</span>}
+              {c.removed ? (
+                <span className="contents-page">{REMOVED}</span>
+              ) : goes || c.startPage === undefined ? null : (
+                <span className="contents-page">{number(c.startPage)}</span>
+              )}
             </button>
             {/* Beside the row, not in it: a button holds no other. */}
             {goes ? (
@@ -66,7 +75,19 @@ interface ContentsSheetProps extends ContentsListProps {
 }
 
 /** Contents on a phone: a sheet dropped under the head, whose list scrolls inside it. */
-export function ContentsSheet({ name, chapters, current, removable, pages, takeFocus, onOpen, onRemove, onDone, children }: ContentsSheetProps): ReactElement {
+export function ContentsSheet({
+  name,
+  chapters,
+  current,
+  removable,
+  still,
+  pages,
+  takeFocus,
+  onOpen,
+  onRemove,
+  onDone,
+  children,
+}: ContentsSheetProps): ReactElement {
   const ref = useRef<HTMLDivElement>(null)
   // Once, as it opens: a long list starts at the current chapter.
   const opening = useRef(takeFocus)
@@ -81,7 +102,7 @@ export function ContentsSheet({ name, chapters, current, removable, pages, takeF
         <span className="contents-name">{name.trim() || 'Untitled'}</span>
         {pages === undefined ? null : <span className="sheet-aside contents-pages">{pagesWord(pages)}</span>}
       </div>
-      <ContentsList chapters={chapters} current={current} removable={removable} onOpen={onOpen} onRemove={onRemove} />
+      <ContentsList chapters={chapters} current={current} removable={removable} still={still} onOpen={onOpen} onRemove={onRemove} />
       <div className="contents-foot">
         {children}
         <button type="button" className="text-link" onClick={onDone}>
@@ -108,7 +129,7 @@ export const RAIL_ID = 'contents-rail'
  * Contents on desktop: the rail, which folds away and never moves the text (DESIGN.md, Layout). Folded,
  * it stays out of the way of the keyboard and of a screen reader.
  */
-export function ContentsRail({ chapters, current, removable, pages, open, onOpen, onRemove, onLeave, children }: ContentsRailProps): ReactElement {
+export function ContentsRail({ chapters, current, removable, still, pages, open, onOpen, onRemove, onLeave, children }: ContentsRailProps): ReactElement {
   const ref = useRef<HTMLElement>(null)
   // A new page opens for each chapter, so a long list starts at the current one; and again on opening.
   useEffect(() => {
@@ -138,7 +159,7 @@ export function ContentsRail({ chapters, current, removable, pages, open, onOpen
           </>
         )}
       </p>
-      <ContentsList chapters={chapters} current={current} removable={removable} onOpen={onOpen} onRemove={onRemove} />
+      <ContentsList chapters={chapters} current={current} removable={removable} still={still} onOpen={onOpen} onRemove={onRemove} />
       {children}
     </nav>
   )
