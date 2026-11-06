@@ -4,6 +4,7 @@ import { placePage } from '../../domain/pieces'
 import { screenOf } from '../../page/pager'
 import { ExportSheet } from '../components/ExportSheet'
 import { IconButton } from '../components/Icon'
+import { ScrollMark } from '../components/ScrollMark'
 import { ThemeButton } from '../components/ThemeButton'
 import { useGoneUnder, useScrolled } from '../components/useScrolled'
 import { update, useSettings } from '../stores/settings'
@@ -244,6 +245,7 @@ export function Library({
           onDone={() => setExporting(null)}
         />
       )}
+      <ScrollMark scroller={scroller} />
     </main>
   )
 }

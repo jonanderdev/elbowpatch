@@ -270,3 +270,55 @@ test('in Safari on an iPhone, Show me how lands on the Home Screen steps', async
   await expect(phone.getByText('Turn the page')).toBeHidden()
   await iphone.close()
 })
+
+test('on a phone, the scroll mark shows while a long list moves, and not when the app scrolls it', async ({ browser, browserName }) => {
+  test.skip(browserName === 'firefox', 'Firefox has no mobile emulation.')
+  const touch = await browser.newContext({ viewport: { width: 390, height: 500 }, hasTouch: true, isMobile: true })
+  const phone = await touch.newPage()
+  await phone.goto('./#/settings/about')
+  const list = phone.locator('.settings')
+  const mark = phone.locator('.scroll-mark-list')
+  await expect(phone.getByRole('heading', { name: 'About & privacy', level: 1 })).toBeVisible()
+  await expect(mark).toHaveCSS('opacity', '0')
+  // The app's own scroll, as when an area opens at its top: no finger, no mark.
+  await list.evaluate((el) => el.scrollTo(0, 80))
+  await expect(list).toHaveJSProperty('scrollTop', 80)
+  await expect(mark).not.toHaveAttribute('data-moving')
+  // A finger moves the list: the mark shows, at the screen's edge, and goes when the list stops.
+  await list.evaluate((el) => {
+    el.dispatchEvent(new Event('touchmove'))
+    el.scrollTo(0, 200)
+  })
+  await expect(mark).toHaveAttribute('data-moving')
+  await expect(mark).toHaveCSS('opacity', '1')
+  const box = (await mark.boundingBox())!
+  expect(box.x + box.width).toBeCloseTo(390 - 10.5, 0)
+  expect(box.y + box.height / 2).toBeCloseTo(250, 0)
+  // The thumb has moved down the track with the scroll.
+  const thumb = await mark.evaluate((el) => new DOMMatrix(getComputedStyle(el, '::before').transform).m42)
+  expect(thumb).toBeGreaterThan(0)
+  await expect(mark).not.toHaveAttribute('data-moving')
+  // The library has it too, in the same place.
+  await phone.setViewportSize({ width: 390, height: 300 })
+  await phone.goto('./#/')
+  const library = phone.locator('.library')
+  await expect(library).toBeVisible()
+  // The mark listens once the screen has painted, so the finger moves until it is heard.
+  await expect(async () => {
+    await library.evaluate((el) => {
+      el.dispatchEvent(new Event('touchmove'))
+      el.scrollTo(0, el.scrollTop === 40 ? 20 : 40)
+    })
+    await expect(library.locator('.scroll-mark-list')).toHaveCSS('opacity', '1', { timeout: 300 })
+  }).toPass()
+  await touch.close()
+})
+
+test('a narrow window that is not a touch screen keeps its own scrollbar', async ({ browser }) => {
+  const narrow = await browser.newContext({ viewport: { width: 390, height: 500 }, hasTouch: false })
+  const window = await narrow.newPage()
+  await window.goto('./#/settings/about')
+  await expect(window.getByRole('heading', { name: 'About & privacy', level: 1 })).toBeVisible()
+  await expect(window.locator('.scroll-mark-list')).toBeHidden()
+  await narrow.close()
+})
