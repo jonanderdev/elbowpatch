@@ -4,6 +4,7 @@
 import { countWords } from './markdown'
 import type { Kind, Outline, OutlineSection, Piece } from './model'
 import { current, type Deps, history, latest, momentIn, openingWords, outlineAt, withoutCounts } from './pieces'
+import type { Tx } from './ports'
 import { dayTitle } from './words'
 
 /** One tick on the tape: a point where the section differs from the tick before it, in its text or its title. */
@@ -173,13 +174,28 @@ export function readingAt(moments: Moment[], at: number | undefined, listedTitle
  * working copy; a time before the first version is empty.
  */
 export function textAt(deps: Pick<Deps, 'store'>, sectionId: string, at: number): Promise<string> {
+  return deps.store.transaction((tx) => textIn(tx, sectionId, at))
+}
+
+/** One section's text at a time, inside a transaction. */
+async function textIn(tx: Tx, sectionId: string, at: number): Promise<string> {
+  const versions = history(await tx.versionsOf(sectionId))
+  if (at === Number.POSITIVE_INFINITY) {
+    const working = await tx.working(sectionId)
+    return working?.content ?? versions.at(-1)?.content ?? ''
+  }
+  return versions.findLast((v) => v.createdAt <= at)?.content ?? ''
+}
+
+/**
+ * Several sections' words at a time, read in one go as `textAt` reads their text: a journal's Days as it was lists
+ * each day with the words it held then. A section with no version yet has none.
+ */
+export function wordsAt(deps: Pick<Deps, 'store'>, sectionIds: readonly string[], at: number): Promise<Record<string, number>> {
   return deps.store.transaction(async (tx) => {
-    const versions = history(await tx.versionsOf(sectionId))
-    if (at === Number.POSITIVE_INFINITY) {
-      const working = await tx.working(sectionId)
-      return working?.content ?? versions.at(-1)?.content ?? ''
-    }
-    return versions.findLast((v) => v.createdAt <= at)?.content ?? ''
+    const words: Record<string, number> = {}
+    for (const id of sectionIds) words[id] = countWords(await textIn(tx, id, at))
+    return words
   })
 }
 

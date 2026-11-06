@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { memoryStore } from '../adapters/memory-store'
-import { listingOf, momentsOf, momentToOpen, readingAt, sectionBeyond, sectionsAt, shapeAt, textAt, timeOf } from './lookBack'
+import { listingOf, momentsOf, momentToOpen, readingAt, sectionBeyond, sectionsAt, shapeAt, textAt, timeOf, wordsAt } from './lookBack'
 import type { Piece } from './model'
 import { newPiece, removeChapter, rename, renameSection, setSubtitle, takeMoment, withChapter, withDay, write } from './pieces'
 import { thin } from './thinning'
@@ -410,5 +410,24 @@ describe('a section’s text at a time, read alone', () => {
     const { book, a, first, second } = await twoChapters(s)
     const moments = await momentsOf(s.deps, book.id, a)
     for (const at of [first, second, Number.POSITIVE_INFINITY]) expect(await textAt(s.deps, a, at)).toBe(readingAt(moments, at, '').content)
+  })
+})
+
+describe('the words of several sections at a time', () => {
+  it('are each one’s words then, none before its first version, and the working copy now', async () => {
+    const s = setup()
+    const { book, a, b, first, second } = await twoChapters(s)
+    expect(await wordsAt(s.deps, [a, b], first)).toEqual({ [a]: 2, [b]: 0 })
+    expect(await wordsAt(s.deps, [a, b], second)).toEqual({ [a]: 2, [b]: 2 })
+    s.clock.set(s.clock.now() + 60_000)
+    await write(s.deps, book, b, 'chapter two, longer')
+    expect(await wordsAt(s.deps, [a, b], Number.POSITIVE_INFINITY)).toEqual({ [a]: 2, [b]: 3 })
+    expect(await wordsAt(s.deps, [a, b], second)).toEqual({ [a]: 2, [b]: 2 })
+  })
+
+  it('agree with each section’s text', async () => {
+    const s = setup()
+    const { a, b, second } = await twoChapters(s)
+    for (const id of [a, b]) expect((await wordsAt(s.deps, [a, b], second))[id]).toBe((await textAt(s.deps, id, second)).split(/\s+/).filter(Boolean).length)
   })
 })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { type Day, dayBeyond, daysLine, journalDays, monthAfter, monthCells, monthLine, monthOf, monthsOf } from './days'
+import { type Day, dayBeyond, daysAsItWas, daysLine, journalDays, monthAfter, monthCells, monthLine, monthOf, monthsOf } from './days'
 import type { Piece } from './model'
 
 const journal = (days: Record<string, number>): Piece => ({
@@ -44,6 +44,24 @@ describe('journalDays', () => {
   it('keeps a day written ahead of today in date order, so it can be reached', () => {
     const days = journalDays(journal({ '2026-11-02': 9 }), TODAY)
     expect(days.map((d) => d.iso)).toEqual(['2026-11-02', '2026-10-30'])
+  })
+})
+
+describe('daysAsItWas', () => {
+  const sections = [
+    { sectionId: 's-22', title: '2026-10-22' },
+    { sectionId: 's-26', title: '2026-10-26' },
+  ]
+
+  it('lists each day the journal had, latest first, with the words it held then, and no today', () => {
+    expect(daysAsItWas(sections, { 's-22': 3, 's-26': 5 })).toEqual([
+      { iso: '2026-10-26', sectionId: 's-26', words: 5 },
+      { iso: '2026-10-22', sectionId: 's-22', words: 3 },
+    ])
+  })
+
+  it('counts a day with no words known as none', () => {
+    expect(daysAsItWas(sections, { 's-22': 3 }).map((d) => d.words)).toEqual([0, 3])
   })
 })
 
