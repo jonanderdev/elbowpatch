@@ -5,6 +5,8 @@ import { caretToEnd, saved } from './helpers'
 const onDesktop = (page: Page) => page.viewportSize()!.width >= 700
 
 const THREE = '# One\n\nFirst chapter.\n\n# Two\n\nSecond.\n\n# Three\n\nThird.\n'
+/** Several pages of text on any screen. */
+const LONG = Array.from({ length: 60 }, (_, i) => `Paragraph ${i} of a chapter that runs on past its opening page, and then some more.`).join('\n\n')
 
 async function importBook(page: Page, markdown = THREE) {
   await page.goto('./#/settings/export')
@@ -228,7 +230,43 @@ test('removing the open first chapter opens the next, which now carries the titl
   await expect(page.locator('.title')).toHaveText('Two')
   await expect(page.locator('.body')).toHaveText('Second.')
   await expect(page.locator('.book-title')).toHaveCount(1)
+  await expect(page.locator('.title')).toBeInViewport()
+  // Its opening page, past the title page it now carries.
+  if (!onDesktop(page)) await expect(page.locator('.page-button')).toHaveAttribute('aria-label', /^Page 2 of /)
   await storedTitles(page).toEqual(['Two', 'Three'])
+})
+
+test('the chapter before opens at its opening page, wherever the writer last was in it', async ({ page }) => {
+  await importBook(page, `# One\n\n${LONG}\n\n# Two\n\nSecond.\n\n# Three\n\nThird.\n`)
+  await page.keyboard.press('PageDown')
+  await page.keyboard.press('PageDown')
+  await page.keyboard.press('PageDown')
+  await expect(page.locator('.title')).not.toBeInViewport()
+  await goTo(page, 'Two')
+  await emptyHere(page, 'Two')
+  await openContents(page)
+  await removes(page).click()
+  await expect(page.locator('.title')).toHaveText('One')
+  await expect(page.locator('.title')).toBeInViewport()
+  if (!onDesktop(page)) await expect(page.locator('.page-button')).toHaveAttribute('aria-label', /^Page 2 of /)
+})
+
+test("the chapter given the title page opens again at the writer's place", async ({ page }) => {
+  test.skip(onDesktop(page), "The page number is read from the phone's button.")
+  await importBook(page, `# One\n\nFirst.\n\n# Two\n\n${LONG}\n\n# Three\n\nThird.\n`)
+  await emptyHere(page, 'One')
+  await goTo(page, 'Two')
+  await caretToEnd(page)
+  await expect(page.locator('.title')).not.toBeInViewport()
+  const pageNow = async () => parseInt(((await page.locator('.page-button').getAttribute('aria-label')) ?? '').replace('Page ', ''), 10)
+  await expect.poll(pageNow).toBeGreaterThan(5)
+  const before = await pageNow()
+  await openContents(page)
+  await removes(page).click()
+  await expect(page.locator('.book-title')).toHaveCount(1)
+  await expect(page.locator('.title')).not.toBeInViewport()
+  // One's two pages are gone and the title page has come: a page fewer before the writer.
+  await expect.poll(pageNow).toBe(before - 1)
 })
 
 test('removing the first chapter from the next one gives that page the title page, with the words kept', async ({ page }) => {
@@ -347,6 +385,27 @@ test('words waiting to be stored for a chapter keep it: no Remove, and they come
   await storedTitles(page).toEqual(['One', '', 'Three'])
 })
 
+test('a press on a chapter whose words reached the journal only just now is refused, and the words come back when it opens', async ({ page }) => {
+  await bookWithEmptied(page)
+  await expect(removes(page)).toHaveCount(1)
+  // Written straight in, so the page has not heard of it, and Remove is still there to press.
+  await page.evaluate(
+    async (at) => {
+      localStorage.setItem(
+        `elbowpatch.unsaved.${at}`,
+        JSON.stringify({ piece: {}, pieceId: '', sectionId: at, name: 'harbour', markdown: 'Kept.', title: null, at: Date.now() }),
+      )
+    },
+    (await stored(page)).ids[1]!,
+  )
+  await removes(page).click()
+  await page.waitForTimeout(500)
+  await expect(rows(page)).toHaveCount(3)
+  await storedTitles(page).toEqual(['One', '', 'Three'])
+  await goTo(page, 'Untitled')
+  await expect(page.locator('.body')).toHaveText('Kept.')
+})
+
 test('a press that was on its way as the words came is refused quietly, and the words stay', async ({ page }) => {
   await bookWithEmptied(page, 'Untitled')
   // The press reaches a Remove the page has already taken away: what counts is what the page holds then.
@@ -395,6 +454,53 @@ test('a window that is not writing shows no Remove', async ({ page, context }) =
   await expect(rows(second)).toHaveCount(3)
   await expect(removes(second)).toHaveCount(0)
   await expect(contents(second).locator('.contents-page').nth(1)).toBeVisible()
+})
+
+test('a press that was on its way as the window stopped writing changes nothing', async ({ page, context }) => {
+  await bookWithEmptied(page)
+  await page.evaluate(() => {
+    ;(window as unknown as { __remove: Element | null }).__remove = document.querySelector('.contents-remove')
+  })
+  const second = await context.newPage()
+  await second.goto(page.url())
+  await second.getByRole('button', { name: 'Write here' }).click()
+  await expect(second.locator('.body')).toHaveAttribute('contenteditable', 'true')
+  await expect(page.locator('.body')).toHaveAttribute('contenteditable', 'false')
+  await page.evaluate(() => (window as unknown as { __remove: HTMLElement }).__remove.click())
+  await page.waitForTimeout(500)
+  await storedTitles(page).toEqual(['One', '', 'Three'])
+})
+
+test('undo at the start of a chapter split from the one removed leaves it a chapter', async ({ page }) => {
+  await importBook(page, '# One\n\nFirst.\n\n# Two\n\nAlpha.\n\nBeta.\n\nGamma.\n\n# Three\n\nThird.\n')
+  await goTo(page, 'Two')
+  await closeContents(page)
+  await page.locator('.body').focus()
+  await page.evaluate(() => {
+    const walker = document.createTreeWalker(document.querySelector('.body')!, NodeFilter.SHOW_TEXT)
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (node.textContent !== 'Beta.') continue
+      getSelection()!.setBaseAndExtent(node, 0, node, 0)
+      document.dispatchEvent(new Event('selectionchange'))
+    }
+  })
+  await page.keyboard.type('# ')
+  await expect(page.locator('.title')).toHaveText('Beta.')
+  await expect.poll(async () => (await stored(page)).titles).toEqual(['One', 'Two', 'Beta.', 'Three'])
+
+  await goTo(page, 'Two')
+  await emptyHere(page, 'Two')
+  await goTo(page, 'Beta.')
+  await openContents(page)
+  await removes(page).click()
+  await expect(rows(page)).toHaveCount(3)
+  await closeContents(page)
+
+  await page.locator('.body').focus()
+  await page.keyboard.press('ControlOrMeta+z')
+  await page.waitForTimeout(500)
+  await expect(page.locator('.body')).toHaveText('Gamma.')
+  await storedTitles(page).toEqual(['One', 'Beta.', 'Three'])
 })
 
 test('Remove works by keyboard, and the focus lands on the current chapter, not on nothing', async ({ page }) => {
