@@ -29,7 +29,7 @@ import { raiseKeyboard } from '../page/useFocusOnOpen'
 import { waiting } from '../settings/PutAway'
 import { type Area, Settings } from '../settings/Settings'
 import { readLast, writeLast } from '../stores/last'
-import { type BringBackRequest, TimeMachine } from '../timeMachine/TimeMachine'
+import { type BringBackLine, type BringBackRequest, TimeMachine } from '../timeMachine/TimeMachine'
 import { bringSectionBack } from './bringBack'
 import { askToPersist } from './persist'
 import { replayJournal } from './replay'
@@ -169,7 +169,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
   // the line. Until then the page stays covered, whatever closes the Time Machine meanwhile, and a second press waits for nothing.
   const [bringing, setBringing] = useState(false)
   const bringingNow = useRef(false)
-  const bringBackTo = async (moment: BringBackRequest, line: string): Promise<void> => {
+  const bringBackTo = async (moment: BringBackRequest, line: BringBackLine): Promise<void> => {
     if (!opened || bringingNow.current) return
     bringingNow.current = true
     setBringing(true)
@@ -184,7 +184,15 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
       timeMachine.leave(() => {
         ++chosen.current
         going.current = ''
-        setOpened({ piece: done.piece, sectionId: done.sectionId, content: done.content, updatedAt: done.updatedAt, at: 'opening', line, readAt: ++reads })
+        setOpened({
+          piece: done.piece,
+          sectionId: done.sectionId,
+          content: done.content,
+          updatedAt: done.updatedAt,
+          at: 'opening',
+          line: typeof line === 'function' ? line(done.piece) : line,
+          readAt: ++reads,
+        })
         bringingNow.current = false
         setBringing(false)
       })
@@ -340,7 +348,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
         <TimeMachine
           deps={deps}
           looking={timeMachine.looking}
-          {...(timeMachine.looking.piece.kind !== 'book' ? { onBringBack: bringBackTo } : {})}
+          onBringBack={bringBackTo}
           onKeepCopy={(moment, line) => keepCopyOf(timeMachine.looking!.piece.id, moment, line)}
           onBack={() => timeMachine.leave()}
           onHome={() => timeMachine.leave(() => void toLibrary())}

@@ -21,7 +21,7 @@ function setup(start = 10 * DAY) {
 type Setup = ReturnType<typeof setup>
 
 const yes = (): boolean => true
-const tick = (s: Setup): void => s.clock.set(s.clock.now() + MIN)
+const tick = (s: Setup): void => void s.clock.set(s.clock.now() + MIN)
 
 /** Four chapters, each with a title and words, one moment so far. */
 async function book(s: Setup): Promise<{ id: string; [k: string]: string }> {
@@ -108,7 +108,7 @@ describe('bringing a chapter back', () => {
       const b = await book(s)
       tick(s)
       await remove(s, b, b.b!)
-      expect(titles((await stored(s, b.id)))).toEqual(['One', 'The quay', 'The lighthouse'])
+      expect(titles(await stored(s, b.id))).toEqual(['One', 'The quay', 'The lighthouse'])
       const before = await outlines(s, b.id)
       tick(s)
       const result = await bringBack(s.deps, b.id, await moment(s, b.id, b.b!, 'b first words'))
