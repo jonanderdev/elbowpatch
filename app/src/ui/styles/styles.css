@@ -870,6 +870,13 @@ button.count[aria-expanded='true'] {
   color: var(--title);
   z-index: 3;
 }
+/* What came back from the Time Machine: words in the secondary colour beside the page button, no surface (DESIGN.md). */
+.line.calm {
+  padding: 0;
+  width: 306px;
+  max-width: calc(100% - 2 * var(--edge) - 56px);
+  color: var(--secondary);
+}
 /* The tools bar stands where the line does: the line waits above it, so the bar can still be pressed. */
 .page-screen[data-tools] .line {
   bottom: calc(var(--rise) + (var(--foot) - 44px) / 2 + 44px + 12px);

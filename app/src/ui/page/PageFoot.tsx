@@ -25,6 +25,8 @@ interface PageFootProps {
   /** A book's count opens Contents, and a journal's Days. */
   onContents?(from: HTMLElement): void
   contentsOpen: boolean
+  /** A calm line stands beside the page button: the folio gives way to it. */
+  noted?: boolean
 }
 
 /**
@@ -48,8 +50,9 @@ export function PageFoot({
   onTimeMachine,
   onContents,
   contentsOpen,
+  noted,
 }: PageFootProps): ReactElement {
-  const folio = page !== undefined && !journal && !titlePage && !tools && !keyboard
+  const folio = page !== undefined && !journal && !titlePage && !tools && !keyboard && !noted
   const said = pageLine(page, count)
   return (
     <>
@@ -96,12 +99,14 @@ interface StatusLineProps {
   failed: boolean
   /** A calm line for a few seconds ("Saved as …"). */
   line: string | null
+  /** What came back from the Time Machine: a calm line in the secondary colour with no surface, as the Time Machine draws them. */
+  note?: string | null
   onWriteHere(): void
   onSaveCopy(): void
 }
 
 /** One line at the foot, most important first: another window writes, a save failed, or a calm note. */
-export function StatusLine({ writer, failed, line, onWriteHere, onSaveCopy }: StatusLineProps): ReactElement | null {
+export function StatusLine({ writer, failed, line, note, onWriteHere, onSaveCopy }: StatusLineProps): ReactElement | null {
   if (writer === 'elsewhere')
     return (
       <div className="line surface" role="status">
@@ -118,6 +123,12 @@ export function StatusLine({ writer, failed, line, onWriteHere, onSaveCopy }: St
         <button type="button" onClick={onSaveCopy}>
           Save a copy
         </button>
+      </div>
+    )
+  if (note)
+    return (
+      <div className="line calm" role="status">
+        {note}
       </div>
     )
   if (!line) return null

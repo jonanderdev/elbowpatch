@@ -163,7 +163,15 @@ export function bringBack(deps: Deps, pieceId: string, request: BringBack): Prom
     await tx.putWorking({ ...working, content, updatedAt: stamp })
     const place: Piece['place'] =
       piece.place?.sectionId === sectionId
-        ? { sectionId, paragraph: 0, offset: 0, snippet: openingWords(content), ...(piece.sections[0]?.sectionId === sectionId ? {} : { page: 1 }), caret: false, at: stamp }
+        ? {
+            sectionId,
+            paragraph: 0,
+            offset: 0,
+            snippet: openingWords(content),
+            ...(piece.sections[0]?.sectionId === sectionId ? {} : { page: 1 }),
+            caret: false,
+            at: stamp,
+          }
         : piece.place
     await tx.putPiece({
       ...piece,

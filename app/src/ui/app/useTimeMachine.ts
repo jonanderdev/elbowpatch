@@ -44,6 +44,11 @@ export function useTimeMachine(thinning: ThinningGate, saveFirst: () => Promise<
   }
 
   const leave = (then?: () => void): void => {
+    // Already closed (the browser's back, mid-action): there is no entry to wait for, and `then` must still run.
+    if (!isOpen.current) {
+      then?.()
+      return
+    }
     afterLeaving.current = then
     // Only our own entry: going back from any other would leave the page.
     if (history.state?.timeMachine) history.back()

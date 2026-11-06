@@ -30,6 +30,8 @@ export interface Opened {
   at?: OpenAt
   /** The writer was in the text when they went there: the caret goes with them. */
   writing?: boolean
+  /** A calm line for the foot as the page opens, for a few seconds: what came back from the Time Machine, and from when. */
+  note?: string
 }
 
 export interface TitleFields {

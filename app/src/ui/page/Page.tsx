@@ -51,6 +51,8 @@ interface Props {
   onWriteHere(): void
   /** Lets the app ask the page to save now, before another window takes the piece. */
   flushRef: { current: (() => Promise<void>) | null }
+  /** Lets the app reshape the section the page holds, as a bring back does: stored first, the page sealed while it runs. */
+  reshapeRef: { current: ((change: (whole: string) => Promise<Piece | undefined>) => Promise<boolean>) | null }
   /** The closing pages' last saves, so the app lets go of the piece only after them. */
   closingRef: { current: Promise<void> }
   /** The library shows over the page; the page stays laid out behind it, inert. */
@@ -94,6 +96,7 @@ export function Page({
   writer,
   onWriteHere,
   flushRef,
+  reshapeRef,
   closingRef,
   covered,
   counted,
@@ -135,6 +138,8 @@ export function Page({
   /** Where Days was opened from, which is where it stands. */
   const [daysFrom, setDaysFrom] = useState<'head' | 'tools'>('head')
   const [line, setLine] = useState<string | null>(null)
+  /** What came back from the Time Machine, said as the page opens. */
+  const [note, setNote] = useState<string | null>(opened.note ?? null)
   const [words, setWords] = useState(() => countWords(content))
   const [blank, setBlank] = useState(() => !content.trim())
   const today = isoDay(new Date(deps.clock.now()))
@@ -240,6 +245,7 @@ export function Page({
     pages: () => (pager && laidOut && screen.current ? { screen: screenOf(screen.current.clientWidth), count: pager.count } : null),
     onStored: reported,
     flushRef,
+    reshapeRef,
     closingRef,
   })
 
@@ -576,6 +582,12 @@ export function Page({
     return () => window.removeEventListener('pointerdown', onDown)
   }, [covered, closeSheet])
 
+  useEffect(() => {
+    if (!note) return
+    const t = setTimeout(() => setNote(null), 4000)
+    return () => clearTimeout(t)
+  }, [note])
+
   // A calm line at the foot for a few seconds.
   useEffect(() => {
     if (!line) return
@@ -754,6 +766,7 @@ export function Page({
         onTimeMachine={lookBack}
         onContents={book || journal ? openContents : undefined}
         contentsOpen={sheet === 'contents'}
+        noted={!!note && writer !== 'elsewhere' && !failed}
       />
 
       {sheet === 'contents' && phone && journal ? (
@@ -795,7 +808,7 @@ export function Page({
       ) : null}
 
       {/* shortcut: Save a copy holds the unsaved section only, not the whole piece. */}
-      <StatusLine writer={writer} failed={failed} line={line} onWriteHere={onWriteHere} onSaveCopy={() => void exportMarkdown()} />
+      <StatusLine writer={writer} failed={failed} line={line} note={note} onWriteHere={onWriteHere} onSaveCopy={() => void exportMarkdown()} />
 
       <div className="visually-hidden" aria-live="polite">
         {said?.over === announcement ? said.text : announcement}

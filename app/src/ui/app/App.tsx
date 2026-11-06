@@ -1,4 +1,4 @@
-import { type ReactElement, useCallback, useEffect, useRef, useState } from 'react'
+import { type ComponentProps, type ReactElement, useCallback, useEffect, useRef, useState } from 'react'
 import { pieceAsMarkdown } from '../../domain/export'
 import type { Kind, Piece } from '../../domain/model'
 import {
@@ -27,7 +27,8 @@ import { raiseKeyboard } from '../page/useFocusOnOpen'
 import { waiting } from '../settings/PutAway'
 import { type Area, Settings } from '../settings/Settings'
 import { readLast, writeLast } from '../stores/last'
-import { TimeMachine } from '../timeMachine/TimeMachine'
+import { type BringBackRequest, TimeMachine } from '../timeMachine/TimeMachine'
+import { bringSectionBack } from './bringBack'
 import { askToPersist } from './persist'
 import { replayJournal } from './replay'
 import { settled } from './settled'
@@ -154,11 +155,42 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
 
   const flushPage = useRef<(() => Promise<void>) | null>(null)
   const closing = useRef<Promise<void>>(Promise.resolve())
-  const { writer, writeHere } = useWriterLock(lock, opened?.piece.id, flushPage, closing)
+  const reshapePage = useRef<ComponentProps<typeof Page>['reshapeRef']['current']>(null)
+  const { writer, holds, writeHere } = useWriterLock(lock, opened?.piece.id, flushPage, closing)
 
   /** The open page saved, and the last one's closing save done; never waiting long for either. */
   const saveFirst = () => Promise.race([Promise.all([flushPage.current?.(), settled(closing.current)]), new Promise((r) => setTimeout(r, 1500))])
   const timeMachine = useTimeMachine(thinning, saveFirst)
+
+  // A section brought back to a moment (#77, Bring back). The page stores what it holds and is sealed, one transaction
+  // brings the text back, and the page reopens on that section by name: stored and at hand, at its opening page, with
+  // the line. Until then the page stays covered, whatever closes the Time Machine meanwhile, and a second press waits for nothing.
+  const [bringing, setBringing] = useState(false)
+  const bringingNow = useRef(false)
+  const bringBackTo = async (moment: BringBackRequest, note: string): Promise<void> => {
+    if (!opened || bringingNow.current) return
+    bringingNow.current = true
+    setBringing(true)
+    let landed = false
+    try {
+      const done = await bringSectionBack({ deps, pieceId: opened.piece.id, reshape: () => reshapePage.current, writes: holds }, moment)
+      if (!done) return void timeMachine.leave()
+      landed = true
+      timeMachine.leave(() => {
+        ++chosen.current
+        going.current = ''
+        setOpened({ piece: done.piece, sectionId: done.sectionId, content: done.content, updatedAt: done.updatedAt, at: 'opening', note, readAt: ++reads })
+        bringingNow.current = false
+        setBringing(false)
+      })
+      void refresh().catch(() => {})
+    } finally {
+      if (!landed) {
+        bringingNow.current = false
+        setBringing(false)
+      }
+    }
+  }
 
   // Another section of the open piece. The lock is the piece's, so it stays. The last chapter chosen
   // wins, should the writer choose again while a save runs.
@@ -263,8 +295,9 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
             })
           }
           flushRef={flushPage}
+          reshapeRef={reshapePage}
           closingRef={closing}
-          covered={inLibrary || inSettings || !!timeMachine.looking}
+          covered={inLibrary || inSettings || !!timeMachine.looking || bringing}
           counted={counted}
           onLibrary={() => void toLibrary()}
           onOpenSection={(sectionId, writing, at) => void openSection(opened.piece, sectionId, writing, at)}
@@ -285,7 +318,13 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
         />
       )}
       {timeMachine.looking && (
-        <TimeMachine deps={deps} looking={timeMachine.looking} onBack={() => timeMachine.leave()} onHome={() => timeMachine.leave(() => void toLibrary())} />
+        <TimeMachine
+          deps={deps}
+          looking={timeMachine.looking}
+          {...(timeMachine.looking.piece.kind === 'essay' ? { onBringBack: bringBackTo } : {})}
+          onBack={() => timeMachine.leave()}
+          onHome={() => timeMachine.leave(() => void toLibrary())}
+        />
       )}
       {/* The page changed under a screen reader: it hears which chapter it is in. Here, for a live region
           must stand before its words do, and the page is new for each chapter. */}
