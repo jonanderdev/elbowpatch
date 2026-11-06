@@ -231,7 +231,7 @@ test('removing the open first chapter opens the next, which now carries the titl
   await storedTitles(page).toEqual(['Two', 'Three'])
 })
 
-test('removing the first chapter from the next one gives that page the title page, with the words and the caret kept', async ({ page }) => {
+test('removing the first chapter from the next one gives that page the title page, with the words kept', async ({ page }) => {
   await importBook(page)
   await emptyHere(page, 'One')
   await goTo(page, 'Two')
@@ -246,6 +246,43 @@ test('removing the first chapter from the next one gives that page the title pag
   await openContents(page)
   await expect(rows(page).nth(0).locator('.contents-page')).toHaveText('1')
   await expect(rows(page).nth(1).locator('.contents-page')).toHaveText('3')
+})
+
+test('removing the first chapter from the next one, keys pressed as it reopens lose nothing, and undo goes on', async ({ page }) => {
+  test.skip(!onDesktop(page), 'The caret stays in the text only beside the rail.')
+  await importBook(page)
+  await emptyHere(page, 'One')
+  await goTo(page, 'Two')
+  await caretToEnd(page)
+  await page.keyboard.type(' Typed.')
+  await saved(page, 'Second. Typed.')
+  await removes(page).click()
+  await page.keyboard.type(' More')
+  await expect(page.locator('.book-title')).toHaveCount(1)
+  await expect(page.locator('.body')).toBeFocused()
+  await storedTitles(page).toEqual(['Two', 'Three'])
+
+  const shown = await page.locator('.body').innerText()
+  await caretToEnd(page)
+  await page.keyboard.type('!')
+  await saved(page, `${shown}!`)
+  await page.reload()
+  await expect(page.locator('.body')).toHaveText(`${shown}!`)
+})
+
+test('undo goes on in the chapter that was given the title page', async ({ page }) => {
+  test.skip(!onDesktop(page), 'The caret stays in the text only beside the rail.')
+  await importBook(page)
+  await emptyHere(page, 'One')
+  await goTo(page, 'Two')
+  await caretToEnd(page)
+  await page.keyboard.type(' Typed.')
+  await saved(page, 'Second. Typed.')
+  await removes(page).click()
+  await expect(page.locator('.book-title')).toHaveCount(1)
+  await expect(page.locator('.body')).toBeFocused()
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect(page.locator('.body')).toHaveText('Second.')
 })
 
 test('a book of one chapter has no Remove, and a book brought down to one has none left', async ({ page }) => {
@@ -332,7 +369,7 @@ test('a press that was on its way as the words came is refused quietly, and the 
   await expect(page.getByRole('alert')).toHaveCount(0)
 })
 
-test('a new chapter not stored yet can be removed too: it opens the one before, and nothing is left behind', async ({ page }) => {
+test('a new chapter not stored yet shows no Remove: leaving it already removes it', async ({ page }) => {
   await importBook(page)
   await goTo(page, 'Three')
   await openContents(page)
@@ -340,12 +377,11 @@ test('a new chapter not stored yet can be removed too: it opens the one before, 
   await expect(page.locator('.title')).toBeFocused()
   await openContents(page)
   await expect(rows(page)).toHaveCount(4)
-  await removes(page).click()
-  await expect(page.locator('.title')).toHaveText('Three')
+  await expect(removes(page)).toHaveCount(0)
+  await goTo(page, 'Three')
   await openContents(page)
   await expect(rows(page)).toHaveCount(3)
-  const { titles } = await stored(page)
-  expect(titles).toEqual(['One', 'Two', 'Three'])
+  expect((await stored(page)).titles).toEqual(['One', 'Two', 'Three'])
 })
 
 test('a window that is not writing shows no Remove', async ({ page, context }) => {

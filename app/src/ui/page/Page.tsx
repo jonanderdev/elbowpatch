@@ -64,8 +64,8 @@ interface Props {
   onChapterRejoined(piece: Piece, sectionId: string, content: string): void
   /** The chapter on the page left the book: the one named opens, at its opening page. */
   onChapterRemoved(removed: Removed, writing: boolean): void
-  /** The chapter before this one left the book, and this one is now the first: the page opens again, with the title page. */
-  onReopen(): void
+  /** The chapter before this one left the book, and this one is now the first: its page opens again, with the title page. */
+  onReopen(piece: Piece, content: string): void
   onChange(piece: Piece): void
 }
 
@@ -174,10 +174,6 @@ export function Page({
     if (titles.bookTitle.current) setName(titles.bookTitle.current.textContent ?? '')
   }, [openedFirst, titles.title, titles.bookTitle, titles.subtitle])
 
-  // The chapter before this one left the book, so the title page is part of this one now, and this page, laid
-  // out without it, is about to open again: until then its count is not the chapter's.
-  const titlePageCame = book && !titlePage && live.outline.sections[0]?.sectionId === sectionId
-
   function reported(stored: Piece): void {
     live.stored(stored)
     onChange(stored)
@@ -225,7 +221,7 @@ export function Page({
       moved.current = false
       return place
     },
-    pages: () => (pager && laidOut && screen.current && !titlePageCame ? { screen: screenOf(screen.current.clientWidth), count: pager.count } : null),
+    pages: () => (pager && laidOut && screen.current ? { screen: screenOf(screen.current.clientWidth), count: pager.count } : null),
     onStored: reported,
     flushRef,
     closingRef,
@@ -234,9 +230,9 @@ export function Page({
   // The count is kept with the piece whenever it changes (a turn of the text settings, a first reading
   // on this kind of screen), so the library shows a book's pages without laying it out (DESIGN.md).
   useEffect(() => {
-    if (readOnly || !pager || !laidOut || !screen.current || titlePageCame || saving?.sealed()) return
+    if (readOnly || !pager || !laidOut || !screen.current || saving?.sealed()) return
     void savePages(deps, piece.id, screenOf(screen.current.clientWidth), sectionId, count).catch(() => {})
-  }, [deps, piece.id, sectionId, count, pager, laidOut, readOnly, saving, titlePageCame])
+  }, [deps, piece.id, sectionId, count, pager, laidOut, readOnly, saving])
 
   const shown = numbers(page, count)
 
@@ -474,18 +470,16 @@ export function Page({
     pieceId: piece.id,
     sectionId,
     outline: () => live.outline,
-    storedHere: () => live.chapters.has(sectionId),
     closing: () => closingRef.current,
     editor,
     saving,
     keyboard,
-    onLeave: (to, writing) => leaveFor(to, writing, 'opening'),
     onRemovedHere: onChapterRemoved,
     onRemoved(stored) {
       reported(stored)
       setSaid({ text: 'Chapter removed', over: announcement })
     },
-    onReopen,
+    onReopen: (stored, text) => onReopen(stored, text),
   })
   // The chapters Contents offers to take out, and the rest of what it lists, on a screen's page.
   function listed(on: 'phone' | 'desktop'): ReturnType<typeof contents> & { removable: ReadonlySet<string> } {

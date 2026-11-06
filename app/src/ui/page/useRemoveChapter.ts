@@ -2,7 +2,7 @@ import { useRef } from 'react'
 import type { Piece } from '../../domain/model'
 import { type Deps, type Removed, removeChapter } from '../../domain/pieces'
 import type { Editor } from '../../page/editor'
-import { forgetChapter } from '../../page/undoMemory'
+import { forgetChapter, keepUndo } from '../../page/undoMemory'
 import { settledWithin } from '../app/settled'
 import { type Unsaved, unsaved } from '../stores/unsaved'
 import { reshapeHeld } from './reshapeHeld'
@@ -23,20 +23,16 @@ interface Options {
   sectionId: string
   /** The book as it stands now. */
   outline(): Piece
-  /** The chapter on the page is stored: one that is not goes by being left. */
-  storedHere(): boolean
   /** The pages closed before this one: settled once none of them can write any more. */
   closing(): Promise<void>
   editor: Editor | null
   saving: Saving | null
   keyboard: boolean
-  /** Leaves a chapter never stored for the one named. */
-  onLeave(to: string, writing: boolean): void
   onRemovedHere(removed: Removed, writing: boolean): void
   /** Another chapter left the book: the page stays. */
   onRemoved(piece: Piece): void
-  /** The chapter on the page became the first, and needs the title page. */
-  onReopen(): void
+  /** The chapter on the page became the first, so it opens again with the title page, with `content` as its text. */
+  onReopen(piece: Piece, content: string): void
 }
 
 /**
@@ -51,13 +47,6 @@ export function useRemoveChapter(o: Options): (chosen: string) => Promise<void> 
   async function removeHere(): Promise<void> {
     if (!editor || !saving) return
     const writing = editor.view.hasFocus() || keyboard
-    if (!o.storedHere()) {
-      const { sections } = o.outline()
-      const at = sections.findIndex((s) => s.sectionId === sectionId)
-      const to = sections[at - 1] ?? sections[at + 1]
-      if (to) o.onLeave(to.sectionId, writing)
-      return
-    }
     let back: Removed | undefined
     const done = await reshapeHeld(editor, saving, keyboard, async (whole) => {
       // Read here, past the wait: a closing save that failed keeps its words as it ends.
@@ -78,15 +67,45 @@ export function useRemoveChapter(o: Options): (chosen: string) => Promise<void> 
     // A closing save landing afterwards would write the chapter back; one that fails leaves its words in the journal.
     if (!(await settledWithin(o.closing(), CLOSING_WAIT))) return
     const { sections } = o.outline()
-    const titlePageComes = sections[0]?.sectionId === chosen && sections[1]?.sectionId === sectionId
     // First, so the place kept for this page is counted as it is laid out now.
     await saving.flush().catch(() => {})
-    const back = await removeChapter(deps, pieceId, { sectionId: chosen, held: heldIn(unsaved.get(chosen)) }).catch(() => undefined)
-    if (!back) return
+    const remove = (): Promise<Removed | undefined> => removeChapter(deps, pieceId, { sectionId: chosen, held: heldIn(unsaved.get(chosen)) })
+    if (sections[0]?.sectionId === chosen && sections[1]?.sectionId === sectionId) await removeBeforeHere(chosen, remove)
+    else {
+      const back = await remove().catch(() => undefined)
+      if (!back) return
+      gone(chosen)
+      o.onRemoved(back.piece)
+    }
+  }
+
+  /**
+   * The chapter on the page becomes the first, and its page, laid out without the title page, opens again. The text
+   * is held as for a split: a key pressed while it reopens would be stored after the new page read its text.
+   */
+  async function removeBeforeHere(chosen: string, remove: () => Promise<Removed | undefined>): Promise<void> {
+    if (!editor || !saving) return
+    const inText = editor.view.hasFocus()
+    let piece: Piece | undefined
+    let text = ''
+    const done = await reshapeHeld(editor, saving, keyboard, async (whole) => {
+      piece = (await remove())?.piece
+      text = whole
+      return piece
+    })
+    if (done && piece) {
+      gone(chosen)
+      // Its text is what it was, so its undo goes on; a sealed page keeps none as it closes.
+      keepUndo(sectionId, editor.view.state)
+      o.onReopen(piece, text)
+      return
+    }
+    if (inText) editor.focus()
+  }
+
+  function gone(chosen: string): void {
     forgetChapter(chosen)
     unsaved.saved(chosen)
-    o.onRemoved(back.piece)
-    if (titlePageComes) o.onReopen()
   }
 
   return async (chosen) => {

@@ -207,12 +207,11 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
     setOpened({ piece, sectionId, content, updatedAt, at: 'opening', writing, readAt: ++reads })
   }
 
-  // The section on the page, read anew at the writer's place.
-  const reopen = async (draft: Piece, sectionId: string): Promise<void> => {
-    const turn = ++chosen.current
-    await saveFirst()
-    const next = await open(draft.id, sectionId).catch(() => undefined)
-    if (next && turn === chosen.current) setOpened(next)
+  // The chapter on the page became the first: stored and at hand, as above, it opens again at the writer's place.
+  const chapterReopened = (piece: Piece, sectionId: string, content: string): void => {
+    ++chosen.current
+    going.current = ''
+    setOpened({ piece, sectionId, content, updatedAt: piece.updatedAt, readAt: ++reads })
   }
 
   const startNew = (kind: Kind) => {
@@ -264,7 +263,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
           onChapterStarted={chapterStarted}
           onChapterRejoined={chapterRejoined}
           onChapterRemoved={chapterRemoved}
-          onReopen={() => void reopen(opened.piece, opened.sectionId)}
+          onReopen={(piece, content) => chapterReopened(piece, opened.sectionId, content)}
           onChange={(piece) => {
             askToPersist()
             setPieces((all) => {
