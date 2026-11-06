@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { memoryStore } from '../adapters/memory-store'
-import { history, newPiece, openPiece, outlineAt, putAway, renameSection, restore, takeMoment, write } from './pieces'
+import type { Piece } from './model'
+import { history, latest, newPiece, openPiece, outlineAt, putAway, renameSection, restore, takeMoment, write } from './pieces'
 import { forgetPutAway, type Thinnable, thin, toThin } from './thinning'
 
 const MIN = 60_000
@@ -79,6 +80,18 @@ async function titlesAtKept(deps: ReturnType<typeof setup>['deps'], pieceId: str
   return outlineAt(outlines, kept.createdAt)?.sections.map((s) => s.title)
 }
 
+/** More renames that same month, then one two months on: what would thin away the outline before them. */
+async function renamesLater(deps: ReturnType<typeof setup>['deps'], clock: ReturnType<typeof setup>['clock'], book: Piece, chapter: string, from: number) {
+  for (const [i, title] of ['The quay', 'The pier', 'The lighthouse'].entries()) {
+    clock.set(from + i * HOUR)
+    await renameSection(deps, book, chapter, title)
+    await takeMoment(deps, book.id)
+  }
+  clock.set(from + 60 * DAY)
+  await renameSection(deps, book, chapter, 'Home')
+  await takeMoment(deps, book.id)
+}
+
 describe('thinning a kept moment\'s outline', () => {
   it('a chapter renamed at the kept moment keeps that title, after more renames and a year', async () => {
     const { deps, clock } = setup()
@@ -93,18 +106,60 @@ describe('thinning a kept moment\'s outline', () => {
     await renameSection(deps, book, chapter, 'The harbour')
     await takeMoment(deps, book.id, { kept: true })
 
-    for (const [i, title] of ['The quay', 'The pier', 'The lighthouse'].entries()) {
-      clock.set(t + (i + 2) * HOUR)
-      await renameSection(deps, book, chapter, title)
-      await takeMoment(deps, book.id)
-    }
-    clock.set(t + 60 * DAY)
-    await renameSection(deps, book, chapter, 'Home')
-    await takeMoment(deps, book.id)
-
+    await renamesLater(deps, clock, book, chapter, t + 2 * HOUR)
     clock.set(NOW)
     expect(await thin(deps)).toBeGreaterThan(0)
     expect(await titlesAtKept(deps, book.id, chapter)).toEqual(['The harbour'])
+  })
+
+  it('a moment kept when no outline changed keeps the outline from before it', async () => {
+    const { deps, clock } = setup()
+    const t = clock.now()
+    const book = newPiece(deps, 'book', 'en')
+    const chapter = book.sections[0]!.sectionId
+    await write(deps, book, chapter, 'The boats came in.')
+    await renameSection(deps, book, chapter, 'Untitled yet')
+    await takeMoment(deps, book.id)
+
+    clock.set(t + HOUR)
+    await renameSection(deps, book, chapter, 'The harbour')
+    await takeMoment(deps, book.id)
+    clock.set(t + 2 * HOUR)
+    expect(await takeMoment(deps, book.id, { kept: true })).toBe(1)
+
+    await renamesLater(deps, clock, book, chapter, t + 3 * HOUR)
+    clock.set(NOW)
+    await thin(deps)
+    expect(await titlesAtKept(deps, book.id, chapter)).toEqual(['The harbour'])
+  })
+
+  it('the outline in place just before a bring back stays, like the text it replaced', async () => {
+    const { deps, clock } = setup()
+    const t = clock.now()
+    const book = newPiece(deps, 'book', 'en')
+    const chapter = book.sections[0]!.sectionId
+    await write(deps, book, chapter, 'The boats came in.')
+    await renameSection(deps, book, chapter, 'Untitled yet')
+    await takeMoment(deps, book.id)
+
+    clock.set(t + HOUR)
+    await renameSection(deps, book, chapter, 'The harbour')
+    await takeMoment(deps, book.id)
+    clock.set(t + 2 * HOUR)
+    await write(deps, book, chapter, 'The boats went out.')
+    await takeMoment(deps, book.id)
+    // Nothing brings back yet: this stands for the moment one will take of the text it replaces.
+    const before = await deps.store.transaction(async (tx) => {
+      const v = latest(await tx.versionsOf(chapter))!
+      await tx.putVersion({ ...v, beforeBringBack: true })
+      return v
+    })
+
+    await renamesLater(deps, clock, book, chapter, t + 3 * HOUR)
+    clock.set(NOW)
+    await thin(deps)
+    const outlines = await deps.store.transaction((tx) => tx.outlinesOf(book.id))
+    expect(outlineAt(outlines, before.createdAt)?.sections.map((s) => s.title)).toEqual(['The harbour'])
   })
 })
 
