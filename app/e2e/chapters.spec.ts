@@ -158,7 +158,10 @@ test('the running head’s arrow points down when Contents is closed, up while i
   await openChapter(page, 'Two')
   await page.keyboard.press('PageDown')
   await expect(runningHead(page)).toContainText('Two')
-  const arrow = () => runningHead(page).locator('.icon').evaluate((el) => (getComputedStyle(el).transform === 'none' ? 'down' : 'up'))
+  const arrow = () =>
+    runningHead(page)
+      .locator('.icon')
+      .evaluate((el) => (getComputedStyle(el).transform === 'none' ? 'down' : 'up'))
   expect(await arrow()).toBe('down')
   await runningHead(page).click()
   await expect(contents(page)).toBeVisible()
