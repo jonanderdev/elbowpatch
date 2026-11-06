@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { memoryStore } from '../adapters/memory-store'
-import { listingOf, momentsOf, momentToOpen, sectionBeyond, sectionsAt } from './lookBack'
+import { listingOf, momentsOf, momentToOpen, sectionBeyond, sectionsAt, timeOf } from './lookBack'
 import type { Piece } from './model'
 import { newPiece, removeChapter, rename, renameSection, takeMoment, withChapter, withDay, write } from './pieces'
 import { thin } from './thinning'
@@ -273,6 +273,27 @@ describe('the sections a piece listed at a time', () => {
       await takeMoment(s.deps, piece.id)
     }
     expect(await idsAt(s, piece.id, s.clock.now())).toEqual([days[1], days[2], days[0]])
+  })
+})
+
+describe('the time a moment stands at', () => {
+  it('is its own, except the last, which stands at now: a chapter added after it is there', async () => {
+    const s = setup()
+    const { book, a, b, first } = await twoChapters(s)
+    // Chapter one changes once more, after chapter two is there.
+    s.clock.set(s.clock.now() + 60_000)
+    await write(s.deps, book, a, 'chapter one, longer')
+    await takeMoment(s.deps, book.id)
+    const moments = await momentsOf(s.deps, book.id, a)
+    const listing = (await listingOf(s.deps, book.id))!
+    expect(timeOf(moments, 0)).toBe(first)
+    expect(sectionsAt(listing, timeOf(moments, 0)!).map((x) => x.sectionId)).toEqual([a])
+    expect(sectionsAt(listing, timeOf(moments, 1)!).map((x) => x.sectionId)).toEqual([a, b])
+  })
+
+  it('is none off the ends', () => {
+    expect(timeOf([], 0)).toBeUndefined()
+    expect(timeOf([], -1)).toBeUndefined()
   })
 })
 

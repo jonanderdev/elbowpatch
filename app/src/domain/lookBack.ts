@@ -104,6 +104,16 @@ export function sectionsAt(listing: Listing, at: number): OutlineSection[] {
   return piece.kind === 'journal' ? [...sections].sort((a, b) => a.title.localeCompare(b.title)) : sections
 }
 
+/**
+ * The time the writer stands at on choosing a moment of the tape. A moment holds until the next one of
+ * its section, so it stands at its own time; the last holds until now, so choosing it is choosing now,
+ * when a chapter added after it is there. Infinity is now: later than any time the history holds.
+ */
+export function timeOf(moments: Moment[], index: number): number | undefined {
+  if (index < 0 || index >= moments.length) return undefined
+  return index === moments.length - 1 ? Number.POSITIVE_INFINITY : moments[index]!.at
+}
+
 /** The section a turn reaches from this one, on (1) or back (-1), or none past the ends or from one not listed. */
 export function sectionBeyond(sections: OutlineSection[], sectionId: string, dir: 1 | -1): string | undefined {
   const here = sections.findIndex((s) => s.sectionId === sectionId)
