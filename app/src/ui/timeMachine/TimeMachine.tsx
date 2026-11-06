@@ -141,6 +141,8 @@ export function TimeMachine({ deps, looking, writes, onBringBack, onKeepCopy, le
   const index = reading.index
   const moment = moments[index]
   const nothing = opened && read.state === 'read' && !moment
+  /** The section was listed at this time but has no words yet: the page reads empty, though the tape stands on its first moment. */
+  const unwritten = !!moment && stands !== undefined && moment.at > stands
   const content = moment ? reading.content : opened ? today.content : ''
   const title = moment ? reading.title : opened ? today.title : ''
   /** Standing at a moment, so what stands beside the page is of that moment, not today's. */
@@ -330,13 +332,13 @@ export function TimeMachine({ deps, looking, writes, onBringBack, onKeepCopy, le
     if (moment && !working.current) copy.keep({ ...moment, content: reading.content, title: reading.title })
   }
   const bringBack = (): void => {
-    if (!moment || !onBringBack || !writes || working.current) return
+    if (!moment || unwritten || !onBringBack || !writes || working.current) return
     start()
   }
   // Another try, after the moment on screen may have gone: the moments are read again first, and the moment that failed is brought
   // back only if it is still stored. If it is not, the tape shows what is, and the writer chooses again.
   const bringAgain = (): void => {
-    if (!moment || !onBringBack || !writes || working.current) return
+    if (!moment || unwritten || !onBringBack || !writes || working.current) return
     const was = moment
     working.current = true
     setBusy(true)
@@ -483,7 +485,7 @@ export function TimeMachine({ deps, looking, writes, onBringBack, onKeepCopy, le
           name={momentName(moment.at, now)}
           tape={<Tape moments={moments} index={index} now={now} tapeRef={tape} onMoment={step} />}
           {...(onBringBack ? { onBringBack: bringBack } : {})}
-          unavailable={!writes}
+          unavailable={!writes || unwritten}
           busy={busy}
           onKeepCopy={keepCopy}
           onBack={leave}
