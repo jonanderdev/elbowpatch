@@ -90,14 +90,35 @@ test('the tool stands after Export and before the text settings', async ({ page 
   expect(names.slice(names.indexOf('Export'), names.indexOf('Export') + 3)).toEqual(['Export', 'Time Machine', 'Text settings'])
 })
 
-test('the tools bar with the Time Machine stays 16px from the edges of a phone', async ({ page }) => {
-  test.skip(!phone(page), 'the tools bar is a phone’s')
-  await essay(page, 'Some words to count on the page.')
-  await openTools(page)
-  const box = (await page.getByRole('toolbar', { name: 'Tools' }).boundingBox())!
-  expect(box.x).toBeGreaterThanOrEqual(16)
-  expect(box.x + box.width).toBeLessThanOrEqual(390 - 16)
-})
+for (const width of [390, 360]) {
+  test(`the tools bar with the Time Machine stays 16px from the edges of a ${width}px phone, with a long count`, async ({ page }) => {
+    test.skip(!phone(page), 'the tools bar is a phone’s')
+    await page.setViewportSize({ width, height: 800 })
+    await essay(page, 'Start.')
+    await page.keyboard.press('ControlOrMeta+a')
+    await page.evaluate((text) => {
+      const data = new DataTransfer()
+      data.setData('text/plain', text)
+      document.querySelector('.body')!.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }))
+    }, Array(1040).fill('word').join(' '))
+    await saved(page, 'word word')
+    await page.locator('.body').blur()
+    await openTools(page)
+    const box = (await page.getByRole('toolbar', { name: 'Tools' }).boundingBox())!
+    expect(box.x).toBeGreaterThanOrEqual(16)
+    expect(box.x + box.width).toBeLessThanOrEqual(width - 16)
+  })
+}
+
+/** What the bar holds stands inside it. */
+async function holdsItsParts(page: Page, parts: string): Promise<void> {
+  const box = (await bar(page).boundingBox())!
+  for (const part of await machine(page).locator(parts).all()) {
+    const inner = (await part.boundingBox())!
+    expect(inner.y).toBeGreaterThanOrEqual(box.y)
+    expect(inner.y + inner.height).toBeLessThanOrEqual(box.y + box.height)
+  }
+}
 
 test('the key opens it with what was just typed kept, and Escape comes back to the caret', async ({ page }) => {
   await history(page, ['One two.', 'One two three.'])
@@ -185,6 +206,7 @@ test('a new piece has nothing earlier: one line, today’s text, and the writing
   expect(box.height).toBe(62)
   expect(box.width).toBe(358)
   expect(box.y).toBe(phone(page) ? 767 : 818)
+  await holdsItsParts(page, '.moment-note')
 })
 
 test('a piece not stored yet opens on nothing earlier too', async ({ page }) => {
@@ -206,6 +228,10 @@ test('the bar stands where the frames draw it, and names what it brings back', a
   expect(box.width).toBe(358)
   expect(box.y).toBe(phone(page) ? 690 : 750)
   expect(box.x).toBe(phone(page) ? 16 : 541)
+  await holdsItsParts(page, '.moment-name, .tape, .moment-action')
+  // As the frames draw it: the moment on the first line, the actions at the foot.
+  expect((await machine(page).locator('.moment-name').boundingBox())!.y - box.y).toBe(13)
+  expect((await machine(page).locator('.moment-action').first().boundingBox())!.y - box.y).toBe(81)
   const back = (await machine(page).locator('.moment-close').boundingBox())!
   expect(back.x - box.x).toBe(311)
   expect(back.y - box.y).toBe(1)
@@ -369,6 +395,7 @@ test('when moments cannot be read, today’s text stays and Try again reads them
   const box = (await bar(page).boundingBox())!
   expect(box.height).toBe(98)
   expect(box.y).toBe(phone(page) ? 722 : 782)
+  await holdsItsParts(page, '.moment-note, .moment-again')
   await expect(machine(page).getByRole('button', { name: 'Back to now' })).toBeVisible()
   await machine(page).getByRole('button', { name: 'Try again' }).click()
   await expect(bar(page)).toContainText('Can’t read your moments')

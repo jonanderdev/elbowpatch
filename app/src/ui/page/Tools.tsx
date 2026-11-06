@@ -27,8 +27,9 @@ export function ToolsBar(props: {
     ref.current?.querySelector<HTMLElement>('button:not(.count)')?.focus()
   }, [])
 
-  // On a narrow phone a long count drops its last word; the label still says it in full.
-  const short = typeof window !== 'undefined' && window.innerWidth < 400 && full.length > 22
+  // On a narrow phone a long count drops its last word; the label still says it in full. The buttons
+  // and the bar's edges take about 256px with the screen's margins, and a character about 5.2px.
+  const short = typeof window !== 'undefined' && window.innerWidth < 400 && full.length > Math.min(22, (window.innerWidth - 256) / 5.2)
   const said = countSaid(props.page, props.count, props.words)
   const shown = short ? countLine(props.page, props.count, number(props.words)) : full
   const { onContents } = props

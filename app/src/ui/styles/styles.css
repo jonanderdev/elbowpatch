@@ -2495,6 +2495,7 @@ button.count[aria-expanded='true'] {
 }
 .moment-name {
   height: 22px;
+  margin: 0;
   padding: 0 44px;
   text-align: center;
   font-size: 15px;
@@ -2509,6 +2510,7 @@ button.count[aria-expanded='true'] {
   color: var(--secondary);
 }
 .moment-note {
+  margin: 0;
   padding: 0 44px;
   text-align: center;
   font-size: 13px;
