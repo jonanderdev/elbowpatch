@@ -361,3 +361,18 @@ test('the rail folds away and comes back, and keeps the moment', async ({ page }
   await expect(contents(page)).toBeVisible()
   await expect(rowsOf(page)).toHaveCount(3)
 })
+
+test('Keep a copy copies the chapter on screen, not the one the Time Machine opened on', async ({ page }) => {
+  await importBook(page, THREE)
+  await keepMoment(page)
+  await typeAtEnd(page, ' Then more.')
+  await open(page)
+  await expect(tape(page)).toBeVisible()
+  await openMachineContents(page)
+  await rowsOf(page).nth(1).click()
+  await expect(machine(page).locator('.title')).toHaveText('Two')
+  await machine(page).getByRole('button', { name: 'Keep a copy' }).click()
+  await expect(machine(page)).toHaveCount(0)
+  await expect(page.locator('.title')).toHaveText('Two, draft 2')
+  await expect(page.locator('.body')).toHaveText('Second.')
+})
