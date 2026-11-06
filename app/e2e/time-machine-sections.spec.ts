@@ -374,3 +374,72 @@ test('Keep a copy copies the chapter on screen, not the one the Time Machine ope
   await expect(page.locator('.title')).toHaveText('Two, draft 2')
   await expect(page.locator('.body')).toHaveText('Second.')
 })
+
+// Bringing a passage back (#85) goes to the chapter on screen, and a chapter no longer in the book offers Copy alone.
+const menu = (page: Page) => page.getByRole('toolbar', { name: 'Selected words' })
+
+/** Selects these words in the old text, as a drag would. */
+async function select(page: Page, words: string): Promise<void> {
+  await oldText(page).evaluate((body, words) => {
+    const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT)
+    for (let t = walker.nextNode(); t; t = walker.nextNode()) {
+      const at = t.textContent!.indexOf(words)
+      if (at < 0) continue
+      const range = document.createRange()
+      range.setStart(t, at)
+      range.setEnd(t, at + words.length)
+      const selection = getSelection()!
+      selection.removeAllRanges()
+      selection.addRange(range)
+      return
+    }
+    throw new Error(`${words} is not in the old text`)
+  }, words)
+}
+
+test('a passage goes into the chapter on screen, not the one the Time Machine opened on', async ({ page }) => {
+  await importBook(page, '# One\n\nFirst chapter.\n\n# Two\n\nSecond.\n\nA lost line here.\n\n# Three\n\nThird.\n')
+  await goTo(page, 'Two')
+  await caretToEnd(page)
+  await page.keyboard.press('ControlOrMeta+a')
+  await page.keyboard.type('Second.')
+  await saved(page, 'Second.')
+  await goTo(page, 'One')
+  await typeAtEnd(page, ' Then more.')
+  await open(page)
+  await expect(tape(page)).toBeVisible()
+  await openMachineContents(page)
+  await rowsOf(page).nth(1).click()
+  await expect(machine(page).locator('.title')).toHaveText('Two')
+  await expect(oldText(page)).toContainText('A lost line here.')
+  await select(page, 'A lost line here.')
+  await expect(menu(page).getByRole('button')).toHaveText(['Bring part back', 'Copy'])
+  await menu(page).getByRole('button', { name: 'Bring part back' }).click()
+  await expect(machine(page)).toHaveCount(0)
+  await expect(page.locator('.title')).toHaveText('Two')
+  await expect(page.locator('.page-screen:not(.time-machine) .body').locator('p')).toHaveText(['Second.', 'A lost line here.'])
+  await expect.poll(() => page.evaluate(() => getSelection()?.toString())).toBe('A lost line here.')
+  await saved(page, 'A lost line here.')
+  // The chapter it was read in was not the one the page stood on: that one is as it was.
+  await goTo(page, 'One')
+  await expect(page.locator('.body')).toHaveText('First chapter. Then more.')
+})
+
+test('a chapter removed since offers Copy alone', async ({ page }) => {
+  await importBook(page, THREE)
+  await goTo(page, 'Two')
+  await emptyHere(page)
+  await goTo(page, 'One')
+  await openContents(page)
+  await contents(page).getByRole('button', { name: 'Remove chapter' }).click()
+  await expect(rowsOf(page)).toHaveCount(2)
+  await closeSheet(page)
+  await typeAtEnd(page, ' Then more.')
+  await open(page)
+  await expect(tape(page)).toBeVisible()
+  await openMachineContents(page)
+  await rowsOf(page).nth(1).click()
+  await expect(oldText(page)).toHaveText('Second.')
+  await select(page, 'Second.')
+  await expect(menu(page).getByRole('button')).toHaveText(['Copy'])
+})

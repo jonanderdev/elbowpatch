@@ -113,7 +113,10 @@ export function TimeMachine({ deps, looking, onBringBack, onKeepCopy, onBack, on
   const stands = chosen ?? momentToOpen(moments)?.at
   /** The piece's outline at that time: the title page's words and the chapters Contents lists. */
   const shape = sections.shape(stands)
-  const here = shape?.sections.find((s) => s.sectionId === sectionId)?.title ?? ''
+  const listed = shape?.sections.find((s) => s.sectionId === sectionId)
+  const here = listed?.title ?? ''
+  /** A chapter no longer in the piece has no text to go back into. The page's piece may be older than a removal made on it. */
+  const removedSince = listed ? listed.removed : !piece.sections.some((s) => s.sectionId === sectionId)
   // A section reached by a turn was listed at this time: with no moment yet it reads as empty.
   const reading = readingAt(moments, stands, piece.kind === 'essay' ? (shape?.title ?? '') : piece.kind === 'journal' ? dayTitle(here) : here)
   const index = reading.index
@@ -401,7 +404,7 @@ export function TimeMachine({ deps, looking, onBringBack, onKeepCopy, onBack, on
       {/* Today's text, while moments load or when there are none, is not a past to bring from; and a chapter no longer in the piece has no text to go back into. Copy stays. */}
       <Part
         part={selected.part}
-        canBring={!!moment && piece.sections.some((s) => s.sectionId === sectionId)}
+        canBring={!!moment && !removedSince}
         onCopied={() => setCopied(true)}
         onBring={(passage) => moment && !working.current && onBringPart({ sectionId, passage, from: momentInSentence(moment.at, now) })}
       />
