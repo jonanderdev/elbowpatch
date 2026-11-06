@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { memoryStore } from '../adapters/memory-store'
+import { exportAll } from './archive'
 import type { Piece } from './model'
-import { history, latest, newPiece, openPiece, outlineAt, putAway, renameSection, restore, takeMoment, write } from './pieces'
+import { history, latest, newPiece, openPiece, outlineAt, putAway, removeChapter, renameSection, restore, takeMoment, withChapter, write } from './pieces'
 import { forgetPutAway, type Thinnable, thin, toThin } from './thinning'
 
 const MIN = 60_000
@@ -92,7 +93,7 @@ async function renamesLater(deps: ReturnType<typeof setup>['deps'], clock: Retur
   await takeMoment(deps, book.id)
 }
 
-describe('thinning a kept moment\'s outline', () => {
+describe("thinning a kept moment's outline", () => {
   it('a chapter renamed at the kept moment keeps that title, after more renames and a year', async () => {
     const { deps, clock } = setup()
     const t = clock.now()
@@ -187,6 +188,71 @@ describe('thinning a kept moment\'s outline', () => {
     await thin(deps)
     const outlines = await deps.store.transaction((tx) => tx.outlinesOf(book.id))
     expect(outlineAt(outlines, before.createdAt)?.sections.map((s) => s.title)).toEqual(['The harbour'])
+  })
+})
+
+/** A book of two chapters, stored in a first moment: the second is the one that will go. */
+async function twoChapters(deps: ReturnType<typeof setup>['deps']) {
+  const first = newPiece(deps, 'book', 'en')
+  const chapter = first.sections[0]!.sectionId
+  const { piece: book, sectionId: second } = withChapter(deps, first, chapter)
+  await write(deps, book, chapter, 'The boats came in.')
+  await renameSection(deps, book, chapter, 'The harbour')
+  await write(deps, book, second, 'Salt on the windows.')
+  await renameSection(deps, book, second, 'Salt')
+  await takeMoment(deps, book.id)
+  return { book, chapter, second }
+}
+
+/** Empties a chapter by hand and takes it out, as the writer can (0005). */
+async function emptyAndRemove(deps: ReturnType<typeof setup>['deps'], book: Piece, sectionId: string) {
+  await renameSection(deps, book, sectionId, '')
+  await write(deps, book, sectionId, '')
+  await takeMoment(deps, book.id)
+  expect(await removeChapter(deps, book.id, { sectionId, held: [] })).toBeDefined()
+}
+
+describe('thinning a book with a chapter removed', () => {
+  it('a kept moment still has the chapter removed since, with its title and text', async () => {
+    const { deps, clock } = setup()
+    const t = clock.now()
+    const { book, chapter, second } = await twoChapters(deps)
+    clock.set(t + HOUR)
+    await renameSection(deps, book, second, 'Salt on the glass')
+    await takeMoment(deps, book.id, { kept: true })
+    clock.set(t + 2 * HOUR)
+    await emptyAndRemove(deps, book, second)
+
+    await renamesLater(deps, clock, book, chapter, t + 3 * HOUR)
+    clock.set(NOW)
+    await thin(deps)
+    expect(await titlesAtKept(deps, book.id, chapter)).toEqual(['The harbour', 'Salt on the glass'])
+    const versions = await deps.store.transaction((tx) => tx.versionsOf(second))
+    expect(versions.find((x) => x.kept)?.content).toBe('Salt on the windows.')
+  })
+
+  it('a removed chapter nobody kept stays in an earlier outline, so its history can still be reached', async () => {
+    const { deps, clock } = setup()
+    const t = clock.now()
+    const first = newPiece(deps, 'book', 'en')
+    const chapter = first.sections[0]!.sectionId
+    await write(deps, first, chapter, 'The boats came in.')
+    await takeMoment(deps, first.id)
+
+    clock.set(t + HOUR)
+    const { piece: book, sectionId: second } = withChapter(deps, first, chapter)
+    await write(deps, book, second, 'Salt on the windows.')
+    await takeMoment(deps, book.id)
+    clock.set(t + 2 * HOUR)
+    await emptyAndRemove(deps, book, second)
+
+    await renamesLater(deps, clock, book, chapter, t + 3 * HOUR)
+    clock.set(NOW)
+    await thin(deps)
+    const outlines = await deps.store.transaction((tx) => tx.outlinesOf(book.id))
+    expect(outlines.some((o) => o.sections.some((s) => s.sectionId === second))).toBe(true)
+    const index = (await exportAll(deps)).find((f) => f.path === 'index.json')!
+    expect(JSON.parse(index.text).versions.some((x: { sectionId: string }) => x.sectionId === second)).toBe(true)
   })
 })
 

@@ -1,3 +1,4 @@
+import type { Outline } from './model'
 import { type Deps, outlineAt } from './pieces'
 
 // Thinning (docs/decisions/0005): a section's local history gets sparser with
@@ -12,7 +13,7 @@ export interface Thinnable {
   id: string
   seq: number
   createdAt: number
-  /** Kept moments, the first, the latest, the one before a bring-back: never removed. */
+  /** Kept moments and the one before a bring-back, the outlines in force at them, the last outline to list a section: never removed. */
   protected: boolean
 }
 
@@ -41,6 +42,13 @@ export function toThin(items: Thinnable[], now: number): Set<string> {
   return new Set(bySeq.filter((i) => !i.protected && !stays.has(i.id)).map((i) => i.id))
 }
 
+/** The last outline to list each section: a removed chapter is reached only through an earlier outline (0005). */
+function lastListings(outlines: Outline[]): Set<string> {
+  const last = new Map<string, string>()
+  for (const o of [...outlines].sort((a, b) => a.seq - b.seq)) for (const s of o.sections) last.set(s.sectionId, o.id)
+  return new Set(last.values())
+}
+
 /** Thins every piece's history, one piece per transaction. Safe to run twice; runs when the app is idle (0010). */
 export async function thin(deps: Pick<Deps, 'store' | 'clock'>): Promise<number> {
   const now = deps.clock.now()
@@ -52,12 +60,13 @@ export async function thin(deps: Pick<Deps, 'store' | 'clock'>): Promise<number>
       if (!piece) return 0
       let n = 0
       const outlines = await tx.outlinesOf(id)
-      // The outline in force at each moment a version is held for stays with it: the piece as it stood then.
-      const held = new Set(piece.outlineId ? [piece.outlineId] : [])
+      const held = lastListings(outlines)
+      if (piece.outlineId) held.add(piece.outlineId)
       const sectionIds = new Set([...piece.sections.map((s) => s.sectionId), ...outlines.flatMap((o) => o.sections.map((s) => s.sectionId))])
       for (const sectionId of sectionIds) {
         const versions = await tx.versionsOf(sectionId)
         const working = await tx.working(sectionId)
+        // The outline in force at each moment a version is held for stays with it: the piece as it stood then.
         for (const v of versions) {
           const outline = v.kept || v.beforeBringBack ? outlineAt(outlines, v.createdAt) : undefined
           if (outline) held.add(outline.id)
