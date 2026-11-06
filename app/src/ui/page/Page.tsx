@@ -436,6 +436,14 @@ export function Page({
     leaveFor(chosen, writing, 'opening')
   }
 
+  // A page chosen in the rail. Over the text it was opened for one page, so it goes, and a keyboard's focus leaves the row with it.
+  function turnFromRail(chosen: number): void {
+    turnTo(chosen)
+    if (!rail.over) return
+    rail.letGo()
+    if (document.activeElement?.closest('.pages-rail')) railToggle.current?.focus()
+  }
+
   // A new chapter opens with the caret in its title: the keyboard comes up from this tap, or not at
   // all on iOS. As when choosing a chapter, the words being left are safe in the journal first.
   function addChapter(after?: string): void {
@@ -610,7 +618,7 @@ export function Page({
             current={page}
             words={words}
             open={rail.open}
-            onTurn={turnTo}
+            onTurn={turnFromRail}
             onLeave={() => {
               rail.letGo()
               railToggle.current?.focus()

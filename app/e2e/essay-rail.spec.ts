@@ -197,6 +197,41 @@ test('the keyboard reaches every page, and Escape goes back to the toggle', asyn
   await expect(rail(page)).toBeVisible()
 })
 
+test('with no room beside the text the rail opens over it, for that page alone', async ({ page, browserName }) => {
+  desktopOnly(page)
+  await page.setViewportSize({ width: 1000, height: 800 })
+  await importEssay(page)
+  await expect(rail(page)).toBeHidden()
+  const box = await page.locator('.pager').boundingBox()
+
+  // Escape lets it go, and the focus returns to the toggle.
+  await toggle(page).click()
+  await expect(rail(page)).toBeVisible()
+  expect(await page.locator('.pager').boundingBox()).toEqual(box)
+  await toggle(page).focus()
+  await page.keyboard.press(browserName === 'webkit' ? 'Alt+Tab' : 'Tab')
+  await expect(row(page, 1)).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(rail(page)).toBeHidden()
+  await expect(toggle(page)).toBeFocused()
+
+  // A row pressed turns to its page, and the rail goes with the page it opened over.
+  await toggle(page).click()
+  await row(page, 2).click()
+  await expect.poll(() => pageInView(page)).toBe(2)
+  await expect(rail(page)).toBeHidden()
+
+  // By keyboard too, and the focus is not lost with the row it was on.
+  await toggle(page).focus()
+  await page.keyboard.press('Enter')
+  await expect(rail(page)).toBeVisible()
+  await page.keyboard.press(browserName === 'webkit' ? 'Alt+Tab' : 'Tab')
+  await page.keyboard.press('Enter')
+  await expect.poll(() => pageInView(page)).toBe(1)
+  await expect(rail(page)).toBeHidden()
+  await expect(toggle(page)).toBeFocused()
+})
+
 test('a long essay keeps the page on screen in view in the rail, going on and back', async ({ page }) => {
   desktopOnly(page)
   await page.setViewportSize({ width: 1440, height: 800 })
