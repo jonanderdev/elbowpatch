@@ -231,13 +231,12 @@ test('the bar stands where the frames draw it, and names what it brings back', a
   expect(back.y - box.y).toBe(1)
 })
 
-test('the actions do nothing yet', async ({ page }) => {
+test('bring back does nothing yet', async ({ page }) => {
   await history(page, ['Before.', 'After.'])
   await open(page)
   await expect(oldText(page)).toHaveText('Before.')
   const before = await stored(page, 'versions')
   await machine(page).getByRole('button', { name: 'Bring essay back' }).click()
-  await machine(page).getByRole('button', { name: 'Keep a copy' }).click()
   await expect(oldText(page)).toHaveText('Before.')
   expect(await stored(page, 'versions')).toEqual(before)
   await close(page)
