@@ -313,6 +313,8 @@ export function TimeMachine({ deps, looking, writes, onBringBack, onKeepCopy, le
   }, [hasTape])
 
   const step = (next: number): void => {
+    // A tape landing after the way out or a bring back has begun changes nothing: what is named is what is brought back.
+    if (gone.current || working.current) return
     setCopied(false)
     setChosen(timeOf(moments, next))
     setSaidOver(announcement)

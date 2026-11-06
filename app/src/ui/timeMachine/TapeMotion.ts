@@ -23,7 +23,7 @@ export class TapeMotion {
   layer: HTMLElement | null = null
   spacing = 11
   count = 0
-  /** The tick the tape was let go on: the moment to show. */
+  /** The tick the tape has landed on: the moment to show, only once it stands there, never during the drag or the glide. */
   onSettle: (tick: number) => void = () => {}
   /** The ticks drawn are those around this one: it is called when the tape has gone far from the last. */
   onCenter: (tick: number) => void = () => {}
@@ -32,6 +32,8 @@ export class TapeMotion {
   private x: number | undefined
   private center = 0
   private glide: Animation | undefined
+  /** A landing waiting for the glide to end. At most one, and it is dropped as soon as anything else moves the tape. */
+  private landing: { tick: number; timer: ReturnType<typeof setTimeout> } | undefined
   private drag: { id: number; from: number; startX: number; moved: boolean; samples: { t: number; x: number }[] } | undefined
   /** A click follows a drag when it ends over the tape: it is not a tap. */
   private dragged = false
@@ -75,8 +77,9 @@ export class TapeMotion {
   }
 
   /** Goes to `x`. A glide takes it over from where the last one has got to, and cancelling it leaves it nowhere else. */
-  moveTo(x: number, glides = true): void {
+  moveTo(x: number, glides = true): number {
     const from = this.where()
+    this.drop()
     this.glide?.cancel()
     this.glide = undefined
     this.put(x)
@@ -86,18 +89,49 @@ export class TapeMotion {
     const ms = glideTime(x - from)
     // Past a throw's reach the ticks on the way are not drawn: it goes there as it is, which the fade of the moment covers.
     const far = Math.abs(x - from) > MAX_THROW * this.spacing
-    if (!el || !glides || ms === 0 || far || reducedMotion() || typeof el.animate !== 'function') return
+    if (!el || !glides || ms === 0 || far || reducedMotion() || typeof el.animate !== 'function') return 0
     const glide = el.animate([{ transform: `translateX(${-from}px)` }, { transform: `translateX(${-x}px)` }], { duration: ms, easing: EASE_OUT })
     glide.onfinish = glide.oncancel = () => {
-      if (this.glide === glide) this.glide = undefined
+      // The end of an older glide, taken over by this one, is not the end of this.
+      if (this.glide !== glide) return
+      this.glide = undefined
+      this.land()
     }
     this.glide = glide
+    return ms
+  }
+
+  /** Lets go on `tick`: the tape goes there, and the moment is shown when it has got there. */
+  private release(tick: number): void {
+    const ms = this.moveTo(tick * this.spacing)
+    // No glide (a nudge, reduced motion, a distance of nothing, or a throw past reach): it is there already.
+    if (ms === 0) {
+      this.onSettle(tick)
+      return
+    }
+    // The end of the glide says so, but an event can be lost (an interrupted animation, a hidden tab): a timer is the second way.
+    this.landing = { tick, timer: setTimeout(() => this.land(), ms + 100) }
+  }
+
+  /** The glide has ended: the moment is shown, once. */
+  private land(): void {
+    const landing = this.landing
+    if (!landing) return
+    this.drop()
+    this.onSettle(landing.tick)
+  }
+
+  /** What was to be shown on landing will not be. */
+  private drop(): void {
+    if (this.landing) clearTimeout(this.landing.timer)
+    this.landing = undefined
   }
 
   down = (e: PointerOn): void => {
     if (e.pointerType === 'mouse' && e.button !== 0) return
     // A glide still going is stopped where it has got to, and the tape is in the hand from there.
     const x = this.where()
+    this.drop()
     this.glide?.cancel()
     this.glide = undefined
     this.put(x)
@@ -131,9 +165,7 @@ export class TapeMotion {
     const first = drag.samples.find((s) => last.t - s.t <= SPEED_OVER) ?? last
     const still = e.timeStamp - last.t > SPEED_OVER || last.t - first.t < LEAST_TIME || Math.abs(last.x - first.x) < MIN_FLICK
     const velocity = still ? 0 : -(last.x - first.x) / (last.t - first.t)
-    const tick = settleOn(this.where(), velocity, this.spacing, this.count)
-    this.moveTo(tick * this.spacing)
-    this.onSettle(tick)
+    this.release(settleOn(this.where(), velocity, this.spacing, this.count))
   }
 
   cancel = (e: PointerOn): void => {
@@ -141,9 +173,7 @@ export class TapeMotion {
     const moved = this.drag.moved
     this.drag = undefined
     if (!moved) return
-    const tick = this.tick
-    this.moveTo(tick * this.spacing)
-    this.onSettle(tick)
+    this.release(this.tick)
   }
 
   /** Whether this click is the end of a drag, which is not a tap. Asked once. */
@@ -155,6 +185,7 @@ export class TapeMotion {
 
   /** Stops what is running when the tape goes. */
   destroy(): void {
+    this.drop()
     this.glide?.cancel()
     this.glide = undefined
   }
