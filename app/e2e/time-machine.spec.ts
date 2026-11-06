@@ -924,7 +924,8 @@ test('labels go by age, none meet, now is the last, and a kept moment stands in 
   const texts = await labels.allTextContents()
   expect(texts.at(-1)).toBe('Now')
   // Hours have no leading zero; and what is older than the week is a date, or a month once it is a year back.
-  expect(texts.some((t) => /^(0|[1-9]\d?):00$/.test(t))).toBe(true)
+  // Just after midnight today has no hour to label yet.
+  if (new Date().getHours() > 0) expect(texts.some((t) => /^(0|[1-9]\d?):00$/.test(t))).toBe(true)
   expect(texts.some((t) => /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)$/.test(t))).toBe(true)
   expect(texts.some((t) => /^(\d{1,2} )?(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)$/.test(t))).toBe(true)
   expect(texts.filter((t) => /^0\d:/.test(t))).toEqual([])

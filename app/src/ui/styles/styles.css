@@ -2664,6 +2664,7 @@ button.count[aria-expanded='true'] {
 @media (min-width: 700px) {
   .page-screen.journal::before {
     top: 0;
+    left: calc(var(--side) - 28px * var(--k, 1));
   }
 }
 

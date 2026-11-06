@@ -369,6 +369,14 @@ test('beside a journal the rail draws no edge and moves nothing: the margin rule
   desktopOnly(page)
   await openJournal(page)
   await expect(rail(page)).toHaveCSS('border-right-width', '0px')
+  const gap = await page.evaluate(() => {
+    const screen = document.querySelector('.page-screen')!
+    const rule = Number.parseFloat(getComputedStyle(screen, '::before').left)
+    const side = Number.parseFloat(getComputedStyle(screen).getPropertyValue('--side'))
+    const k = Number.parseFloat(getComputedStyle(screen).getPropertyValue('--k') || '1')
+    return (side - rule) / k
+  })
+  expect(gap).toBeCloseTo(28, 0)
   const pager = page.locator('.pager')
   const open = (await pager.boundingBox())!.x
   await page.getByRole('button', { name: 'Days', exact: true }).click()
