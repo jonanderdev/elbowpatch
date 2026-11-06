@@ -393,6 +393,65 @@ test('a long title wraps in the rail, whole, with the page number on its first l
   }
 })
 
+test('a failed save stands in the rail, above + New chapter, with every word and every chapter in reach', async ({ page }) => {
+  desktopOnly(page)
+  await importBook(page, MANY)
+  await openChapter(page, 'Chapter 2')
+  await writeHere(page)
+  const add = page.getByRole('button', { name: 'New chapter' })
+  const before = (await add.boundingBox())!
+  await page.evaluate(() => {
+    IDBDatabase.prototype.transaction = () => {
+      throw new DOMException('The disk is full.', 'QuotaExceededError')
+    }
+  })
+  await page.keyboard.type(' Not stored.')
+  const line = page.getByRole('alert')
+  await expect(line).toHaveText("Can't save right now. Your words are still here.Save a copy")
+
+  const box = (await line.boundingBox())!
+  expect(box.x).toBe(20)
+  expect(box.x + box.width).toBeLessThanOrEqual(316)
+  // Whole, wrapped rather than cut.
+  expect(await line.evaluate((el) => el.scrollWidth <= el.clientWidth && el.scrollHeight <= el.clientHeight)).toBe(true)
+  await expect(line.getByRole('button', { name: 'Save a copy' })).toBeInViewport({ ratio: 1 })
+  // + New chapter stands where it stood, 12px under the line, and can be pressed.
+  const after = (await add.boundingBox())!
+  expect(after).toEqual(before)
+  expect(after.y - (box.y + box.height)).toBeGreaterThanOrEqual(12)
+  await add.click({ trial: true })
+
+  // The last chapter scrolls clear of the line.
+  const list = contents(page).locator('.contents-list')
+  await list.evaluate((el) => {
+    el.scrollTop = el.scrollHeight
+  })
+  const last = (await rows(page).last().boundingBox())!
+  expect(last.y + last.height).toBeLessThanOrEqual(box.y)
+})
+
+test('a short book keeps its chapters and + New chapter where they stood when a save fails', async ({ page }) => {
+  desktopOnly(page)
+  await importBook(page, TWO)
+  await openChapter(page, 'Two')
+  await writeHere(page)
+  const add = page.getByRole('button', { name: 'New chapter' })
+  const before = (await add.boundingBox())!
+  await page.evaluate(() => {
+    IDBDatabase.prototype.transaction = () => {
+      throw new DOMException('The disk is full.', 'QuotaExceededError')
+    }
+  })
+  await page.keyboard.type(' Not stored.')
+  await expect(page.getByRole('alert')).toBeVisible()
+  expect(await add.boundingBox()).toEqual(before)
+  await page.getByRole('button', { name: 'Contents' }).click()
+  // Folded, there is no + New chapter to clear: the line goes down to the foot, and keeps its width.
+  const box = (await page.getByRole('alert').boundingBox())!
+  expect(box.x + box.width).toBeLessThanOrEqual(316)
+  expect(box.y + box.height).toBe(900 - 20)
+})
+
 test('words typed just before a jump are there after a reload, in their own chapter', async ({ page }) => {
   await importBook(page, TWO)
   await writeHere(page)

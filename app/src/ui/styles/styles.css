@@ -2422,6 +2422,27 @@ button.count[aria-expanded='true'] {
   .contents-rail .new-chapter-mark {
     margin-right: 0.25em;
   }
+  /* On a page the line keeps to the rail's rows, and wraps; it never reaches the text. */
+  .page-screen .line {
+    max-width: 296px;
+    overflow-wrap: anywhere;
+  }
+  /* It stands 12px above *+ New chapter*, which a long book holds at the rail's foot (24px up, 31px tall). */
+  .page-screen:has(.contents-rail:not([data-folded]) .new-chapter) .line {
+    bottom: calc(24px + 31px + 12px);
+  }
+  /* A long list can still scroll its last rows clear of the line. The room is out of flow, so nothing in
+     the rail moves when the line comes: it holds the line's two lines and the 12px above them. */
+  .page-screen:has(> .line) .contents-rail .contents-list {
+    scroll-padding-bottom: 72px;
+  }
+  .page-screen:has(> .line) .contents-rail .contents-line:last-child::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    width: 1px;
+    height: 72px;
+  }
   /* Write's menu drops under it, right-aligned to it, never over it. */
   .write-menu-anchor {
     position: relative;
