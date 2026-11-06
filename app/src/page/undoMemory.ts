@@ -52,3 +52,10 @@ export function splitOf(sectionId: string, markdown: string): Split | undefined 
 export function forgetSplit(sectionId: string): void {
   splits.delete(sectionId)
 }
+
+/** A chapter left the book: its history goes, and so does any split that would go back to or from it. */
+export function forgetChapter(sectionId: string): void {
+  histories.delete(sectionId)
+  splits.delete(sectionId)
+  for (const [id, split] of splits) if (split.into === sectionId) splits.delete(id)
+}

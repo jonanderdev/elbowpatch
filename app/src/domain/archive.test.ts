@@ -5,7 +5,9 @@ import {
   newPiece,
   openPiece,
   putAway,
+  recover,
   rejoinChapter,
+  removeChapter,
   rename,
   renameSection,
   savePages,
@@ -175,6 +177,43 @@ describe('export and import', () => {
     const { place } = (await openPiece(elsewhere, book.id))!.piece
     expect(place).toMatchObject({ sectionId: first, snippet: 'One.' })
     expect(place?.page).toBeUndefined()
+  })
+
+  it('a chapter removed stays out of the book, the rest comes along whole, and its versions too', async () => {
+    const deps = setup()
+    const book = newPiece(deps, 'book', 'en')
+    const first = book.sections[0]!.sectionId
+    await write(deps, book, first, 'One.')
+    await renameSection(deps, book, first, 'One')
+    const { piece: more, sectionId: second } = withChapter(deps, book)
+    await write(deps, more, second, 'Soon gone.')
+    await takeMoment(deps, book.id)
+    const { piece: all, sectionId: third } = withChapter(deps, more)
+    await write(deps, all, third, 'Three.')
+    await renameSection(deps, all, third, 'Three')
+    await write(deps, all, second, '')
+    await takeMoment(deps, book.id)
+    await removeChapter(deps, book.id, { sectionId: second, held: [] })
+
+    const files = await exportAll(deps)
+    // Its history travels, as a file the book's own text does not list.
+    expect(files.some((f) => f.path.endsWith('.md') && f.text === 'Soon gone.')).toBe(true)
+    const whole = files.find((f) => f.path.endsWith('Untitled.md'))!
+    expect(whole.text).not.toContain('Untitled')
+
+    const elsewhere = { ...setup(), store: memoryStore() }
+    expect(await importArchive(elsewhere, files)).toMatchObject({ ok: true, added: 1 })
+    await recover(elsewhere)
+    const back = (await openPiece(elsewhere, book.id))!
+    expect(back.sections.map((s) => [s.title, s.content])).toEqual([
+      ['One', 'One.'],
+      ['Three', 'Three.'],
+    ])
+    expect(Object.keys(back.piece.words!).sort()).toEqual([first, third].sort())
+    const versions = await elsewhere.store.transaction((tx) => tx.versionsOf(second))
+    expect(versions.map((v) => v.content)).toContain('Soon gone.')
+    const outlines = await elsewhere.store.transaction((tx) => tx.outlinesOf(book.id))
+    expect(outlines.some((o) => o.sections.some((s) => s.sectionId === second))).toBe(true)
   })
 
   it('a chapter rejoined stays out of the book, and its versions come along', async () => {

@@ -15,6 +15,7 @@ import {
   putAway,
   recover,
   rejoinChapter,
+  removableChapters,
   removeChapter,
   rename,
   renameSection,
@@ -23,6 +24,7 @@ import {
   savePlace,
   setSubtitle,
   startChapterAt,
+  storedChapters,
   storedPiece,
   storedSection,
   takeMoment,
@@ -1185,6 +1187,68 @@ describe('removing an empty chapter', () => {
     const place = { sectionId: b.c, paragraph: 2, offset: 5, snippet: 'The end.', page: 3, screen: 'phone', caret: true, at: 1 } as const
     await savePlace(b.deps, b.id, place)
     expect((await remove(b))!.piece.place).toEqual(place)
+  })
+
+  describe('what Contents offers', () => {
+    const offered = async (b: Book, open: { sectionId: string; blank: boolean }, held: ReadonlySet<string> = new Set()) => {
+      const piece = await stored(b)
+      return [...removableChapters(contents(piece, 'phone').chapters, await storedChapters(b.deps, b.id), open, held)]
+    }
+
+    it('offers a chapter with no words and no title, and no other', async () => {
+      const b = await storedBook()
+      expect(await offered(b, { sectionId: b.a, blank: false })).toEqual([b.b])
+    })
+
+    it('does not offer a chapter with a title', async () => {
+      const b = await storedBook()
+      await renameSection(b.deps, b.draft, b.b, 'Named')
+      expect(await offered(b, { sectionId: b.a, blank: false })).toEqual([])
+    })
+
+    it('does not offer text with no word in it: removing it would be refused', async () => {
+      const b = await storedBook()
+      await write(b.deps, b.draft, b.b, '—')
+      expect(await offered(b, { sectionId: b.a, blank: false })).toEqual([])
+    })
+
+    it('goes by what the page holds for the open chapter, not by what is stored', async () => {
+      const b = await storedBook()
+      expect(await offered(b, { sectionId: b.b, blank: false })).toEqual([])
+      expect(await offered(b, { sectionId: b.b, blank: true })).toEqual([b.b])
+    })
+
+    it('does not offer a chapter with words waiting in the unsaved journal', async () => {
+      const b = await storedBook()
+      expect(await offered(b, { sectionId: b.a, blank: false }, new Set([b.b]))).toEqual([])
+    })
+
+    it('a book of one chapter offers nothing', async () => {
+      const s = setup()
+      const draft = newPiece(s, 'book', 'en')
+      const only = draft.sections[0]!.sectionId
+      await write(s.deps, draft, only, '')
+      const chapters = contents((await storedPiece(s.deps, draft.id))!, 'phone').chapters
+      expect([...removableChapters(chapters, await storedChapters(s.deps, draft.id), { sectionId: only, blank: true }, new Set())]).toEqual([])
+    })
+
+    it('an unstored chapter is offered, but the one stored chapter beside it is not: it must stay', async () => {
+      const s = setup()
+      const draft = newPiece(s, 'book', 'en')
+      const only = draft.sections[0]!.sectionId
+      await write(s.deps, draft, only, '')
+      const { piece, sectionId } = withChapter(s, (await storedPiece(s.deps, draft.id))!)
+      const chapters = contents(withOpenSection((await storedPiece(s.deps, draft.id))!, piece, sectionId), 'phone').chapters
+      expect(chapters).toHaveLength(2)
+      expect([...removableChapters(chapters, await storedChapters(s.deps, draft.id), { sectionId, blank: true }, new Set())]).toEqual([sectionId])
+    })
+
+    it('a book never stored offers nothing: there is nothing yet to take it out of', async () => {
+      const s = setup()
+      const { piece, sectionId } = withChapter(s, newPiece(s, 'book', 'en'))
+      const chapters = contents(piece, 'phone').chapters
+      expect([...removableChapters(chapters, await storedChapters(s.deps, piece.id), { sectionId, blank: true }, new Set())]).toEqual([])
+    })
   })
 
   describe('the first chapter', () => {

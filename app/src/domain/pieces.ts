@@ -523,6 +523,31 @@ export function removeChapter(deps: Deps, pieceId: string, removal: ChapterRemov
   })
 }
 
+/** Each chapter stored, and whether its text is blank: a count of no words is not enough, for a lone dash is the writer's. */
+export function storedChapters(deps: Pick<Deps, 'store'>, pieceId: string): Promise<ReadonlyMap<string, boolean>> {
+  return deps.store.transaction(async (tx) => {
+    const chapters = new Map<string, boolean>()
+    for (const { sectionId } of (await tx.piece(pieceId))?.sections ?? []) chapters.set(sectionId, blank((await current(tx, sectionId)).content))
+    return chapters
+  })
+}
+
+/**
+ * The chapters Contents offers to remove, by the rule `removeChapter` holds to, so an offer is not refused:
+ * no title, no text, nothing `held` in the unsaved journal, and another stored chapter to stay. The open
+ * chapter goes by what its page holds, and may not be stored yet: leaving it is then what removes it.
+ */
+export function removableChapters(
+  chapters: ContentsChapter[],
+  stored: ReadonlyMap<string, boolean>,
+  open: { sectionId: string; blank: boolean },
+  held: ReadonlySet<string>,
+): ReadonlySet<string> {
+  const empty = (id: string): boolean => (id === open.sectionId ? open.blank : stored.get(id) === true)
+  const otherStays = (id: string): boolean => [...stored.keys()].some((other) => other !== id)
+  return new Set(chapters.filter((c) => blank(c.title) && empty(c.sectionId) && !held.has(c.sectionId) && otherStays(c.sectionId)).map((c) => c.sectionId))
+}
+
 /** Where the writer's place stands once a chapter has gone: `moved`, if it was there. */
 function placeAfter(place: Place | undefined, gone: string, nowFirst: string | undefined, moved: Place): Place | undefined {
   if (place?.sectionId === gone) return moved

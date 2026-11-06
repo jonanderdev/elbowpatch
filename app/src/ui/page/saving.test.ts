@@ -1,7 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { memoryStore } from '../../adapters/memory-store'
 import type { Piece, Place } from '../../domain/model'
-import { newPiece, openPiece, rejoinChapter, renameSection, startChapterAt, takeMoment, write } from '../../domain/pieces'
+import {
+  newPiece,
+  openPiece,
+  rejoinChapter,
+  removeChapter,
+  renameSection,
+  startChapterAt,
+  storedPiece,
+  takeMoment,
+  withChapter,
+  write,
+} from '../../domain/pieces'
 import type { Store } from '../../domain/ports'
 import { replayJournal } from '../app/replay'
 import { closingAfter, settledWithin } from '../app/settled'
@@ -454,5 +465,83 @@ describe('reshaping behind a page still closing', () => {
 
   it('a closing page that failed has finished: nothing of it can land later', async () => {
     expect(await settledWithin(closingAfter(Promise.reject(new Error('The disk is full.')), Promise.resolve()), 20)).toBe(true)
+  })
+})
+
+/** A stored book of two chapters, open on the second, which was written and has been emptied. */
+async function openOnEmptied() {
+  let n = 0
+  const clock = { now: () => 1_000_000 }
+  const ids = { next: () => `id${++n}` }
+  const store = memoryStore()
+  const deps = { store, clock, ids }
+  const first = newPiece(deps, 'book', 'en')
+  await write(deps, first, first.sections[0]!.sectionId, WHOLE)
+  const { piece: draft, sectionId } = withChapter(deps, first)
+  await write(deps, draft, sectionId, 'Soon gone.')
+  await renameSection(deps, draft, sectionId, 'Two')
+  await takeMoment(deps, draft.id)
+  await write(deps, draft, sectionId, '')
+  await renameSection(deps, draft, sectionId, '')
+  const page = { held: { markdown: '', title: '', bookTitle: null, subtitle: null } as Held, failed: false }
+  const saving = createSaving({
+    deps,
+    // The draft still lists the chapter: it is what a late write would put back.
+    piece: draft,
+    sectionId,
+    stored: { markdown: '', title: '', bookTitle: '', subtitle: '' },
+    read: () => page.held,
+    readOnly: () => false,
+    place: () => undefined,
+    pages: () => ({ screen: 'phone', count: 2 }),
+    onStored: () => {},
+    onFailed: (failed) => {
+      page.failed = failed
+    },
+    closing: () => Promise.resolve(),
+  })
+  const remove = (whole: string) => async () => (await removeChapter(deps, draft.id, { sectionId, held: [whole] }))?.piece
+  const chapters = async () => (await storedPiece(deps, draft.id))!.sections.map((s) => s.sectionId)
+  return { deps, draft, sectionId, page, saving, remove, chapters }
+}
+
+describe('removing the chapter on the page', () => {
+  it('the page closing afterwards writes nothing back, whatever it holds', async () => {
+    const b = await openOnEmptied()
+    expect(await b.saving.reshape(b.remove(''))).toBe(true)
+    expect(await b.chapters()).not.toContain(b.sectionId)
+    b.page.held = { ...b.page.held, markdown: 'Typed behind it.', title: 'And named.' }
+    b.saving.touch()
+    b.saving.journal()
+    await b.saving.close()
+    expect(await b.chapters()).not.toContain(b.sectionId)
+    expect(unsaved.get(b.sectionId)).toBeUndefined()
+  })
+
+  it('refused, it says nothing has failed, and the page goes on saving', async () => {
+    const b = await openOnEmptied()
+    b.page.held = { ...b.page.held, markdown: 'Just typed.' }
+    expect(await b.saving.reshape(b.remove('Just typed.'))).toBe(false)
+    expect(b.page.failed).toBe(false)
+    expect(b.saving.sealed()).toBe(false)
+    expect(await b.chapters()).toContain(b.sectionId)
+    expect((await openPiece(b.deps, b.draft.id))!.sections.at(-1)!.content).toBe('Just typed.')
+    b.page.held = { ...b.page.held, markdown: 'Just typed, and more.' }
+    b.saving.touch()
+    await b.saving.close()
+    expect((await openPiece(b.deps, b.draft.id))!.sections.at(-1)!.content).toBe('Just typed, and more.')
+  })
+
+  it('a save that fails first leaves the chapter in the book and the words kept', async () => {
+    const b = await openOnEmptied()
+    b.page.held = { ...b.page.held, markdown: 'Not stored.' }
+    const { store } = b.deps
+    const { transaction } = store
+    store.transaction = () => Promise.reject(new Error('The disk is full.'))
+    expect(await b.saving.reshape(b.remove('Not stored.'))).toBe(false)
+    store.transaction = transaction
+    expect(await b.chapters()).toContain(b.sectionId)
+    expect(unsaved.get(b.sectionId)?.markdown).toBe('Not stored.')
+    await b.saving.close()
   })
 })

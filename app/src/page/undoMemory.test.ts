@@ -3,7 +3,7 @@ import { EditorState } from 'prosemirror-state'
 import { describe, expect, it } from 'vitest'
 import { parse, serialize } from '../domain/markdown'
 import { schema, toBlocks, toDoc } from './schema'
-import { forgetSplit, keepUndo, rememberSplit, splitOf, takeUndo } from './undoMemory'
+import { forgetChapter, forgetSplit, keepUndo, rememberSplit, splitOf, takeUndo } from './undoMemory'
 
 const opened = (markdown: string) => EditorState.create({ doc: toDoc(parse(markdown)), plugins: [history()] })
 const typed = (state: EditorState, text: string) => state.apply(state.tr.insertText(text, 1))
@@ -65,5 +65,28 @@ describe('a chapter born of a split', () => {
 
   it('a chapter that was never split is not one', () => {
     expect(splitOf('other', 'The rail.')).toBeUndefined()
+  })
+})
+
+describe('a chapter that left the book', () => {
+  it('takes its history with it', () => {
+    keepUndo('gone', opened(''))
+    forgetChapter('gone')
+    expect(takeUndo('gone', '')).toBeUndefined()
+  })
+
+  it('takes its split with it', () => {
+    rememberSplit('gone', { into: 'a', after: 'Salt.', seam: SEAM })
+    forgetChapter('gone')
+    expect(splitOf('gone', 'Salt.')).toBeUndefined()
+  })
+
+  it('takes with it the splits that would go back into it, and no other', () => {
+    rememberSplit('later', { into: 'gone', after: 'Salt.', seam: SEAM })
+    rememberSplit('other', { into: 'a', after: 'Sea.', seam: SEAM })
+    forgetChapter('gone')
+    expect(splitOf('later', 'Salt.')).toBeUndefined()
+    expect(splitOf('other', 'Sea.')).toBeDefined()
+    forgetSplit('other')
   })
 })
