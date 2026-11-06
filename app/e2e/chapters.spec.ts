@@ -367,6 +367,32 @@ test('the focus ring on a Contents row stands whole outside it, at the top, the 
   expect(await room()).toBeGreaterThanOrEqual(-0.5)
 })
 
+test('a long title wraps in the rail, whole, with the page number on its first line', async ({ page }) => {
+  desktopOnly(page)
+  const unbroken = 'Unbroken'.repeat(12)
+  const spaced = 'The windows of the shop had been salted white by the first storm of November'
+  await importBook(page, `# One\n\nFirst.\n\n# ${unbroken}\n\nSecond.\n\n# ${spaced}\n\nThird.\n`)
+  await expect(rows(page).nth(2).locator('.contents-page')).toBeVisible()
+
+  const short = (await rows(page).first().boundingBox())!
+  expect(short.height).toBe(36)
+  expect(short.width).toBe(296)
+  for (const n of [1, 2]) {
+    const row = rows(page).nth(n)
+    const box = (await row.boundingBox())!
+    expect(box.height).toBeGreaterThan(36)
+    expect(box.width).toBe(296)
+    // Nothing cut: the title is as tall as it needs, and no wider than its place.
+    const title = row.locator('.contents-title')
+    expect(await title.evaluate((el) => el.scrollWidth <= el.clientWidth && getComputedStyle(el).whiteSpace !== 'nowrap')).toBe(true)
+    const line = (await title.boundingBox())!
+    const number = (await row.locator('.contents-page').boundingBox())!
+    // On the first line, not the middle of the row.
+    expect(number.y - box.y).toBe((await rows(page).first().locator('.contents-page').boundingBox())!.y - short.y)
+    expect(number.y).toBeLessThan(line.y + 23)
+  }
+})
+
 test('words typed just before a jump are there after a reload, in their own chapter', async ({ page }) => {
   await importBook(page, TWO)
   await writeHere(page)

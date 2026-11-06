@@ -2387,29 +2387,26 @@ button.count[aria-expanded='true'] {
     font-size: 13px;
     color: var(--secondary);
   }
-  /* One line, 36px tall, as the library's places; 4px apart, so two tints never touch. */
+  /* At least 36px, as the library's places; 4px apart, so two tints never touch. */
   .contents-rail .contents-list {
     gap: 4px;
     /* 296px of rows, and the room for the ring either side. */
     width: 304px;
   }
+  /* A long title wraps, as on the sheet. From the top, not centred, so the page number keeps to the first line;
+     it shares that line's height, so a line of 23px in 36px stands where a centred one would. */
   .contents-rail .contents-row {
-    align-items: center;
+    align-items: flex-start;
     gap: 12px;
-    height: 36px;
-    padding: 0 12px;
+    min-height: 36px;
+    padding: 6.5px 12px;
     border-radius: 18px;
-    line-height: normal;
+    line-height: 23px;
     color: var(--text);
   }
   .contents-rail .contents-row:hover,
   .contents-rail .contents-row[aria-current='true'] {
     color: var(--title);
-  }
-  .contents-rail .contents-title {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
   .contents-rail .contents-remove {
     padding: 0 12px;
