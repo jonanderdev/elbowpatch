@@ -1121,6 +1121,25 @@ test('a failed bring back leaves everything as it was, says so with Try again, a
   expect((await versionsOf(page)).at(-1)!.content).toBe('One.')
 })
 
+test('pressed again while the screen is leaving, Keep a copy makes no second copy', async ({ page }) => {
+  await history(page, ['One.', 'Two.'])
+  await open(page)
+  await expect(oldText(page)).toHaveText('One.')
+  // The Time Machine is slow to close: the second press comes after the copy was made, before the screen is gone.
+  await page.evaluate(() => {
+    const back = history.back.bind(history)
+    history.back = () => void ((window as unknown as { closeNow: () => void }).closeNow = back)
+  })
+  const pieces = () => stored(page, 'pieces')
+  const before = (await pieces()).length
+  await machine(page).getByRole('button', { name: 'Keep a copy' }).click()
+  await expect.poll(async () => (await pieces()).length).toBe(before + 1)
+  await machine(page).getByRole('button', { name: 'Keep a copy' }).click({ force: true })
+  await page.evaluate(() => (window as unknown as { closeNow: () => void }).closeNow())
+  await expect(machine(page)).toHaveCount(0)
+  expect((await pieces()).length).toBe(before + 1)
+})
+
 test('a failed bring back stops asking to be tried again once another window writes the piece', async ({ page, context }) => {
   await history(page, ['One.', 'Two.'])
   await open(page)
