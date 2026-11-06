@@ -188,7 +188,7 @@ describe('keeping a copy', () => {
 
   it('refuses a piece that is gone, and writes nothing', async () => {
     const s = setup()
-    await expect(keepCopy(s.deps, 'nothing', { at: 1, content: 'x', title: 'y', kept: false })).rejects.toThrow()
+    await expect(keepCopy(s.deps, 'nothing', { content: 'x', title: 'y' })).rejects.toThrow()
     expect(await s.store.transaction((tx) => tx.pieces())).toEqual([])
   })
 })

@@ -30,6 +30,8 @@ export interface Opened {
   at?: OpenAt
   /** The writer was in the text when they went there: the caret goes with them. */
   writing?: boolean
+  /** A calm line the page opens with, at its foot for a few seconds ("A copy of Sunday evening, kept as a new essay."). */
+  line?: string
 }
 
 export interface TitleFields {
