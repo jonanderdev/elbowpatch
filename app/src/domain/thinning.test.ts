@@ -133,6 +133,33 @@ describe('thinning a kept moment\'s outline', () => {
     expect(await titlesAtKept(deps, book.id, chapter)).toEqual(['The harbour'])
   })
 
+  it.each([
+    ['a clock that jumped back', -8 * HOUR],
+    ['the very same millisecond', 0],
+  ])('a rename after a kept moment is still after it, with %s', async (_, jump) => {
+    const { deps, clock } = setup()
+    const t = clock.now()
+    const book = newPiece(deps, 'book', 'en')
+    const chapter = book.sections[0]!.sectionId
+    await write(deps, book, chapter, 'The boats came in.')
+    await renameSection(deps, book, chapter, 'Untitled yet')
+    await takeMoment(deps, book.id)
+
+    clock.set(t + HOUR)
+    await renameSection(deps, book, chapter, 'The harbour')
+    await takeMoment(deps, book.id)
+    clock.set(t + 10 * HOUR)
+    await takeMoment(deps, book.id, { kept: true })
+
+    clock.set(t + 10 * HOUR + jump)
+    await renameSection(deps, book, chapter, 'The quay')
+    await takeMoment(deps, book.id)
+    await renamesLater(deps, clock, book, chapter, t + 11 * HOUR)
+    clock.set(NOW)
+    await thin(deps)
+    expect(await titlesAtKept(deps, book.id, chapter)).toEqual(['The harbour'])
+  })
+
   it('the outline in place just before a bring back stays, like the text it replaced', async () => {
     const { deps, clock } = setup()
     const t = clock.now()
