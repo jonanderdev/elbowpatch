@@ -880,13 +880,15 @@ test('the tape fades at its edges over the ticks, not over the labels', async ({
 })
 
 /** A finger across the screen, by the browser's own touch input: `from` to `to`, in steps about 16ms apart. */
-async function finger(page: Page, from: { x: number; y: number }, dx: number, steps = 8): Promise<void> {
+async function finger(page: Page, from: { x: number; y: number }, dx: number, steps = 8, hold = 0): Promise<void> {
   const cdp = await page.context().newCDPSession(page)
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [from] })
   for (let i = 1; i <= steps; i++) {
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: from.x + (dx * i) / steps, y: from.y }] })
     await page.waitForTimeout(16)
   }
+  // Held still a moment before it lifts, a finger carries no speed: a loaded machine cannot turn a drag into a throw.
+  if (hold) await page.waitForTimeout(hold)
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
   await cdp.detach()
 }
@@ -905,7 +907,7 @@ test('a finger on the tape moves the tape and turns no page, and a finger on the
       .evaluate((el) => el.scrollLeft)
   const box = (await tape(page).boundingBox())!
   // Dragged right by a tick (44px with so few), the tape goes to the moment before.
-  await finger(page, { x: box.x + box.width / 2, y: box.y + 14 }, 44)
+  await finger(page, { x: box.x + box.width / 2, y: box.y + 14 }, 44, 8, 150)
   await expect(tape(page)).toHaveAttribute('aria-valuenow', '1')
   await expect(oldText(page)).not.toContainText('And more.')
   await expect(oldText(page)).toContainText('Paragraph 40')
