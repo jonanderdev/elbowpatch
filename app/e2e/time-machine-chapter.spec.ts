@@ -177,6 +177,31 @@ test('Bring chapter back restores that chapter’s words, keeps its title and th
   expect((await stored<{ content: string }>(page, 'working')).map((w) => w.content).sort()).toEqual(['First chapter.', 'Second.', 'Third.'])
 })
 
+test('on desktop the rail of a short book stays as it is while the line shows', async ({ page }) => {
+  test.skip(!onDesktop(page), 'the rail is on desktop')
+  await importBook(page, THREE)
+  await goTo(page, 'Two')
+  await keepMoment(page)
+  await typeAtEnd(page, ' Changed since.')
+  await open(page)
+  await machine(page).getByRole('button', { name: 'Bring chapter back' }).click()
+  await expect(machine(page)).toHaveCount(0)
+  await expect(line(page)).toBeVisible()
+  const list = contents(page).locator('.contents-list')
+  expect(await list.evaluate((el) => el.scrollTop)).toBe(0)
+  // Folded and opened again, the rail still shows its first row whole.
+  await page
+    .getByRole('button', { name: /contents/i })
+    .first()
+    .click()
+  await page
+    .getByRole('button', { name: /contents/i })
+    .first()
+    .click()
+  expect(await list.evaluate((el) => el.scrollTop)).toBe(0)
+  await expect(rowsOf(page).first()).toBeInViewport({ ratio: 1 })
+})
+
 test('a chapter removed since returns in its old place with its old title, in a later outline, and stays through a reload', async ({ page }) => {
   await twoRemoved(page)
   await typeAtEnd(page, ' Then more.')
