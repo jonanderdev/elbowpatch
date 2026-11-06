@@ -126,7 +126,7 @@ export function createEditor(mount: HTMLElement, options: EditorOptions): Editor
 }
 
 /** Text copied from the page is Markdown. */
-function asMarkdown(slice: Slice): string {
+export function asMarkdown(slice: Slice): string {
   return serialize(toBlocks(schema.nodes.doc.create(null, slice.content.size ? slice.content : undefined)))
 }
 
