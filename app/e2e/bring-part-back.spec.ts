@@ -7,13 +7,26 @@ const menu = (page: Page) => page.getByRole('toolbar', { name: 'Selected words' 
 const text = (page: Page) => page.locator('.page-screen:not(.time-machine) .body')
 const paragraphs = (page: Page) => text(page).locator('p, blockquote').allTextContents()
 
-/** A new essay with these words (a new line is a new paragraph), saved. */
-async function essay(page: Page, words: string, title = 'Salt'): Promise<void> {
+/** A new piece of this kind with these words in its text (a new line is a new paragraph), saved. */
+async function essay(page: Page, words: string, title = 'Salt', kind: 'essay' | 'book' | 'journal' = 'essay'): Promise<void> {
   await page.goto('./')
-  await page.locator('.start.essay').click()
-  await expect(page.locator('.title')).toBeFocused()
-  await page.keyboard.type(title)
-  await page.keyboard.press('Enter')
+  await page.locator(`.start.${kind}`).click()
+  if (kind === 'essay') {
+    await expect(page.locator('.title')).toBeFocused()
+    await page.keyboard.type(title)
+    await page.keyboard.press('Enter')
+  } else {
+    await expect(page.locator('.book-title')).toBeFocused()
+    await page.keyboard.type('The Long Winter')
+    await page.keyboard.press('Enter')
+    await page.keyboard.press('Enter')
+    // A book's chapter is named at its opening; a journal's day is named for its date.
+    if (kind === 'book') {
+      await page.keyboard.type(title)
+      await page.keyboard.press('Enter')
+    }
+  }
+  await expect(page.locator('.body')).toBeFocused()
   await page.keyboard.type(words)
   await saved(page, words.split('\n').at(-1)!)
 }
@@ -34,8 +47,8 @@ async function open(page: Page): Promise<void> {
 }
 
 /** An essay that was `before`, and is now `now`, with a moment between. */
-async function changed(page: Page, before: string, now: string): Promise<void> {
-  await essay(page, before)
+async function changed(page: Page, before: string, now: string, kind: 'essay' | 'book' | 'journal' = 'essay'): Promise<void> {
+  await essay(page, before, 'Salt', kind)
   await open(page)
   await machine(page).getByRole('button', { name: 'Back to now' }).click()
   await expect(machine(page)).toHaveCount(0)
@@ -225,3 +238,14 @@ test('the Time Machine’s history entry is gone after it, so back goes where it
   await page.goBack()
   await expect(page.locator('.library, .shelf, .start').first()).toBeVisible()
 })
+
+for (const kind of ['book', 'journal'] as const) {
+  test(`in a ${kind} it goes into the ${kind === 'book' ? 'chapter' : 'day'} it was read in`, async ({ page }) => {
+    await changed(page, 'Alpha one.\nBeta has a lost sentence here. And more.', 'Alpha one.\nBeta has And more.', kind)
+    await bring(page, 'a lost sentence here.')
+    await expect.poll(() => paragraphs(page)).toEqual(['Alpha one.', 'a lost sentence here.', 'Beta has And more.'])
+    await expect(page.locator('.calm-line')).toHaveText('Brought back from just now.')
+    await expect.poll(() => selected(page)).toBe('a lost sentence here.')
+    await saved(page, 'a lost sentence here.')
+  })
+}
