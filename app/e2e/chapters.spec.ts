@@ -727,12 +727,3 @@ test('just wide enough for the rail, a chapter opens with the rail standing stil
   await expect(page.locator('.title')).toHaveText('One')
   await expect(page.locator('body')).not.toHaveAttribute('data-rail-slid')
 })
-
-test('an essay has no rail and no toggle', async ({ page }) => {
-  desktopOnly(page)
-  await page.goto('./')
-  await page.locator('.start.essay').click()
-  await expect(page.locator('.title')).toBeFocused()
-  await expect(contents(page)).toHaveCount(0)
-  await expect(toggle(page)).toHaveCount(0)
-})

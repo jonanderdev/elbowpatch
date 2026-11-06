@@ -51,7 +51,7 @@ export function NewChapter({ onAdd }: { onAdd(): void }): ReactElement {
   )
 }
 
-const pagesWord = (pages: number): string => `${number(pages)} ${pages === 1 ? 'page' : 'pages'}`
+export const pagesWord = (pages: number): string => `${number(pages)} ${pages === 1 ? 'page' : 'pages'}`
 
 interface ContentsSheetProps extends ContentsListProps {
   /** The book's name: a phone shows it nowhere else past the title page. */
@@ -145,15 +145,15 @@ export function ContentsRail({ chapters, current, removable, pages, open, onOpen
 }
 
 interface RailToggleProps {
-  /** What the rail holds. */
-  label: 'Contents' | 'Days'
+  /** What the rail holds: Contents, unless said otherwise. */
+  label?: string
   open: boolean
   onToggle(): void
   buttonRef: RefObject<HTMLButtonElement | null>
 }
 
 /** Folds the rail away and opens it again, from the path. Pressed, it leaves the focus in the text. */
-export function RailToggle({ label, open, onToggle, buttonRef }: RailToggleProps): ReactElement {
+export function RailToggle({ label = 'Contents', open, onToggle, buttonRef }: RailToggleProps): ReactElement {
   return (
     <button
       ref={buttonRef}
