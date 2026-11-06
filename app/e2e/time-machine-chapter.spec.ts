@@ -198,6 +198,11 @@ test('a chapter removed since returns in its old place with its old title, in a 
   await openContents(page)
   await expect(rowsOf(page)).toHaveText([/^One/, /^Two/, /^Three/])
   await expect(rowsOf(page).nth(1)).toHaveAttribute('aria-current', 'true')
+  // The counts follow: three chapters again, and pages once the chapter that came back has been laid out.
+  if (onDesktop(page)) await expect(contents(page).locator('.rail-line')).toContainText('3 chapters')
+  await expect(contents(page).locator('.contents-pages')).toHaveText(/^\d+ pages?$/, { timeout: 15000 })
+  const piece = (await stored<{ words: Record<string, number>; sections: { sectionId: string }[] }>(page, 'pieces'))[0]!
+  expect(piece.words[piece.sections[1]!.sectionId]).toBe(1)
   await closeSheet(page)
 
   // The text it replaced stands marked, and the outline that has the chapter back is stamped later than it.
@@ -279,8 +284,11 @@ test('Try again after the moment has gone reads the moments again, and writes no
   await importBook(page, THREE)
   await keepMoment(page)
   await typeAtEnd(page, ' Then more.')
+  await keepMoment(page)
+  await typeAtEnd(page, ' And more.')
   await open(page)
-  await expect(oldText(page)).toHaveText('First chapter.')
+  // Opens on the most recent moment that differs from now: the middle one.
+  await expect(oldText(page)).toHaveText('First chapter. Then more.')
   await page.evaluate(() => {
     const w = window as unknown as { broken: boolean }
     w.broken = true
@@ -293,23 +301,23 @@ test('Try again after the moment has gone reads the moments again, and writes no
   await machine(page).getByRole('button', { name: 'Bring chapter back' }).click()
   await expect(bar(page)).toContainText('Couldn’t bring that back just now.')
 
-  // Another window thinned it away meanwhile.
-  const seen = (await stored<Version>(page, 'versions')).filter((v) => v.content === 'First chapter.')
-  expect(seen.length).toBeGreaterThan(0)
+  // Another window thinned that moment away meanwhile, which is all thinning can do to a middle one.
+  const middle = (await stored<Version>(page, 'versions')).filter((v) => v.content === 'First chapter. Then more.')
+  expect(middle).toHaveLength(1)
   await page.evaluate(
-    (ids) =>
+    (id) =>
       new Promise<void>((done) => {
         const open = indexedDB.open('elbowpatch')
         open.onsuccess = () => {
           const tx = open.result.transaction('versions', 'readwrite')
-          for (const id of ids) tx.objectStore('versions').delete(id)
+          tx.objectStore('versions').delete(id)
           tx.oncomplete = () => {
             open.result.close()
             done()
           }
         }
       }),
-    seen.map((v) => v.id),
+    middle[0]!.id,
   )
   await page.evaluate(() => {
     ;(window as unknown as { broken: boolean }).broken = false
@@ -318,14 +326,15 @@ test('Try again after the moment has gone reads the moments again, and writes no
 
   await machine(page).getByRole('button', { name: 'Try again' }).click()
 
-  // It does not fail again for a moment that is not there: the tape shows what is left.
+  // It does not fail again for a moment that is not there: the tape shows what is left, and nothing is written.
+  await expect(oldText(page)).toHaveText('First chapter.')
   await expect(bar(page)).not.toContainText('Couldn’t bring that back')
-  await expect(tape(page)).toBeVisible()
-  await expect(oldText(page)).toHaveText('')
+  await expect(machine(page).getByRole('button', { name: 'Bring chapter back' })).toBeVisible()
   expect(await stored(page, 'versions')).toEqual(before)
-  await page.keyboard.press('Escape')
+  // And it brings back what is there.
+  await machine(page).getByRole('button', { name: 'Bring chapter back' }).click()
   await expect(machine(page)).toHaveCount(0)
-  await expect(page.locator('.body')).toHaveText('First chapter. Then more.')
+  await expect(page.locator('.body')).toHaveText('First chapter.')
 })
 
 test('bringing back another chapter keeps the undo of the chapter the page was on, and ends that of the one that came back', async ({ page }) => {
@@ -375,4 +384,12 @@ test('the chapter that was first returns first, with the title page', async ({ p
   await expect(page.locator('.book-title')).toHaveText('harbour')
   await expect(line(page)).toHaveText('Chapter 1 brought back from just now. The rest of the book is as it was.')
   expect(await titlesNow(page)).toEqual(['One', 'Two', 'Three'])
+  // Two had the title page and has it no more: its undo goes on, though its page was sealed meanwhile.
+  if (onDesktop(page)) {
+    await goTo(page, 'Two')
+    await expect(page.locator('.body')).toHaveText('Second. Then more.')
+    await page.locator('.body').focus()
+    await page.keyboard.press('ControlOrMeta+z')
+    await expect(page.locator('.body')).toHaveText('Second.')
+  }
 })
