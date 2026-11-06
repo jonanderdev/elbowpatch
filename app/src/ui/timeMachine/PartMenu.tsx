@@ -1,4 +1,4 @@
-import { type ReactElement, useEffect, useState } from 'react'
+import type { ReactElement } from 'react'
 import type { Passage } from '../../page/passage'
 import { useFloatingAt } from '../components/useFloatingAt'
 import type { SelectedPart } from './usePart'
@@ -41,30 +41,18 @@ interface Props {
   /** Whether the passage can go back into the section; *Copy* is always there. */
   canBring: boolean
   onBring(passage: Passage): void
+  /** The passage reached the clipboard: the screen says so. */
+  onCopied(): void
 }
 
-/** What the selection in old text offers, and says when it copied: the clipboard gets the passage as Markdown, as copying on the page does. */
-export function Part({ part, canBring, onBring }: Props): ReactElement {
-  const [copied, setCopied] = useState(false)
-  const there = !!part
-  // Said once, for the words that were copied: a new selection starts afresh.
-  useEffect(() => {
-    if (!there) setCopied(false)
-  }, [there])
-
+/** What the selection in old text offers: the clipboard gets the passage as Markdown, as copying on the page does. */
+export function Part({ part, canBring, onBring, onCopied }: Props): ReactElement | null {
   function copy(passage: Passage): void {
     void navigator.clipboard
       ?.writeText(passage.markdown)
-      .then(() => setCopied(true))
+      .then(onCopied)
       .catch(() => {})
   }
 
-  return (
-    <>
-      {part ? <PartMenu rect={part.rect} canBring={canBring} onBring={() => onBring(part.passage)} onCopy={() => copy(part.passage)} /> : null}
-      <div className="visually-hidden" aria-live="polite">
-        {copied ? 'Copied' : ''}
-      </div>
-    </>
-  )
+  return part ? <PartMenu rect={part.rect} canBring={canBring} onBring={() => onBring(part.passage)} onCopy={() => copy(part.passage)} /> : null
 }

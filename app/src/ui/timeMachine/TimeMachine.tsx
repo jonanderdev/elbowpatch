@@ -92,6 +92,11 @@ export function TimeMachine({ deps, looking, onKeepCopy, onBack, onBringPart, on
 
   // Before the pager, so its first layout already has the text.
   const selected = usePart(viewport)
+  /** Words were just copied: said once, for those words. */
+  const [copied, setCopied] = useState(false)
+  const chosenWords = selected.part?.passage.markdown
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new selection starts afresh.
+  useEffect(() => setCopied(false), [chosenWords])
   const reader = useReader(mount, today.content, piece.lang, selected.follow)
   const { pager, page, announcement } = usePager({
     screen,
@@ -156,6 +161,7 @@ export function TimeMachine({ deps, looking, onKeepCopy, onBack, onBringPart, on
   }, [hasTape])
 
   const step = (next: number): void => {
+    setCopied(false)
     setChosen(moments[next]?.at)
     setSaidOver(announcement)
   }
@@ -164,7 +170,7 @@ export function TimeMachine({ deps, looking, onKeepCopy, onBack, onBringPart, on
   const word = (piece.kind === 'essay' ? title : today.name).trim() || 'Untitled'
   const crumbs: Crumb[] = moment ? [{ word, onClick: onBack }, { word: momentShort(moment.at, now) }] : [{ word, onClick: onBack }]
   const heading = title.trim() || 'Untitled'
-  const said = moment && saidOver === announcement ? momentName(moment.at, now) : announcement
+  const said = copied ? 'Copied' : moment && saidOver === announcement ? momentName(moment.at, now) : announcement
 
   return (
     <div
@@ -212,6 +218,7 @@ export function TimeMachine({ deps, looking, onKeepCopy, onBack, onBringPart, on
       <Part
         part={selected.part}
         canBring={!!moment && piece.sections.some((s) => s.sectionId === sectionId)}
+        onCopied={() => setCopied(true)}
         onBring={(passage) => moment && onBringPart({ sectionId, passage, from: momentInSentence(moment.at, now) })}
       />
 

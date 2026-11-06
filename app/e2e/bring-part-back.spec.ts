@@ -207,7 +207,7 @@ test('Copy puts the passage on the clipboard and leaves the Time Machine open', 
   await select(page, 'a lost sentence here.')
   await menu(page).getByRole('button', { name: 'Copy' }).click()
   await expect(machine(page)).toBeVisible()
-  await expect(machine(page).locator('[aria-live]', { hasText: 'Copied' })).toHaveCount(1)
+  await expect(machine(page).locator('[aria-live]')).toHaveText('Copied')
   expect(await page.evaluate(() => (window as unknown as { copies: string[] }).copies)).toEqual(['a lost sentence here.'])
 })
 
