@@ -1,4 +1,4 @@
-import type { Deps } from './pieces'
+import { type Deps, outlineAt } from './pieces'
 
 // Thinning (docs/decisions/0005): a section's local history gets sparser with
 // age, keeping the last version in each period. It is the one place the app
@@ -52,10 +52,16 @@ export async function thin(deps: Pick<Deps, 'store' | 'clock'>): Promise<number>
       if (!piece) return 0
       let n = 0
       const outlines = await tx.outlinesOf(id)
+      // The outline in force at each moment a version is held for stays with it: the piece as it stood then.
+      const held = new Set(piece.outlineId ? [piece.outlineId] : [])
       const sectionIds = new Set([...piece.sections.map((s) => s.sectionId), ...outlines.flatMap((o) => o.sections.map((s) => s.sectionId))])
       for (const sectionId of sectionIds) {
         const versions = await tx.versionsOf(sectionId)
         const working = await tx.working(sectionId)
+        for (const v of versions) {
+          const outline = v.kept || v.beforeBringBack ? outlineAt(outlines, v.createdAt) : undefined
+          if (outline) held.add(outline.id)
+        }
         const gone = toThin(
           versions.map((v) => ({ ...v, protected: !!v.kept || !!v.beforeBringBack || v.id === working?.baseVersionId })),
           now,
@@ -64,7 +70,7 @@ export async function thin(deps: Pick<Deps, 'store' | 'clock'>): Promise<number>
         n += gone.size
       }
       const gone = toThin(
-        outlines.map((o) => ({ ...o, protected: o.id === piece.outlineId })),
+        outlines.map((o) => ({ ...o, protected: held.has(o.id) })),
         now,
       )
       for (const oid of gone) await tx.deleteOutline(oid)

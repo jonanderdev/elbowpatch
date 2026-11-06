@@ -664,6 +664,11 @@ export function latest(versions: Version[]): Version | undefined {
   return history(versions).at(-1)
 }
 
+/** The outline in force at a moment: the one that moment wrote, else the last before it (0005). */
+export function outlineAt(outlines: Outline[], at: number): Outline | undefined {
+  return [...outlines].sort((a, b) => b.seq - a.seq).find((o) => o.createdAt <= at)
+}
+
 /**
  * The stored sections, with this one added from the draft if it is new: journal days in date order,
  * anything else where the draft has it, before the next section that is stored, else at the end.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { memoryStore } from '../adapters/memory-store'
-import { history, newPiece, openPiece, putAway, restore, takeMoment, write } from './pieces'
+import { history, newPiece, openPiece, outlineAt, putAway, renameSection, restore, takeMoment, write } from './pieces'
 import { forgetPutAway, type Thinnable, thin, toThin } from './thinning'
 
 const MIN = 60_000
@@ -71,6 +71,42 @@ function setup() {
   const deps = { store: memoryStore(), clock, ids: { next: () => `id${++n}` } }
   return { deps, clock }
 }
+
+/** The chapter titles of the outline in force at a section's kept moment, as a Time Machine would ask. */
+async function titlesAtKept(deps: ReturnType<typeof setup>['deps'], pieceId: string, sectionId: string): Promise<string[] | undefined> {
+  const [outlines, versions] = await deps.store.transaction(async (tx) => [await tx.outlinesOf(pieceId), await tx.versionsOf(sectionId)] as const)
+  const kept = versions.find((x) => x.kept)!
+  return outlineAt(outlines, kept.createdAt)?.sections.map((s) => s.title)
+}
+
+describe('thinning a kept moment\'s outline', () => {
+  it('a chapter renamed at the kept moment keeps that title, after more renames and a year', async () => {
+    const { deps, clock } = setup()
+    const t = clock.now()
+    const book = newPiece(deps, 'book', 'en')
+    const chapter = book.sections[0]!.sectionId
+    await write(deps, book, chapter, 'The boats came in.')
+    await renameSection(deps, book, chapter, 'Untitled yet')
+    await takeMoment(deps, book.id)
+
+    clock.set(t + HOUR)
+    await renameSection(deps, book, chapter, 'The harbour')
+    await takeMoment(deps, book.id, { kept: true })
+
+    for (const [i, title] of ['The quay', 'The pier', 'The lighthouse'].entries()) {
+      clock.set(t + (i + 2) * HOUR)
+      await renameSection(deps, book, chapter, title)
+      await takeMoment(deps, book.id)
+    }
+    clock.set(t + 60 * DAY)
+    await renameSection(deps, book, chapter, 'Home')
+    await takeMoment(deps, book.id)
+
+    clock.set(NOW)
+    expect(await thin(deps)).toBeGreaterThan(0)
+    expect(await titlesAtKept(deps, book.id, chapter)).toEqual(['The harbour'])
+  })
+})
 
 describe('thinning the store', () => {
   it('thins a section written over a year, keeps the text, and is safe to run twice', async () => {
