@@ -472,3 +472,13 @@ test('left on an earlier day, the journal still opens on today, from the library
   await page.reload()
   await expect(page.locator('.title')).toHaveText('Friday 30 October')
 })
+
+test('the Time Machine opens a day with its page where it stood, beside the rail', async ({ page }) => {
+  desktopOnly(page)
+  await openJournal(page)
+  const before = (await page.locator('.pager').boundingBox())!
+  await page.getByRole('button', { name: 'Time Machine' }).click()
+  const pager = page.locator('.time-machine .pager')
+  await expect(pager).toBeVisible()
+  await expect.poll(async () => (await pager.boundingBox())!.x).toBeCloseTo(before.x, 1)
+})
