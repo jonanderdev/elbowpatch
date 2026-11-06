@@ -14,14 +14,14 @@ function BackToNow({ onBack }: { onBack(): void }): ReactElement {
 }
 
 /** The bar's two actions. They show from here on; what they do comes with their own tickets. */
-function Actions({ kind }: { kind: Kind }): ReactElement {
+function Actions({ kind, onKeepCopy }: { kind: Kind; onKeepCopy?(): void }): ReactElement {
   return (
     <div className="moment-actions">
       <button type="button" className="moment-action leading">
         {BRING_BACK[kind]}
       </button>
       <span className="bar-separator" />
-      <button type="button" className="moment-action">
+      <button type="button" className="moment-action" onClick={onKeepCopy}>
         Keep a copy
       </button>
     </div>
@@ -29,12 +29,24 @@ function Actions({ kind }: { kind: Kind }): ReactElement {
 }
 
 /** The moment bar with moments: the moment named, the tape under it (passed in), then the actions. */
-export function MomentsBar({ kind, name, tape, onBack }: { kind: Kind; name: string; tape: ReactNode; onBack(): void }): ReactElement {
+export function MomentsBar({
+  kind,
+  name,
+  tape,
+  onKeepCopy,
+  onBack,
+}: {
+  kind: Kind
+  name: string
+  tape: ReactNode
+  onKeepCopy(): void
+  onBack(): void
+}): ReactElement {
   return (
     <div className="moment-bar surface">
       <p className="moment-name">{name}</p>
       {tape}
-      <Actions kind={kind} />
+      <Actions kind={kind} onKeepCopy={onKeepCopy} />
       <BackToNow onBack={onBack} />
     </div>
   )
