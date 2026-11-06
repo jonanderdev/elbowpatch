@@ -4,7 +4,10 @@ import { caretToEnd, saved } from './helpers'
 // Friday 30 October 2026: fixed, so the month and its days are the ones drawn.
 const NOW = new Date(2026, 9, 30, 10, 0)
 
-const LONG = Array.from({ length: 40 }, (_, i) => `Paragraph ${i} of a long day, with enough words in it to fill a good part of a line or two on the page.`).join('\n\n')
+const LONG = Array.from(
+  { length: 40 },
+  (_, i) => `Paragraph ${i} of a long day, with enough words in it to fill a good part of a line or two on the page.`,
+).join('\n\n')
 
 /** Written days, by date. */
 const DAYS: Record<string, string> = {
@@ -37,7 +40,13 @@ async function openJournal(page: Page, days: Record<string, string> = DAYS): Pro
     words: Object.fromEntries(sections.map((s) => [s.sectionId, count(days[s.title]!)])),
     outlineId: null,
   }
-  const working = sections.map((s) => ({ sectionId: s.sectionId, pieceId: piece.id, content: days[s.title]!, baseVersionId: null, updatedAt: NOW.getTime() - 1000 }))
+  const working = sections.map((s) => ({
+    sectionId: s.sectionId,
+    pieceId: piece.id,
+    content: days[s.title]!,
+    baseVersionId: null,
+    updatedAt: NOW.getTime() - 1000,
+  }))
   await page.evaluate(
     ({ piece, working }) =>
       new Promise<void>((done) => {
@@ -197,7 +206,9 @@ test('the rail lists the days under their months, Today first, the open day tint
 test('a day chosen in the rail opens, takes the tint, and its month is the one counted', async ({ page }) => {
   desktopOnly(page)
   await openJournal(page)
-  await rail(page).getByRole('button', { name: /^Saturday 12 September/ }).click()
+  await rail(page)
+    .getByRole('button', { name: /^Saturday 12 September/ })
+    .click()
   await expect(page.locator('.title')).toHaveText('Saturday 12 September')
   await expect(rail(page).locator('[aria-current="true"]')).toContainText('Saturday 12')
   await expect(rail(page).locator('.rail-line')).toHaveText('4 days · 1 in September')
@@ -206,7 +217,9 @@ test('a day chosen in the rail opens, takes the tint, and its month is the one c
 test('a day from another year says its year, in the count and over the rail’s month', async ({ page }) => {
   desktopOnly(page)
   await openJournal(page, { '2025-12-24': 'An old day.' })
-  await rail(page).getByRole('button', { name: /^Wednesday 24 December/ }).click()
+  await rail(page)
+    .getByRole('button', { name: /^Wednesday 24 December/ })
+    .click()
   await expect(page.locator('.head-tools .count')).toContainText('24 Dec 2025')
   await expect(rail(page).locator('.days-month-name')).toHaveText(['October', 'December 2025'])
 })

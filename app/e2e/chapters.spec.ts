@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-import { caretToEnd, saved, write } from './helpers'
+import { caretToEnd, saved } from './helpers'
 
 // Contents: a sheet on a phone (#55), the rail on desktop (#57).
 const onDesktop = (page: Page) => page.viewportSize()!.width >= 700
