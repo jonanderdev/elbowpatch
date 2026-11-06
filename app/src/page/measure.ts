@@ -17,6 +17,12 @@ export async function fontsFor(chapter: ChapterToLayOut): Promise<void> {
   await Promise.all(FACES.map((face) => document.fonts.load(face, text))).catch(() => {})
 }
 
+/** Whether the faces a chapter's text needs are loaded: if so it can be laid out now, with no wait. */
+export function fontsReady(chapter: ChapterToLayOut): boolean {
+  const text = `${chapter.title} ${chapter.content}`
+  return FACES.every((face) => document.fonts.check(face, text))
+}
+
 /**
  * A chapter's pages on this screen's page at the text settings, laid out as the page lays it out: the same
  * elements, styles and pager, without an editor (0003). Built, read and taken away in one task, so it is

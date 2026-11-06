@@ -130,6 +130,88 @@ test('a chapter added since is not there at an earlier moment, and is there at n
   await expect(oldText(page)).toHaveText('Third.')
 })
 
+test('the tape is the chapter on screen’s own, and the time it stands at goes with a turn', async ({ page }) => {
+  await importBook(page, '# One\n\nFirst chapter.\n\n# Two\n\nSecond.\n')
+  await keepMoment(page)
+  await typeAtEnd(page, ' Then more.')
+  await typeAtEnd(page, ' And more.')
+  await open(page)
+  await expect(tape(page)).toBeVisible()
+  const moments = Number(await tape(page).getAttribute('aria-valuemax'))
+  expect(moments).toBeGreaterThan(0)
+  await expect(tape(page)).toHaveAttribute('aria-valuenow', String(moments - 1))
+
+  // The second chapter has one moment: a tape of its own, standing on it.
+  await page.keyboard.press('PageDown')
+  await page.keyboard.press('PageDown')
+  await expect(machine(page).locator('.title')).toHaveText('Two')
+  await expect(tape(page)).toHaveAttribute('aria-valuemax', '0')
+  await expect(tape(page)).toHaveAttribute('aria-valuenow', '0')
+  await tape(page).focus()
+  await page.keyboard.press('ArrowLeft')
+  await expect(tape(page)).toHaveAttribute('aria-valuenow', '0')
+
+  // Back in the first, the tape is the first's again, and steps along its own moments.
+  await page.keyboard.press('PageUp')
+  await expect(machine(page).locator('.title')).toHaveText('One')
+  await expect(tape(page)).toHaveAttribute('aria-valuemax', String(moments))
+  await tape(page).focus()
+  await page.keyboard.press('Home')
+  await expect(tape(page)).toHaveAttribute('aria-valuenow', '0')
+  await expect(oldText(page)).toHaveText('First chapter.')
+})
+
+/** Counts the pages the Time Machine lays out out of sight to count a chapter, and the times a number in Contents stands empty. */
+async function watchNumbers(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const w = { layouts: 0, empty: 0 }
+    ;(window as unknown as { __numbers: typeof w }).__numbers = w
+    new MutationObserver((list) => {
+      for (const r of list)
+        for (const n of r.addedNodes) if (n instanceof HTMLElement && n.classList.contains('page-screen') && n.style.visibility === 'hidden') w.layouts++
+    }).observe(document.getElementById('app')!, { childList: true })
+    const look = (): void => {
+      const rows = document.querySelectorAll('.time-machine .contents-row .contents-page')
+      for (const row of rows) if (!/^\d+$/.test(row.textContent?.trim() ?? '')) w.empty++
+      requestAnimationFrame(look)
+    }
+    look()
+  })
+}
+const numbers = (page: Page) => page.evaluate(() => (window as unknown as { __numbers: { layouts: number; empty: number } }).__numbers)
+
+test('stepping the tape lays out only the chapter whose words changed, and no number goes empty', async ({ page }) => {
+  test.skip(!onDesktop(page), 'the rail is open beside the page on desktop')
+  const long = (n: string) =>
+    Array.from({ length: 30 }, (_, i) => `Paragraph ${i} of chapter ${n}, which runs on past its opening page, and then some more.`).join('\n\n')
+  await importBook(page, `# One\n\n${long('one')}\n\n# Two\n\n${long('two')}\n\n# Three\n\n${long('three')}\n`)
+  await keepMoment(page)
+  for (const words of [' Then more.', ' And more.', ' And still more.']) {
+    await typeAtEnd(page, words)
+    await keepMoment(page)
+  }
+  await open(page)
+  await expect(tape(page)).toBeVisible()
+  expect(Number(await tape(page).getAttribute('aria-valuemax'))).toBeGreaterThanOrEqual(3)
+  await openMachineContents(page)
+  // Every chapter counted once the rail has been looked at for a while.
+  await expect(rowsOf(page).nth(2).locator('.contents-page')).toHaveText(/^\d+$/)
+  const before = await Promise.all([0, 1, 2].map((i) => rowsOf(page).nth(i).locator('.contents-page').textContent()))
+  await watchNumbers(page)
+  await tape(page).focus()
+  // Back to the oldest moment, then forward to now: each is a text the first chapter has not been counted at.
+  for (const key of ['ArrowLeft', 'ArrowLeft', 'ArrowLeft', 'ArrowRight', 'ArrowRight', 'ArrowRight']) {
+    await page.keyboard.press(key)
+    await page.waitForTimeout(250)
+  }
+  const seen = await numbers(page)
+  // Only the first chapter's words changed between these moments: it is laid out when a text is new to it, never the others,
+  // and the numbers after it, which rest on its count, are never taken away to be counted again.
+  expect(seen.empty).toBe(0)
+  expect(seen.layouts).toBeLessThanOrEqual(3)
+  expect(await Promise.all([0, 1, 2].map((i) => rowsOf(page).nth(i).locator('.contents-page').textContent()))).toEqual(before)
+})
+
 // Contents as it was, and the title page (#90).
 const closeSheet = async (page: Page): Promise<void> => {
   if (onDesktop(page)) return

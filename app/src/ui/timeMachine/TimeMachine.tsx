@@ -174,6 +174,7 @@ export function TimeMachine({ deps, looking, onBringBack, onKeepCopy, leaving = 
       stands,
       phone ? 'phone' : 'desktop',
       book && asItWas && (phone ? sheet.open : rail.open),
+      asItWas ? { sectionId, content } : undefined,
     ) ?? today.contents
 
   usePageTurns({
