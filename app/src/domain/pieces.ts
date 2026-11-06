@@ -142,6 +142,8 @@ export function bookPages(piece: Piece, screen: Screen): number | undefined {
 /** A line of Contents. Its start page is unknown while a chapter before it has not been laid out on this screen's page. */
 export interface ContentsChapter extends OutlineSection {
   startPage?: number
+  /** Contents as it was: the chapter is not in the book now. */
+  removed?: boolean
 }
 
 /** The open chapter as it stands on the page, newer than what is stored. */

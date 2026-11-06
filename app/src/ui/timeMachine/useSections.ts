@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { type Listing, listingOf, type Moment, momentsOf, sectionBeyond, sectionsAt } from '../../domain/lookBack'
+import { type Listing, listingOf, type Moment, momentsOf, type Shape, sectionBeyond, shapeAt } from '../../domain/lookBack'
 import type { Deps } from '../../domain/pieces'
 
 export type MomentsRead = { state: 'loading' } | { state: 'error' } | { state: 'read'; moments: Moment[] }
@@ -12,6 +12,8 @@ export interface Sections {
   /** A section could not be read when it was reached: the one on screen is as it was, and `again` tries it once more. */
   failed: boolean
   again(): void
+  /** The piece's outline at that time: its title page and its sections, which are what Contents lists. None until it is read. */
+  shape(at: number | undefined): Shape | undefined
   /** The section a turn past this one's end reaches at that time, or none. */
   beyond(dir: 1 | -1, at: number | undefined): string | undefined
   /**
@@ -100,8 +102,12 @@ export function useSections(deps: Pick<Deps, 'store'>, pieceId: string, first: s
     setTries((n) => n + 1)
   }, [failed, reach])
 
-  const beyond = (dir: 1 | -1, at: number | undefined): string | undefined =>
-    listing.current && at !== undefined ? sectionBeyond(sectionsAt(listing.current, at), sectionId, dir) : undefined
+  // The listing is in hand once the first section is read, and stays: it is small, and fixed while the Time Machine is open.
+  const shape = (at: number | undefined): Shape | undefined => (listing.current && at !== undefined ? shapeAt(listing.current, at) : undefined)
+  const beyond = (dir: 1 | -1, at: number | undefined): string | undefined => {
+    const found = shape(at)
+    return found && sectionBeyond(found.sections, sectionId, dir)
+  }
 
-  return { sectionId, read, failed, again, beyond, reach }
+  return { sectionId, read, failed, again, shape, beyond, reach }
 }

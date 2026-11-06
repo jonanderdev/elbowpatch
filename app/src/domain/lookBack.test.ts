@@ -388,7 +388,7 @@ describe('a section read at a time', () => {
 
   it('is nowhere with no moment at all', () => {
     expect(readingAt([], 5, 'Listed')).toEqual({ index: -1, content: '', title: 'Listed' })
-    expect(readingAt(moments, undefined, 'Listed').index).toBe(0)
+    expect(readingAt(moments, undefined, 'Listed').index).toBe(-1)
   })
 })
 

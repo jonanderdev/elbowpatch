@@ -1,15 +1,21 @@
 import { type ReactElement, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { momentToOpen, timeOf } from '../../domain/lookBack'
+import { momentToOpen, readingAt, timeOf } from '../../domain/lookBack'
 import type { Piece } from '../../domain/model'
-import type { Deps } from '../../domain/pieces'
-import { momentName, momentShort, pageLine } from '../../domain/words'
+import type { ContentsChapter, Deps } from '../../domain/pieces'
+import { dayTitle, momentName, momentShort, pageLine } from '../../domain/words'
 import { type Crumb, Path } from '../components/Path'
+import { usePhone } from '../components/usePhone'
 import { useScrolled } from '../components/useScrolled'
+import { ContentsRail, ContentsSheet, RailToggle, RunningHeadControl } from '../page/Contents'
 import { usePager } from '../page/usePager'
 import { usePageTurns } from '../page/usePageTurns'
+import { useRail } from '../page/useRail'
 import { useSettings } from '../stores/settings'
 import { ErrorBar, LoadingBar, MomentsBar, NothingEarlierBar } from './MomentBar'
+import { OldTitlePage } from './OldTitlePage'
 import { EmptyTape, Tape } from './Tape'
+import { useContentsAsItWas } from './useContentsAsItWas'
+import { useContentsSheet } from './useContentsSheet'
 import { useReader } from './useReader'
 import { useSections } from './useSections'
 
@@ -20,6 +26,10 @@ export interface Today {
   title: string
   /** A book's or journal's name. */
   name: string
+  /** A book's subtitle. */
+  subtitle?: string
+  /** A book's Contents as the page showed it: what stands in the rail and the sheet until moments are read. */
+  contents?: { chapters: ContentsChapter[]; pages?: number }
 }
 
 /** Where the Time Machine stands: a section of a piece, from a page that was open on it. */
@@ -41,6 +51,8 @@ interface Props {
 }
 
 const NOTHING = (): void => {}
+/** The past is read-only: no chapter can be removed from it. */
+const NONE: ReadonlySet<string> = new Set()
 
 /**
  * The Time Machine (DESIGN.md): a section as it was at one moment, on a shorter page above the moment bar.
@@ -59,19 +71,32 @@ export function TimeMachine({ deps, looking, onBack, onHome }: Props): ReactElem
   /** The announcement a turn into another section was said over, which says which section. */
   const [crossedOver, setCrossedOver] = useState<string | undefined>(undefined)
   /** Which page a section reached by a turn opens on: its first going on, its last coming back. */
-  const arrive = useRef<'first' | 'last' | undefined>(undefined)
+  const arrive = useRef<'first' | 'last' | 'opening' | undefined>(undefined)
   const settings = useSettings()
+  const phone = usePhone()
+  const book = piece.kind === 'book'
+  const rail = useRail()
+  const sheet = useContentsSheet()
   const now = deps.clock.now()
 
   const moments = read.state === 'read' ? read.moments : []
   const stands = chosen ?? momentToOpen(moments)?.at
-  const found = stands === undefined ? -1 : moments.findLastIndex((m) => m.at <= stands)
-  // A section reached by a turn was listed at this time, so it has a moment; its first is the most it can lack.
-  const index = opened ? found : Math.max(0, found)
+  /** The piece's outline at that time: the title page's words and the chapters Contents lists. */
+  const shape = sections.shape(stands)
+  const here = shape?.sections.find((s) => s.sectionId === sectionId)?.title ?? ''
+  // A section reached by a turn was listed at this time: with no moment yet it reads as empty.
+  const reading = readingAt(moments, stands, piece.kind === 'essay' ? (shape?.title ?? '') : piece.kind === 'journal' ? dayTitle(here) : here)
+  const index = reading.index
   const moment = moments[index]
   const nothing = opened && read.state === 'read' && !moment
-  const content = moment?.content ?? (opened ? today.content : '')
-  const title = moment?.title ?? (opened ? today.title : '')
+  const content = moment ? reading.content : opened ? today.content : ''
+  const title = moment ? reading.title : opened ? today.title : ''
+  /** Standing at a moment, so what stands beside the page is of that moment, not today's. */
+  const asItWas = !!moment && !!shape
+  const sectionList = shape?.sections
+  const titlePage = book && (asItWas ? sectionList?.[0]?.sectionId === sectionId : piece.sections[0]?.sectionId === sectionId)
+  const bookName = asItWas ? shape.title : today.name
+  const subtitle = (asItWas ? shape.subtitle : today.subtitle) ?? ''
 
   const screen = useRef<HTMLDivElement>(null)
   const viewport = useRef<HTMLDivElement>(null)
@@ -91,7 +116,7 @@ export function TimeMachine({ deps, looking, onBack, onHome }: Props): ReactElem
     settings,
     keyboard: false,
     short: !nothing,
-    onRelayout: NOTHING,
+    onRelayout: (p) => rail.laidOut(p.g.side),
     say: (at, total) => pageLine(at + 1, total) || 'Page turned',
   })
   // A turn past the section's end reaches the one next to it as it was at this time, and stays at this time.
@@ -104,6 +129,32 @@ export function TimeMachine({ deps, looking, onBack, onHome }: Props): ReactElem
       setCrossedOver(announcement)
     })
   }
+
+  // A chapter chosen in Contents opens at its opening page, at the same time.
+  function openChapter(to: string): void {
+    sheet.close()
+    rail.letGo()
+    if (stands === undefined) return
+    if (to === sectionId) {
+      pager?.turnTo(titlePage ? 1 : 0)
+      return
+    }
+    sections.reach(to, () => {
+      arrive.current = 'opening'
+      setChosen(stands)
+      setCrossedOver(announcement)
+    })
+  }
+
+  const list =
+    useContentsAsItWas(
+      deps,
+      piece,
+      book && asItWas ? sectionList : undefined,
+      stands,
+      phone ? 'phone' : 'desktop',
+      book && asItWas && (phone ? sheet.open : rail.open),
+    ) ?? today.contents
 
   usePageTurns({
     screen,
@@ -121,11 +172,17 @@ export function TimeMachine({ deps, looking, onBack, onHome }: Props): ReactElem
   // Before paint, so the words of one moment never stand on the pages of another.
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new title's height moves the page breaks too, and a section reached opens on its own page even when its words read the same.
   useLayoutEffect(() => {
+    // Reaching a section is no page turn, and says its title instead: the page it lands on is not announced.
+    const arriving = arrive.current
+    if (pager && arriving) pager.opening = true
     reader?.show(content)
     pager?.measure()
-    if (pager && arrive.current) pager.turnTo(arrive.current === 'last' ? pager.count - 1 : 0)
+    if (pager && arriving) {
+      pager.turnTo(arriving === 'last' ? pager.count - 1 : arriving === 'opening' && titlePage ? 1 : 0)
+      pager.opening = false
+    }
     arrive.current = undefined
-  }, [reader, pager, content, title, sectionId])
+  }, [reader, pager, content, title, sectionId, titlePage])
 
   // Read when a key comes; re-attached on each render, an Escape could reach the listener from before it.
   const back = useRef(onBack)
@@ -159,6 +216,7 @@ export function TimeMachine({ deps, looking, onBack, onHome }: Props): ReactElem
   }
 
   const scrolled = useScrolled()
+  const railToggle = useRef<HTMLButtonElement>(null)
   const word = (piece.kind === 'essay' ? title : today.name).trim() || 'Untitled'
   const crumbs: Crumb[] = moment ? [{ word, onClick: onBack }, { word: momentShort(moment.at, now) }] : [{ word, onClick: onBack }]
   const heading = title.trim() || 'Untitled'
@@ -174,19 +232,59 @@ export function TimeMachine({ deps, looking, onBack, onHome }: Props): ReactElem
       <div className="head" data-scrolled={scrolled || undefined}>
         <div className="head-path">
           <Path crumbs={crumbs} onHome={onHome} />
+          {book && !phone ? <RailToggle open={rail.open} onToggle={rail.toggle} buttonRef={railToggle} /> : null}
         </div>
-        {/* As on the writing page, an essay's first page has none: its title stands there. A book's and a journal's keep theirs. */}
-        {piece.kind !== 'essay' || page > 0 ? <div className="running-head">{heading}</div> : null}
+        {/* In the head, so the toggle's next stop is what it opens. As on the page, the rail never offers to add or remove. */}
+        {book && !phone && list ? (
+          <ContentsRail
+            chapters={list.chapters}
+            {...(list.pages !== undefined && { pages: list.pages })}
+            current={sectionId}
+            removable={NONE}
+            still={!asItWas}
+            open={rail.open}
+            onOpen={openChapter}
+            onRemove={NOTHING}
+            onLeave={() => {
+              rail.letGo()
+              railToggle.current?.focus()
+            }}
+          />
+        ) : null}
+        {/* As on the writing page, an essay's first page has none: its title stands there, and it is no control. A book's
+            and a journal's keep theirs on every page. On a phone a book's opens Contents as it was; the book's name stands
+            there while the title page and the chapter's opening page carry the chapter's own. */}
+        {book && phone ? (
+          <RunningHeadControl title={page <= (titlePage ? 1 : 0) ? bookName : heading} label="Contents" open={sheet.open} onOpen={sheet.toggle} />
+        ) : piece.kind !== 'essay' || page > 0 ? (
+          <div className="running-head">{heading}</div>
+        ) : null}
       </div>
 
       <div ref={viewport} className="pager">
-        <div ref={flow} className="flow" lang={piece.lang}>
-          <h1 className="title" data-placeholder="Untitled" data-empty={title === '' || undefined}>
+        <div ref={flow} className="flow" lang={piece.lang} data-title-page={titlePage || undefined}>
+          {titlePage ? <OldTitlePage name={bookName} subtitle={subtitle} /> : null}
+          <h1 className={titlePage ? 'title chapter-opening' : 'title'} data-placeholder="Untitled" data-empty={title === '' || undefined}>
             {title}
           </h1>
           <div ref={mount} />
         </div>
       </div>
+
+      {book && phone && sheet.open && list ? (
+        <ContentsSheet
+          chapters={list.chapters}
+          {...(list.pages !== undefined && { pages: list.pages })}
+          name={bookName}
+          current={sectionId}
+          removable={NONE}
+          still={!asItWas}
+          takeFocus={sheet.byKey}
+          onOpen={openChapter}
+          onRemove={NOTHING}
+          onDone={sheet.close}
+        />
+      ) : null}
 
       {read.state === 'error' || sections.failed ? (
         <ErrorBar line="Can’t read your moments right now. Your words are still here." onAgain={again} onBack={onBack} />

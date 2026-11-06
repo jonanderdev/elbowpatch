@@ -156,10 +156,11 @@ export interface Reading {
 /**
  * A section at a time: the latest of its moments at or before it. A section the piece listed then with
  * no moment yet reads as empty, under the title it was listed with; the tape stands on its first moment,
- * the nearest it has.
+ * the nearest it has. With no time to stand at, there is nothing to read.
  */
 export function readingAt(moments: Moment[], at: number | undefined, listedTitle: string): Reading {
-  const found = at === undefined ? -1 : moments.findLastIndex((m) => m.at <= at)
+  if (at === undefined) return { index: -1, content: '', title: listedTitle }
+  const found = moments.findLastIndex((m) => m.at <= at)
   const moment = moments[found]
   if (moment) return { index: found, content: moment.content, title: moment.title }
   return { index: moments.length > 0 ? 0 : -1, content: '', title: listedTitle }
