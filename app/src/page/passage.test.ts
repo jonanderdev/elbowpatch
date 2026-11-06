@@ -2,7 +2,8 @@ import { history, undo } from 'prosemirror-history'
 import { EditorState, TextSelection } from 'prosemirror-state'
 import { describe, expect, it } from 'vitest'
 import { parse, serialize } from '../domain/markdown'
-import { bringPassage, paragraphFound, passageOf } from './passage'
+import { bringPassage, passageOf } from './passage'
+import { paragraphOf } from './place'
 import { schema, toBlocks, toDoc } from './schema'
 
 const doc = (markdown: string) => toDoc(parse(markdown))
@@ -60,24 +61,29 @@ describe('finding the paragraph that came before', () => {
   const snippet = { paragraph: 1, snippet: 'The second paragraph begins here and goes on.' }
 
   it('finds it where it was', () => {
-    expect(paragraphFound(doc('One.\n\nThe second paragraph begins here and goes on.\n\nThree.'), snippet)).toBe(1)
+    expect(paragraphOf(doc('One.\n\nThe second paragraph begins here and goes on.\n\nThree.'), snippet.paragraph, snippet.snippet)).toBe(1)
   })
 
   it('finds it after paragraphs were added and removed around it', () => {
-    expect(paragraphFound(doc('New.\n\nNew too.\n\nAnother.\n\nThe second paragraph begins here and goes on, longer now.'), snippet)).toBe(3)
+    expect(
+      paragraphOf(doc('New.\n\nNew too.\n\nAnother.\n\nThe second paragraph begins here and goes on, longer now.'), snippet.paragraph, snippet.snippet),
+    ).toBe(3)
   })
 
   it('says it is gone when its words are', () => {
-    expect(paragraphFound(doc('One.\n\nSomething else entirely.'), snippet)).toBeUndefined()
+    expect(paragraphOf(doc('One.\n\nSomething else entirely.'), snippet.paragraph, snippet.snippet)).toBeUndefined()
   })
 
-  it('takes the one nearest its old place among paragraphs that begin alike', () => {
-    const same = { paragraph: 4, snippet: 'Yes.' }
-    expect(paragraphFound(doc('Yes.\n\nA.\n\nB.\n\nC.\n\nYes.\n\nD.'), same)).toBe(4)
+  it('keeps the one at its old place among paragraphs that begin alike, as a reading place does', () => {
+    expect(paragraphOf(doc('Yes.\n\nA.\n\nB.\n\nC.\n\nYes.\n\nD.'), 4, 'Yes.')).toBe(4)
+  })
+
+  it('takes the first that begins alike when none is at its old place, as a reading place does', () => {
+    expect(paragraphOf(doc('A.\n\nYes.\n\nB.\n\nYes.'), 5, 'Yes.')).toBe(1)
   })
 
   it('cannot tell a paragraph with no words, and says it is gone', () => {
-    expect(paragraphFound(doc('One.\n\nTwo.'), { paragraph: 0, snippet: '' })).toBeUndefined()
+    expect(paragraphOf(doc('One.\n\nTwo.'), 0, '')).toBeUndefined()
   })
 })
 

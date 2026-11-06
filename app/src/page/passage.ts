@@ -7,6 +7,7 @@ import type { Node } from 'prosemirror-model'
 import { type EditorState, Selection, TextSelection, type Transaction } from 'prosemirror-state'
 import { parse } from '../domain/markdown'
 import { asMarkdown } from './editor'
+import { paragraphOf } from './place'
 import { toDoc } from './schema'
 
 /** The paragraph before the passage, as a reading place holds a paragraph: where it was, and its opening words. */
@@ -22,9 +23,7 @@ export interface Passage {
   after: Anchor | null
 }
 
-/** How much of a paragraph's opening finds it again. */
-const KEY = 40
-/** How much of it is kept to find it by. */
+/** How much of a paragraph is kept to find it by. */
 const SNIPPET = 160
 
 /** The words between `from` and `to` of old text, or null when they hold none. */
@@ -37,22 +36,6 @@ export function passageOf(doc: Node, from: number, to: number): Passage | null {
 }
 
 /**
- * Where the paragraph is in the text now: by its opening words, and among paragraphs that begin alike the one
- * nearest where it was. Unlike restorePlace, which falls back to the same index, it can say the paragraph is
- * gone, which is undefined.
- */
-export function paragraphFound(doc: Node, anchor: Anchor): number | undefined {
-  const key = anchor.snippet.slice(0, KEY)
-  if (!key) return undefined
-  let found: number | undefined
-  doc.forEach((node, _offset, i) => {
-    if (!node.textContent.startsWith(key)) return
-    if (found === undefined || Math.abs(i - anchor.paragraph) < Math.abs(found - anchor.paragraph)) found = i
-  })
-  return found
-}
-
-/**
  * The passage in the text, as paragraphs of its own that replace and merge nothing, and left selected. One
  * transaction, closed off from the typing before it, so one undo takes it away. Null when it holds no words.
  */
@@ -60,7 +43,7 @@ export function bringPassage(state: EditorState, passage: Passage): Transaction 
   const blocks = toDoc(parse(passage.markdown)).content
   if (!blocks.textBetween(0, blocks.size, ' ').trim()) return null
   const doc = state.doc
-  const found = passage.after ? paragraphFound(doc, passage.after) : undefined
+  const found = passage.after ? paragraphOf(doc, passage.after.paragraph, passage.after.snippet) : undefined
   let from: number
   if (!passage.after) from = 0
   else if (found === undefined) from = doc.content.size

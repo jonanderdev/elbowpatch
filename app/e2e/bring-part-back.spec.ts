@@ -249,3 +249,47 @@ for (const kind of ['book', 'journal'] as const) {
     await saved(page, 'a lost sentence here.')
   })
 }
+
+test('words kept for an unsaved journal day are not written over what is brought back', async ({ page }) => {
+  await changed(page, 'Alpha one.\nBeta has a lost sentence here. And more.', 'Alpha one.\nBeta has And more.', 'journal')
+  // The day's words, newer than what is stored, left in the unsaved journal as a failed save leaves them.
+  await page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((done) => {
+      const open = indexedDB.open('elbowpatch')
+      open.onsuccess = () => done(open.result)
+    })
+    const all = <T>(store: string) =>
+      new Promise<T[]>((done) => {
+        const request = database.transaction(store).objectStore(store).getAll()
+        request.onsuccess = () => done(request.result as T[])
+      })
+    const [working] = await all<{ sectionId: string; pieceId: string }>('working')
+    const [piece] = (await all<{ id: string }>('pieces')).filter((p) => p.id === working!.pieceId)
+    localStorage.setItem(
+      `elbowpatch.unsaved.${working!.sectionId}`,
+      JSON.stringify({
+        piece,
+        pieceId: working!.pieceId,
+        sectionId: working!.sectionId,
+        name: 'Day.md',
+        markdown: 'Alpha one.\n\nBeta has And more.\n\nKept, not stored.',
+        title: null,
+        at: Date.now() + 1000,
+      }),
+    )
+  })
+  await page.reload()
+  await expect.poll(() => paragraphs(page)).toEqual(['Alpha one.', 'Beta has And more.', 'Kept, not stored.'])
+  // The words it opened on are the stored day; the one before has the sentence.
+  await open(page)
+  await machine(page).getByRole('slider').press('Home')
+  await expect(oldText(page)).toContainText('a lost sentence here.')
+  await select(page, 'a lost sentence here.')
+  await menu(page).getByRole('button', { name: 'Bring part back' }).click()
+  await expect(machine(page)).toHaveCount(0)
+  await expect.poll(() => paragraphs(page)).toEqual(['Alpha one.', 'a lost sentence here.', 'Beta has And more.', 'Kept, not stored.'])
+  await saved(page, 'a lost sentence here.')
+  await page.reload()
+  await expect.poll(() => paragraphs(page)).toEqual(['Alpha one.', 'a lost sentence here.', 'Beta has And more.', 'Kept, not stored.'])
+  expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('elbowpatch.unsaved.')))).toEqual([])
+})
