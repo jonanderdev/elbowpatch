@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { momentFull, momentName, momentShort, tapeLabel } from './words'
+import { momentFull, momentName, momentPhrase, momentShort, tapeLabel } from './words'
 
 // Local time throughout, so these read the same in any time zone. Friday 6 November 2026.
 const at = (month: number, day: number, hour = 0, minute = 0, year = 2026): number => new Date(year, month - 1, day, hour, minute).getTime()
@@ -136,5 +136,21 @@ describe('a label on the tape', () => {
     expect(tapeLabel(at(12, 25, 12, 0), newYear)).toBe('Dec')
     expect(tapeLabel(at(1, 1, 9, 0, 2027), at(1, 9, 10, 0, 2027))).toBe('1 Jan')
     expect(tapeLabel(at(12, 31, 12, 0), at(1, 9, 10, 0, 2027))).toBe('Dec')
+  })
+})
+
+describe('a moment inside a sentence', () => {
+  it('lowercases the relative words', () => {
+    expect(momentPhrase(NOW - 5_000, NOW)).toBe('just now')
+    expect(momentPhrase(NOW - 12 * 60_000, NOW)).toBe('12 minutes ago')
+    expect(momentPhrase(at(11, 6, 9, 5), NOW)).toBe('this morning, 9:05')
+    expect(momentPhrase(at(11, 5, 21, 10), NOW)).toBe('yesterday evening, 21:10')
+    expect(momentPhrase(at(11, 6, 0, 0), NOW)).toBe('last night, 0:00')
+  })
+
+  it('keeps weekdays and dates as they are', () => {
+    expect(momentPhrase(at(11, 1, 21, 10), NOW)).toBe('Sunday evening')
+    expect(momentPhrase(at(10, 14), NOW)).toBe('14 October')
+    expect(momentPhrase(at(10, 14, 12, 0, 2025), NOW)).toBe('14 October 2025')
   })
 })

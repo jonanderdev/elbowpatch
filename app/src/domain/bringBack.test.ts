@@ -101,10 +101,16 @@ describe('bringing a section back', () => {
   it('stamps the marked moment and the old text later than anything before, after the clock jumped back', async () => {
     const s = setup(10 * DAY)
     const { piece, sectionId } = await essay(s, ['one', 'two'])
+    const before = (await s.store.transaction((tx) => tx.working(sectionId)))!.updatedAt
     s.clock.set(DAY)
     const result = await bringBack(s.deps, piece.id, await moment(s, piece, sectionId, 'one'))
     expect(result.changed).toBe(true)
     const versions = await versionsOf(s, sectionId)
+    // The working copy is stamped later than it was and than the version written: words kept before stay overtaken (ruling 8).
+    const working = (await s.store.transaction((tx) => tx.working(sectionId)))!
+    expect(working.updatedAt).toBeGreaterThan(before)
+    expect(working.updatedAt).toBeGreaterThanOrEqual(versions.at(-1)!.createdAt)
+    expect(result.updatedAt).toBe(working.updatedAt)
     const stamps = versions.map((v) => v.createdAt)
     expect(stamps).toEqual([...stamps].sort((a, b) => a - b))
     expect(new Set(stamps).size).toBe(stamps.length)

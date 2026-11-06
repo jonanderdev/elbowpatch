@@ -158,7 +158,8 @@ export function bringBack(deps: Deps, pieceId: string, request: BringBack): Prom
     await momentIn(tx, deps, pieceId, { beforeBringBack: sectionId })
     const piece = (await tx.piece(pieceId))!
     const working = (await tx.working(sectionId))!
-    const stamp = deps.clock.now()
+    // Never earlier than what the working copy was stamped: a journal entry overtaken by it must stay overtaken (ruling 8).
+    const stamp = Math.max(deps.clock.now(), now.updatedAt + 1)
     await tx.putWorking({ ...working, content, updatedAt: stamp })
     const place: Piece['place'] =
       piece.place?.sectionId === sectionId
@@ -173,6 +174,10 @@ export function bringBack(deps: Deps, pieceId: string, request: BringBack): Prom
     })
     // The old text as a version of its own, stamped later than the marked one by the same rule.
     await momentIn(tx, deps, pieceId)
-    return { piece: (await tx.piece(pieceId))!, sectionId, content, updatedAt: stamp, changed: true }
+    // The version was stamped by the moment rule, which can be later than the clock: the working copy is never earlier than it.
+    const version = latest(await tx.versionsOf(sectionId))
+    const updatedAt = Math.max(stamp, version?.createdAt ?? 0)
+    if (updatedAt !== stamp) await tx.putWorking({ ...(await tx.working(sectionId))!, updatedAt })
+    return { piece: (await tx.piece(pieceId))!, sectionId, content, updatedAt, changed: true }
   })
 }
