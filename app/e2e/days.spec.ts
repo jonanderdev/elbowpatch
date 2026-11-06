@@ -134,12 +134,53 @@ test('a written day opens with one tap, at its opening page, and the sheet goes'
   await expect(sheet(page)).toHaveCount(0)
 })
 
-test('days still to come and days with nothing written cannot be opened; today can', async ({ page }) => {
+test('a past day with nothing written opens, and is stored only by its first words, in date order', async ({ page }) => {
+  phoneOnly(page)
+  await openJournal(page)
+  await openMonth(page)
+  await day(page, '4 October, nothing written').click()
+  await expect(page.locator('.title')).toHaveText('Sunday 4 October')
+  // Looked at and left: it never joins.
+  await page.keyboard.press('PageDown')
+  await expect(page.locator('.title')).toHaveText('Thursday 22 October')
+  await expect.poll(() => storedDays(page)).toEqual(Object.keys(DAYS))
+
+  await openMonth(page)
+  await day(page, '4 October, nothing written').click()
+  await expect(page.locator('.title')).toHaveText('Sunday 4 October')
+  await caretToEnd(page)
+  await page.keyboard.insertText('Written late.')
+  await saved(page, 'Written late.')
+  await expect.poll(() => storedDays(page)).toEqual(['2026-09-12', '2026-10-04', '2026-10-22', '2026-10-26', '2026-10-29'])
+  await page.keyboard.press('PageUp')
+  await expect(page.locator('.title')).toHaveText('Saturday 12 September')
+  await page.keyboard.press('PageDown')
+  await expect(page.locator('.title')).toHaveText('Sunday 4 October')
+  await expect(page.locator('.body')).toHaveText('Written late.')
+})
+
+test('in a journal with nothing stored, a past day opens and keeps its first words', async ({ page }) => {
+  phoneOnly(page)
+  await page.clock.setFixedTime(NOW)
+  await page.goto('./')
+  await page.locator('.start.journal').click()
+  await expect(page.locator('.book-title')).toBeFocused()
+  await expect(page.locator('.body')).toHaveAttribute('contenteditable', 'true')
+  await openMonth(page)
+  await day(page, '4 October, nothing written').click()
+  await expect(page.locator('.title')).toHaveText('Sunday 4 October')
+  await expect(page.locator('.body')).toHaveAttribute('contenteditable', 'true')
+  await caretToEnd(page)
+  await page.keyboard.insertText('The first words.')
+  await saved(page, 'The first words.')
+  await expect.poll(() => storedDays(page)).toEqual(['2026-10-04'])
+})
+
+test('days still to come cannot be opened; today can', async ({ page }) => {
   phoneOnly(page)
   await openJournal(page)
   await openMonth(page)
   await expect(day(page, '31 October, still to come')).toBeDisabled()
-  await expect(day(page, '4 October, nothing written')).toBeDisabled()
   await day(page, '29 October, written').click()
   await expect(page.locator('.title')).toHaveText('Thursday 29 October')
   await openMonth(page)
@@ -177,6 +218,12 @@ test('from a day’s second page the running head names the day and drops the mo
   expect((await sheet(page).boundingBox())!.y).toBe(56)
   await sheet(page).getByRole('button', { name: 'Done' }).click()
   await expect(sheet(page)).toHaveCount(0)
+
+  // Under the head whatever else is open: it stands by what opened it.
+  await page.locator('.page-button').click()
+  await head.click()
+  await expect(sheet(page)).toBeVisible()
+  expect((await sheet(page).boundingBox())!.y).toBe(56)
 })
 
 test('the month reaches every day by keyboard, and Escape gives the focus back', async ({ page, browserName }) => {

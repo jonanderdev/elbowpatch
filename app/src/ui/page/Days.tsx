@@ -93,7 +93,7 @@ export function DaysSheet({ days, current, today, last, from, takeFocus, onOpen,
         )}
       </div>
       <div className="month-foot">
-        <span>{monthLine(days, month, today)}</span>
+        <span>{monthLine(days, month)}</span>
         <button type="button" className="text-link" onClick={onDone}>
           Done
         </button>
@@ -151,13 +151,13 @@ export function DaysRail({ days, current, today, open, onOpen, onLeave }: DaysRa
         onLeave()
       }}
     >
-      <p className="rail-line">{daysLine(days, current, today)}</p>
+      <p className="rail-line">{daysLine(days, current)}</p>
       {/* One list scrolls, whatever the months: the current day is brought into view in it. */}
       <div className="contents-list">
         {monthsOf(days).map((group) => {
           const name = group.month.startsWith(`${year}-`) ? monthName(group.month) : monthTitle(group.month)
           return (
-            <section key={group.month} className="days-month" aria-label={name}>
+            <section key={group.month} className="days-month">
               <h2 className="days-month-name">{name}</h2>
               <ol className="days-list">
                 {group.days.map((day) => (

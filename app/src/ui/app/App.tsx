@@ -36,6 +36,8 @@ import { useWriterLock } from './useWriterLock'
 
 /** Counts the sections read from storage, so each reading opens a new page. */
 let reads = 0
+/** A journal's day not stored yet is asked for by its date. */
+const DATE = /^\d{4}-\d{2}-\d{2}$/
 /** The least time the launch screen shows, from its first frame, in ms. */
 const MIN_LAUNCH = 1000
 
@@ -69,7 +71,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
       let piece = found.piece
       let sectionId: string
       if (piece.kind === 'journal') {
-        const day = piece.sections.find((s) => s.sectionId === wanted)?.title ?? isoDay(new Date())
+        const day = piece.sections.find((s) => s.sectionId === wanted)?.title ?? (wanted && DATE.test(wanted) ? wanted : isoDay(new Date()))
         ;({ piece, sectionId } = withDay(deps, piece, day))
       } else {
         const sections = piece.sections
@@ -169,7 +171,9 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
     const next = await open(draft.id, sectionId).catch(() => undefined)
     if (going.current === where) going.current = ''
     if (next === undefined || turn !== chosen.current) return
-    const there = next ?? { piece: neverStored(draft), sectionId, content: '', readAt: ++reads }
+    // Nothing stored yet: a journal's day joins an empty draft, by its date; a book keeps its first chapter.
+    const unstored = draft.kind === 'journal' ? withDay(deps, { ...draft, sections: [] }, sectionId) : { piece: neverStored(draft), sectionId }
+    const there = next ?? { ...unstored, content: '', readAt: ++reads }
     setOpened({ ...there, at, writing })
   }
 

@@ -74,16 +74,16 @@ describe('the count lines', () => {
   ]
 
   it('says the journal’s written days and the month’s, leaving out a today not begun', () => {
-    expect(daysLine(days, '2026-10-26', TODAY)).toBe('3 days · 2 in October')
+    expect(daysLine(days, '2026-10-26')).toBe('3 days · 2 in October')
   })
 
   it('counts today once it has words', () => {
     const begun = [{ iso: TODAY, sectionId: 't', words: 5 }, ...days.slice(1)]
-    expect(daysLine(begun, TODAY, TODAY)).toBe('4 days · 3 in October')
+    expect(daysLine(begun, TODAY)).toBe('4 days · 3 in October')
   })
 
-  it('counts every day it is given when no today is named', () => {
-    expect(daysLine(days.slice(1), '2026-09-12')).toBe('3 days · 1 in September')
+  it('leaves out a past day open but not begun', () => {
+    expect(daysLine([...days, { iso: '2026-10-04', sectionId: 'd', words: 0 }], '2026-10-26')).toBe('3 days · 2 in October')
   })
 
   it('writes a thousand as the app does, and one day as one', () => {
@@ -93,9 +93,9 @@ describe('the count lines', () => {
   })
 
   it('says how many days of a month are written', () => {
-    expect(monthLine(days, '2026-10', TODAY)).toBe('2 days written in October')
-    expect(monthLine(days, '2026-09', TODAY)).toBe('1 day written in September')
-    expect(monthLine(days, '2026-08', TODAY)).toBe('No days written in August')
+    expect(monthLine(days, '2026-10')).toBe('2 days written in October')
+    expect(monthLine(days, '2026-09')).toBe('1 day written in September')
+    expect(monthLine(days, '2026-08')).toBe('No days written in August')
   })
 })
 
@@ -149,11 +149,24 @@ describe('monthCells', () => {
     expect(cell(october, 28)?.state).toBe('future')
   })
 
-  it('holds the day that opens: a written one, a today not begun, and nothing else', () => {
+  it('holds the day that opens: a written one, a today not begun, a past day not written, and none to come', () => {
     expect(cell(october, 26)?.opens?.sectionId).toBe('a')
     expect(cell(october, 27)?.opens).toEqual({ iso: '2026-10-27', words: 0 })
-    expect(cell(october, 4)?.opens).toBeUndefined()
+    expect(cell(october, 4)?.opens).toEqual({ iso: '2026-10-04', words: 0 })
     expect(cell(october, 28)?.opens).toBeUndefined()
+  })
+
+  it('opens only what was there when no today is named', () => {
+    const asItWas = monthCells('2026-10', days.slice(1), { last: '2026-10-26' })
+    expect(cell(asItWas, 26)?.opens?.sectionId).toBe('a')
+    expect(cell(asItWas, 4)?.state).toBe('empty')
+    expect(cell(asItWas, 4)?.opens).toBeUndefined()
+  })
+
+  it('shows a day emptied since as empty, and still opens it: its moments are there', () => {
+    const emptied = monthCells('2026-10', [{ iso: '2026-10-05', sectionId: 'e', words: 0 }], { last: '2026-10-27' })
+    expect(cell(emptied, 5)?.state).toBe('empty')
+    expect(cell(emptied, 5)?.opens?.sectionId).toBe('e')
   })
 
   it('marks nothing as today when none is named, and days after the last recede', () => {

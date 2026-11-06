@@ -131,6 +131,8 @@ export function Page({
   const [sheet, setSheet] = useState<'text' | 'export' | 'contents' | null>(null)
   /** Contents was opened by keyboard, so it takes the focus. */
   const [contentsFocus, setContentsFocus] = useState(false)
+  /** Where Days was opened from, which is where it stands. */
+  const [daysFrom, setDaysFrom] = useState<'head' | 'tools'>('head')
   const [line, setLine] = useState<string | null>(null)
   const [words, setWords] = useState(() => countWords(content))
   const [blank, setBlank] = useState(() => !content.trim())
@@ -407,6 +409,7 @@ export function Page({
     }
     opener.current = from
     setContentsFocus(document.activeElement === from)
+    setDaysFrom(from.closest('.tools') ? 'tools' : 'head')
     setAnchor(undefined)
     setSheet('contents')
     live.reread()
@@ -752,7 +755,7 @@ export function Page({
           current={dayOpen}
           today={today}
           last={today}
-          from={tools ? 'tools' : 'head'}
+          from={daysFrom}
           takeFocus={contentsFocus}
           onOpen={(day) => openChapter(dayId(day))}
           onDone={closeSheet}

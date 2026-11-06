@@ -32,8 +32,8 @@ export function dayBeyond(days: Day[], iso: string, dir: 1 | -1): Day | undefine
   return here < 0 ? undefined : days[here - dir]
 }
 
-/** Everything but a today with nothing in it. */
-const written = (days: Day[], today?: string): Day[] => days.filter((d) => d.iso !== today || d.words > 0)
+/** A day open but not begun is listed, and is not written yet. */
+const written = (days: Day[]): Day[] => days.filter((d) => d.words > 0)
 
 /** A month: "2026-10". */
 export const monthOf = (iso: string): string => iso.slice(0, 7)
@@ -41,15 +41,15 @@ export const monthOf = (iso: string): string => iso.slice(0, 7)
 const daysWord = (n: number): string => `${number(n)} ${n === 1 ? 'day' : 'days'}`
 
 /** The rail's line, "214 days · 19 in October": the month is the one of the day on the page. */
-export function daysLine(days: Day[], current: string, today?: string): string {
-  const all = written(days, today)
+export function daysLine(days: Day[], current: string): string {
+  const all = written(days)
   const month = monthOf(current)
   return `${daysWord(all.length)} · ${number(all.filter((d) => monthOf(d.iso) === month).length)} in ${monthName(month)}`
 }
 
 /** The month sheet's line: "19 days written in October". */
-export function monthLine(days: Day[], month: string, today?: string): string {
-  const n = written(days, today).filter((d) => monthOf(d.iso) === month).length
+export function monthLine(days: Day[], month: string): string {
+  const n = written(days).filter((d) => monthOf(d.iso) === month).length
   return `${n === 0 ? 'No days' : daysWord(n)} written in ${monthName(month)}`
 }
 
@@ -86,9 +86,10 @@ export interface MonthCell {
 const SAID: Record<DayState, string> = { written: 'written', empty: 'nothing written', today: 'today', future: 'still to come' }
 
 /**
- * A month as a grid, Monday first, with a blank for each weekday before the 1st. With no `today`,
- * nothing is marked as one. Days after `last` recede, but a day written never does: nothing written
- * is out of reach.
+ * A month as a grid, Monday first, with a blank for each weekday before the 1st. Days after `last`
+ * recede, but a day stored never does: nothing written is out of reach. With a `today`, a past day with
+ * nothing in it opens to be written, and is stored by its first words as today is. With none, the
+ * journal is as it was: nothing is marked as today, and only what was there opens.
  */
 export function monthCells(month: string, days: Day[], { today, last }: { today?: string; last: string }): (MonthCell | null)[] {
   const [y, m] = month.split('-').map(Number) as [number, number]
@@ -97,9 +98,10 @@ export function monthCells(month: string, days: Day[], { today, last }: { today?
   const length = new Date(y, m, 0).getDate()
   for (let day = 1; day <= length; day++) {
     const iso = `${month}-${String(day).padStart(2, '0')}`
-    const opens = byDate.get(iso)
-    const state: DayState = iso === today ? 'today' : opens ? 'written' : iso > last ? 'future' : 'empty'
-    const said = state === 'today' && opens?.words ? 'today, written' : SAID[state]
+    const found = byDate.get(iso)
+    const state: DayState = iso === today ? 'today' : found?.words ? 'written' : !found && iso > last ? 'future' : 'empty'
+    const opens = found ?? (today && state === 'empty' ? { iso, words: 0 } : undefined)
+    const said = state === 'today' && found?.words ? 'today, written' : SAID[state]
     cells.push({ day, state, label: `${dayAndMonth(iso)}, ${said}`, ...(opens ? { opens } : {}) })
   }
   return cells
