@@ -5,6 +5,7 @@
 import type { RefObject } from 'react'
 import type { Piece } from '../../domain/model'
 import { dayTitle } from '../../domain/words'
+import type { Passage } from '../../page/passage'
 import { type Unsaved, unsaved } from '../stores/unsaved'
 import { type FieldHistory, fieldHistory } from './fieldHistory'
 
@@ -30,6 +31,15 @@ export interface Opened {
   at?: OpenAt
   /** The writer was in the text when they went there: the caret goes with them. */
   writing?: boolean
+  /** Words brought back from the Time Machine: the page puts them in once, as its own paragraph, whenever this changes. */
+  bringing?: Bringing
+}
+
+/** A passage brought back from a moment of the section. */
+export interface Bringing {
+  passage: Passage
+  /** The moment it was read at, in the middle of a sentence ("yesterday evening, 21:10"). */
+  from: string
 }
 
 export interface TitleFields {

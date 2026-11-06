@@ -142,7 +142,7 @@ export interface Reader {
  * Text to read and not change, through the editor's own schema, so it looks exactly like the page. It
  * has none of the editor's plugins: no caret, no history, and night dims nothing here.
  */
-export function createReader(mount: HTMLElement, content: string, lang: string): Reader {
+export function createReader(mount: HTMLElement, content: string, lang: string, onSelection?: (view: EditorView) => void): Reader {
   const stateOf = (markdown: string): EditorState => EditorState.create({ doc: toDoc(parse(markdown)) })
   const view = new EditorView(
     { mount },
@@ -151,9 +151,21 @@ export function createReader(mount: HTMLElement, content: string, lang: string):
       editable: () => false,
       attributes: { class: 'body', lang, 'aria-label': 'Text' },
       clipboardTextSerializer: asMarkdown,
+      // The words selected can be brought back or copied: the screen follows the selection.
+      dispatchTransaction(tr) {
+        view.updateState(view.state.apply(tr))
+        if (tr.selectionSet || tr.docChanged) onSelection?.(view)
+      },
     },
   )
-  return { view, show: (markdown) => view.updateState(stateOf(markdown)), destroy: () => view.destroy() }
+  return {
+    view,
+    show(markdown) {
+      view.updateState(stateOf(markdown))
+      onSelection?.(view)
+    },
+    destroy: () => view.destroy(),
+  }
 }
 
 function markActive(state: EditorState, type: MarkType): boolean {
@@ -295,11 +307,11 @@ function nightFocus(): Plugin {
 /**
  * Where a selection is on the page in view, for the selection menu: only the words shown count, as the rest
  * of a selection across pages stands a screen's width away. Null for a caret, while not writing, or when none
- * of the selection is on this page.
+ * of the selection is on this page. Old text being read has no focus to need: `reading` asks for its selection.
  */
-export function selectionBox(view: EditorView, viewport: HTMLElement | null): DOMRect | null {
+export function selectionBox(view: EditorView, viewport: HTMLElement | null, reading = false): DOMRect | null {
   const { from, to, empty } = view.state.selection
-  if (empty || !viewport || !view.hasFocus()) return null
+  if (empty || !viewport || !(reading || view.hasFocus())) return null
   const page = viewport.getBoundingClientRect()
   const start = view.domAtPos(from)
   const end = view.domAtPos(to)

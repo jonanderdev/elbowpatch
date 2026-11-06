@@ -23,10 +23,11 @@ import type { Today } from '../timeMachine/TimeMachine'
 import { ContentsRail, ContentsSheet, NewChapter, RailToggle, RunningHeadControl } from './Contents'
 import { DaysRail, DaysSheet } from './Days'
 import { fillTitleFields, keptFor, type OpenAt, type Opened, type TitleRefs } from './fields'
-import { PageFoot, StatusLine } from './PageFoot'
+import { CalmLine, PageFoot, StatusLine } from './PageFoot'
 import { SectionTitle, TitlePage } from './Titles'
 import { HeadTools, TextSettings } from './Tools'
 import { isTimeMachineKey } from './timeMachineKey'
+import { useBringPart } from './useBringPart'
 import { useCaretFollowing, useCaretKeys } from './useCaret'
 import { useChapterStart } from './useChapterStart'
 import { useEditor } from './useEditor'
@@ -135,6 +136,8 @@ export function Page({
   /** Where Days was opened from, which is where it stands. */
   const [daysFrom, setDaysFrom] = useState<'head' | 'tools'>('head')
   const [line, setLine] = useState<string | null>(null)
+  /** What was just done, said quietly at the foot (Brought back from Sunday evening.). */
+  const [calm, setCalm] = useState<string | null>(null)
   const [words, setWords] = useState(() => countWords(content))
   const [blank, setBlank] = useState(() => !content.trim())
   const today = isoDay(new Date(deps.clock.now()))
@@ -466,6 +469,22 @@ export function Page({
     return () => window.removeEventListener('keydown', onKey)
   }, [covered])
 
+  // Words brought back from the Time Machine go in as soon as the page shows, after the focus above has gone back.
+  useBringPart({
+    editor,
+    pager,
+    bringing: opened.bringing,
+    covered,
+    writer,
+    onBrought(from) {
+      moved.current = true
+      backFromLooking.current = null
+      const text = `Brought back from ${from}.`
+      setCalm(text)
+      setSaid({ text, over: announcement })
+    },
+  })
+
   // A chapter chosen in Contents opens at its opening page.
   function openChapter(chosen: string): void {
     if (!editor || !pager) return
@@ -582,6 +601,12 @@ export function Page({
     const t = setTimeout(() => setLine(null), 4000)
     return () => clearTimeout(t)
   }, [line])
+
+  useEffect(() => {
+    if (!calm) return
+    const t = setTimeout(() => setCalm(null), 4000)
+    return () => clearTimeout(t)
+  }, [calm])
 
   async function exportMarkdown(): Promise<string | undefined> {
     if (!editor) return undefined
@@ -796,6 +821,7 @@ export function Page({
 
       {/* shortcut: Save a copy holds the unsaved section only, not the whole piece. */}
       <StatusLine writer={writer} failed={failed} line={line} onWriteHere={onWriteHere} onSaveCopy={() => void exportMarkdown()} />
+      <CalmLine text={calm} />
 
       <div className="visually-hidden" aria-live="polite">
         {said?.over === announcement ? said.text : announcement}

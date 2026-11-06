@@ -2,15 +2,18 @@ import { type ReactElement, useEffect, useLayoutEffect, useRef, useState } from 
 import { momentToOpen } from '../../domain/lookBack'
 import type { Piece } from '../../domain/model'
 import type { Deps } from '../../domain/pieces'
-import { momentName, momentShort, pageLine } from '../../domain/words'
+import { momentInSentence, momentName, momentShort, pageLine } from '../../domain/words'
+import type { Passage } from '../../page/passage'
 import { type Crumb, Path } from '../components/Path'
 import { useScrolled } from '../components/useScrolled'
 import { usePager } from '../page/usePager'
 import { usePageTurns } from '../page/usePageTurns'
 import { useSettings } from '../stores/settings'
 import { ErrorBar, LoadingBar, MomentsBar, NothingEarlierBar } from './MomentBar'
+import { Part } from './PartMenu'
 import { EmptyTape, Tape } from './Tape'
 import { useMoments } from './useMoments'
+import { usePart } from './usePart'
 import { useReader } from './useReader'
 
 /** What the page held as the Time Machine opened: it stays on screen until moments are read, and if they cannot be. */
@@ -31,11 +34,21 @@ export interface Looking {
   ready: Promise<unknown>
 }
 
+/** A passage chosen to bring back, and the section it was read in. */
+export interface PartBack {
+  sectionId: string
+  passage: Passage
+  /** The moment it was read at, in the middle of a sentence ("yesterday evening, 21:10"). */
+  from: string
+}
+
 interface Props {
   deps: Pick<Deps, 'store' | 'clock'>
   looking: Looking
   /** Back to now, at the same place. */
   onBack(): void
+  /** The writer brings a selected passage back: the app closes onto the page and puts it in. */
+  onBringPart(part: PartBack): void
   /** § goes home, from here too. */
   onHome(): void
 }
@@ -47,7 +60,7 @@ const NOTHING = (): void => {}
  * The Time Machine (DESIGN.md): a section as it was at one moment, on a shorter page above the moment bar.
  * It stands over the page, which stays as it was left. It writes nothing: no text, no place, no page counts.
  */
-export function TimeMachine({ deps, looking, onBack, onHome }: Props): ReactElement {
+export function TimeMachine({ deps, looking, onBack, onBringPart, onHome }: Props): ReactElement {
   const { piece, sectionId, today, ready } = looking
   const { read, again } = useMoments(deps, piece.id, sectionId, ready)
   /** The time it stands at, once the writer has moved: it opens on the most recent moment that differs from now. */
@@ -73,7 +86,8 @@ export function TimeMachine({ deps, looking, onBack, onHome }: Props): ReactElem
   const noBookTitle = useRef<HTMLHeadingElement>(null)
 
   // Before the pager, so its first layout already has the text.
-  const reader = useReader(mount, today.content, piece.lang)
+  const selected = usePart(viewport)
+  const reader = useReader(mount, today.content, piece.lang, selected.follow)
   const { pager, page, announcement } = usePager({
     screen,
     viewport,
@@ -98,6 +112,11 @@ export function TimeMachine({ deps, looking, onBack, onHome }: Props): ReactElem
     beyond: NEVER,
     onCross: NOTHING,
   })
+
+  // A turn of the page moves the selected words, and the part menu with them.
+  const { look } = selected
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the page turning is the reason to look again.
+  useEffect(look, [page, look])
 
   // Before paint, so the words of one moment never stand on the pages of another.
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new title's height moves the page breaks too.
@@ -180,6 +199,13 @@ export function TimeMachine({ deps, looking, onBack, onHome }: Props): ReactElem
       ) : (
         <NothingEarlierBar onBack={onBack} />
       )}
+
+      {/* Today's text, while moments load or when there are none, is not a past to bring from; and a chapter no longer in the piece has no text to go back into. Copy stays. */}
+      <Part
+        part={selected.part}
+        canBring={!!moment && piece.sections.some((s) => s.sectionId === sectionId)}
+        onBring={(passage) => moment && onBringPart({ sectionId, passage, from: momentInSentence(moment.at, now) })}
+      />
 
       <div className="visually-hidden" aria-live="polite">
         {said}

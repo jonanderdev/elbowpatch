@@ -880,6 +880,26 @@ button.count[aria-expanded='true'] {
   text-underline-offset: 3px;
   flex: none;
 }
+/* The calm line (DESIGN.md): what was just done, in secondary with no surface, where the folio stands. The folio gives way. */
+.calm-line {
+  position: fixed;
+  left: var(--side);
+  bottom: calc(var(--rise) + (var(--foot) - 44px) / 2 + 13px);
+  max-width: calc(100% - var(--side) - var(--edge) - 56px);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--secondary);
+  z-index: 3;
+}
+.page-screen:has(.calm-line) .folio {
+  visibility: hidden;
+}
+@media (min-width: 700px) {
+  .calm-line {
+    bottom: 36px;
+    max-width: var(--measure-px);
+  }
+}
 
 /* ——— Sheets ——— */
 
@@ -2636,6 +2656,34 @@ button.count[aria-expanded='true'] {
 }
 .time-machine .title {
   cursor: text;
+}
+/* The bar over selected old words: two words to press, in the selection menu's frame. */
+.bar.part-menu {
+  position: fixed;
+  z-index: 4;
+  gap: 0;
+  padding: 0 4px;
+}
+.part-menu .bar-separator {
+  margin: 0 6px;
+}
+.part-action {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 18px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--title);
+  white-space: nowrap;
+  transition: background-color 160ms;
+}
+.part-action:active {
+  background: var(--pressed);
+}
+@media (hover: hover) {
+  .part-action:hover {
+    background: var(--pressed);
+  }
 }
 /* Fixed to the window: in a window smaller than the page the bar stays on screen, in every state, ✕ included, and
    the page scrolls under it. The page ends above it, so scrolled to its end no text stands under the bar. */

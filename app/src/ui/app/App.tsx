@@ -27,7 +27,7 @@ import { raiseKeyboard } from '../page/useFocusOnOpen'
 import { waiting } from '../settings/PutAway'
 import { type Area, Settings } from '../settings/Settings'
 import { readLast, writeLast } from '../stores/last'
-import { TimeMachine } from '../timeMachine/TimeMachine'
+import { type PartBack, TimeMachine } from '../timeMachine/TimeMachine'
 import { askToPersist } from './persist'
 import { replayJournal } from './replay'
 import { settled } from './settled'
@@ -180,6 +180,25 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
     setOpened({ ...there, at, writing })
   }
 
+  // A passage brought back from the Time Machine: the Time Machine closes onto the page, and the page puts it in.
+  // The page that has the section already has it in at once; another section opens first, saved as any is.
+  const bringPart = ({ sectionId, passage, from }: PartBack): void => {
+    const bringing = { passage, from }
+    timeMachine.leave(() => {
+      if (!opened) return
+      if (opened.sectionId === sectionId) {
+        setOpened((now) => now && { ...now, bringing })
+        return
+      }
+      const turn = ++chosen.current
+      void (async () => {
+        await saveFirst()
+        const next = await open(opened.piece.id, sectionId).catch(() => undefined)
+        if (next && turn === chosen.current) setOpened({ ...next, bringing })
+      })()
+    })
+  }
+
   // A new chapter at the end of the book or right after a chapter, read from what is stored once the
   // section left is saved. It is not stored yet: it joins the piece with its first words or title, so one
   // left empty is gone.
@@ -285,7 +304,13 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
         />
       )}
       {timeMachine.looking && (
-        <TimeMachine deps={deps} looking={timeMachine.looking} onBack={() => timeMachine.leave()} onHome={() => timeMachine.leave(() => void toLibrary())} />
+        <TimeMachine
+          deps={deps}
+          looking={timeMachine.looking}
+          onBack={() => timeMachine.leave()}
+          onBringPart={bringPart}
+          onHome={() => timeMachine.leave(() => void toLibrary())}
+        />
       )}
       {/* The page changed under a screen reader: it hears which chapter it is in. Here, for a live region
           must stand before its words do, and the page is new for each chapter. */}

@@ -91,6 +91,18 @@ export function PageFoot({
   )
 }
 
+/**
+ * What was just done, said at the foot for a few seconds (DESIGN.md, Calm line): in secondary, with no surface and
+ * no action. It stands where the folio does, which gives way. Heard through the page's own live region.
+ */
+export function CalmLine({ text }: { text: string | null }): ReactElement | null {
+  return text ? (
+    <div className="calm-line" aria-hidden="true">
+      {text}
+    </div>
+  ) : null
+}
+
 interface StatusLineProps {
   writer: 'waiting' | 'here' | 'elsewhere'
   failed: boolean
