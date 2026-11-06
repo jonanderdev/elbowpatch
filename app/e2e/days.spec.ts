@@ -21,6 +21,9 @@ const phone = (page: Page): boolean => page.viewportSize()!.width < 700
 const phoneOnly = (page: Page): void => test.skip(!phone(page), 'the month sheet is a phone’s')
 const desktopOnly = (page: Page): void => test.skip(phone(page), 'the rail is desktop’s')
 
+/** On macOS, WebKit's Tab skips buttons unless Option is held, as Safari's does. */
+const tab = (browserName: string): string => (browserName === 'webkit' ? 'Alt+Tab' : 'Tab')
+
 const count = (text: string): number => text.split(/\s+/).filter(Boolean).length
 
 /** Stores a journal with these days, as earlier sessions left it, and opens it. */
@@ -176,14 +179,14 @@ test('from a day’s second page the running head names the day and drops the mo
   await expect(sheet(page)).toHaveCount(0)
 })
 
-test('the month reaches every day by keyboard, and Escape gives the focus back', async ({ page }) => {
+test('the month reaches every day by keyboard, and Escape gives the focus back', async ({ page, browserName }) => {
   phoneOnly(page)
   await openJournal(page)
   await page.locator('.page-button').click()
   await page.locator('.tools button.count').focus()
   await page.keyboard.press('Enter')
   await expect(day(page, '30 October, today')).toBeFocused()
-  await page.keyboard.press('Shift+Tab')
+  await page.keyboard.press(`Shift+${tab(browserName)}`)
   await expect(day(page, '29 October, written')).toBeFocused()
   await page.keyboard.press('Escape')
   await expect(sheet(page)).toHaveCount(0)
@@ -224,15 +227,15 @@ test('a day from another year says its year, in the count and over the rail’s 
   await expect(rail(page).locator('.days-month-name')).toHaveText(['October', 'December 2025'])
 })
 
-test('the rail folds as a book’s does, and gives way to the keyboard', async ({ page }) => {
+test('the rail folds as a book’s does, and gives way to the keyboard', async ({ page, browserName }) => {
   desktopOnly(page)
   await openJournal(page)
   const toggle = page.locator('.head').getByRole('button', { name: 'Days', exact: true })
   await expect(toggle).toHaveAttribute('aria-expanded', 'true')
   await toggle.focus()
-  await page.keyboard.press('Tab')
+  await page.keyboard.press(tab(browserName))
   await expect(rail(page).locator('.contents-row').first()).toBeFocused()
-  await page.keyboard.press('Tab')
+  await page.keyboard.press(tab(browserName))
   await page.keyboard.press('Enter')
   await expect(page.locator('.title')).toHaveText('Thursday 29 October')
   await toggle.click()
@@ -282,8 +285,11 @@ test('turning back from the first day reaches the title page, and goes no furthe
   await openJournal(page, { '2026-10-28': 'First day.' })
   await page.keyboard.press('PageUp')
   await expect(page.locator('.title')).toHaveText('Wednesday 28 October')
-  await page.keyboard.press('PageUp')
-  await expect(page.locator('.book-title')).toBeInViewport()
+  // Again until it holds: the page settles once the fonts are in, and a turn in that instant is taken back.
+  await expect(async () => {
+    await page.keyboard.press('PageUp')
+    await expect(page.locator('.book-title')).toBeInViewport({ timeout: 300 })
+  }).toPass({ timeout: 5000 })
   await page.keyboard.press('PageUp')
   await expect(page.locator('.title')).toHaveText('Wednesday 28 October')
   await page.keyboard.press('PageDown')
