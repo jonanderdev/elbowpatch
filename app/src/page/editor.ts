@@ -76,7 +76,7 @@ export function createEditor(mount: HTMLElement, options: EditorOptions): Editor
       // Pasted plain text is read as Markdown, with the same rules as typing (0003).
       // Markdown outside the v1 marks, headings included, arrives as plain paragraphs.
       clipboardTextParser: (text) => new Slice(Fragment.from(toDoc(parse(text).map(plainIfRaw)).content), 0, 0),
-      clipboardTextSerializer: (slice) => serialize(toBlocks(schema.nodes.doc.create(null, slice.content.size ? slice.content : undefined))),
+      clipboardTextSerializer: asMarkdown,
       // The pager turns to the caret; nothing scrolls by itself.
       handleKeyDown: (v, e) => options.onKey?.(v, e) ?? false,
       handleScrollToSelection: (v) => {
@@ -120,6 +120,49 @@ export function createEditor(mount: HTMLElement, options: EditorOptions): Editor
     },
     hold(on) {
       held = on
+    },
+    destroy: () => view.destroy(),
+  }
+}
+
+/** Text copied from the page is Markdown. */
+export function asMarkdown(slice: Slice): string {
+  return serialize(toBlocks(schema.nodes.doc.create(null, slice.content.size ? slice.content : undefined)))
+}
+
+/** Old text on the page (DESIGN.md, The Time Machine). */
+export interface Reader {
+  view: EditorView
+  /** Shows this text in place of what it held. */
+  show(markdown: string): void
+  destroy(): void
+}
+
+/**
+ * Text to read and not change, through the editor's own schema, so it looks exactly like the page. It
+ * has none of the editor's plugins: no caret, no history, and night dims nothing here.
+ */
+export function createReader(mount: HTMLElement, content: string, lang: string, onSelection?: (view: EditorView) => void): Reader {
+  const stateOf = (markdown: string): EditorState => EditorState.create({ doc: toDoc(parse(markdown)) })
+  const view = new EditorView(
+    { mount },
+    {
+      state: stateOf(content),
+      editable: () => false,
+      attributes: { class: 'body', lang, 'aria-label': 'Text' },
+      clipboardTextSerializer: asMarkdown,
+      // The words selected can be brought back or copied: the screen follows the selection.
+      dispatchTransaction(tr) {
+        view.updateState(view.state.apply(tr))
+        if (tr.selectionSet || tr.docChanged) onSelection?.(view)
+      },
+    },
+  )
+  return {
+    view,
+    show(markdown) {
+      view.updateState(stateOf(markdown))
+      onSelection?.(view)
     },
     destroy: () => view.destroy(),
   }
@@ -264,11 +307,11 @@ function nightFocus(): Plugin {
 /**
  * Where a selection is on the page in view, for the selection menu: only the words shown count, as the rest
  * of a selection across pages stands a screen's width away. Null for a caret, while not writing, or when none
- * of the selection is on this page.
+ * of the selection is on this page. Old text being read has no focus to need: `reading` asks for its selection.
  */
-export function selectionBox(view: EditorView, viewport: HTMLElement | null): DOMRect | null {
+export function selectionBox(view: EditorView, viewport: HTMLElement | null, reading = false): DOMRect | null {
   const { from, to, empty } = view.state.selection
-  if (empty || !viewport || !view.hasFocus()) return null
+  if (empty || !viewport || !(reading || view.hasFocus())) return null
   const page = viewport.getBoundingClientRect()
   const start = view.domAtPos(from)
   const end = view.domAtPos(to)

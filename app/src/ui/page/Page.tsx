@@ -1,14 +1,15 @@
 import { TextSelection } from 'prosemirror-state'
 import { type CSSProperties, type ReactElement, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { type Day, dayBeyond, journalDays } from '../../domain/days'
 import { countWords } from '../../domain/markdown'
 import type { Piece } from '../../domain/model'
 import { type BookCount, bookCount, contents, type Deps, type Removed, removableChapters, savePages, withOpenSection } from '../../domain/pieces'
-import { pageLine } from '../../domain/words'
+import { dayShort, isoDay, pageLine } from '../../domain/words'
 import { scrollToCaret, showCaret, toOpeningPage } from '../../page/caret'
 import { type Editor, selectionBox } from '../../page/editor'
 import { screenOf } from '../../page/pager'
 import { placeOf } from '../../page/place'
-import { keepUndo, takeUndo } from '../../page/undoMemory'
+import { closeUndo, takeUndo } from '../../page/undoMemory'
 import { settled } from '../app/settled'
 import { ExportSheet } from '../components/ExportSheet'
 import { Path } from '../components/Path'
@@ -18,11 +19,15 @@ import { download } from '../files/download'
 import { markdownFile } from '../files/markdownFile'
 import { useSettings } from '../stores/settings'
 import { useUnsaved } from '../stores/unsaved'
+import type { Today } from '../timeMachine/TimeMachine'
 import { ContentsRail, ContentsSheet, NewChapter, RailToggle, RunningHeadControl } from './Contents'
+import { DaysRail, DaysSheet } from './Days'
 import { fillTitleFields, keptFor, type OpenAt, type Opened, type TitleRefs } from './fields'
 import { PageFoot, StatusLine } from './PageFoot'
 import { SectionTitle, TitlePage } from './Titles'
 import { HeadTools, TextSettings } from './Tools'
+import { isTimeMachineKey } from './timeMachineKey'
+import { useBringPart } from './useBringPart'
 import { useCaretFollowing, useCaretKeys } from './useCaret'
 import { useChapterStart } from './useChapterStart'
 import { useEditor } from './useEditor'
@@ -47,6 +52,8 @@ interface Props {
   onWriteHere(): void
   /** Lets the app ask the page to save now, before another window takes the piece. */
   flushRef: { current: (() => Promise<void>) | null }
+  /** Lets the app reshape the section the page holds, as a bring back does: stored first, the page sealed while it runs. */
+  reshapeRef: { current: ((change: (whole: string) => Promise<Piece | undefined>) => Promise<boolean>) | null }
   /** The closing pages' last saves, so the app lets go of the piece only after them. */
   closingRef: { current: Promise<void> }
   /** The library shows over the page; the page stays laid out behind it, inert. */
@@ -66,6 +73,8 @@ interface Props {
   onChapterRemoved(removed: Removed, writing: boolean): void
   /** The chapter before this one left the book, and this one is now the first: its page opens again, with the title page. */
   onReopen(piece: Piece, content: string): void
+  /** Opens the Time Machine on this section, from what the page holds now. */
+  onTimeMachine(today: Today): void
   onChange(piece: Piece): void
 }
 
@@ -88,6 +97,7 @@ export function Page({
   writer,
   onWriteHere,
   flushRef,
+  reshapeRef,
   closingRef,
   covered,
   counted,
@@ -98,6 +108,7 @@ export function Page({
   onChapterRejoined,
   onChapterRemoved,
   onReopen,
+  onTimeMachine,
   onChange,
 }: Props): ReactElement {
   const { piece, sectionId } = opened
@@ -115,18 +126,29 @@ export function Page({
   const keyboard = useKeyboard()
   const phone = usePhone()
   const book = piece.kind === 'book'
+  const journal = piece.kind === 'journal'
   const live = useOutline(deps, piece, sectionId, counted)
   const rail = useRail()
   const waiting = useUnsaved()
-  /** On a book's page, on desktop: Contents is the rail. Essays and journals have none yet. */
-  const railed = book && !phone
+  /** On a book's or a journal's page, on desktop: Contents or Days is the rail. */
+  const railed = (book || journal) && !phone
   const [tools, setTools] = useState(false)
   const [sheet, setSheet] = useState<'text' | 'export' | 'contents' | null>(null)
   /** Contents was opened by keyboard, so it takes the focus. */
   const [contentsFocus, setContentsFocus] = useState(false)
-  const [line, setLine] = useState<string | null>(null)
+  /** Where Days was opened from, which is where it stands. */
+  const [daysFrom, setDaysFrom] = useState<'head' | 'tools'>('head')
+  const [line, setLine] = useState<string | null>(opened.line ?? null)
+  /** The line said after a passage was brought back (Brought back from Sunday evening.): calm, as the line a page opens with is. */
+  const [brought, setBrought] = useState<string | null>(null)
+  /** Said at the foot when a passage could not come back because another window writes the piece now. */
+  const [refused, setRefused] = useState<string | null>(null)
   const [words, setWords] = useState(() => countWords(content))
   const [blank, setBlank] = useState(() => !content.trim())
+  const today = isoDay(new Date(deps.clock.now()))
+  const days = journal ? journalDays(live.outline, today, { sectionId, words }) : []
+  /** The day on the page, in a journal. */
+  const dayOpen = days.find((d) => d.sectionId === sectionId)?.iso ?? today
   const [heading, setHeading] = useState('')
   // A book's or a journal's name, as on its title page: the desktop path shows it while it is written.
   const [name, setName] = useState(piece.title)
@@ -157,6 +179,8 @@ export function Page({
   const scrolled = windowScrolled || (keyboard && pageScrolled)
   /** The head's control that opened the sheet: the focus goes back to it when the sheet closes. */
   const opener = useRef<HTMLElement | null>(null)
+  /** What held the focus when the Time Machine opened, if not the text. */
+  const backFromLooking = useRef<HTMLElement | null>(null)
   const titles: TitleRefs = {
     title: useRef<HTMLHeadingElement>(null),
     bookTitle: useRef<HTMLHeadingElement>(null),
@@ -193,6 +217,7 @@ export function Page({
     kind: piece.kind,
     settings,
     keyboard,
+    rail: book && !phone && !settings.railFolded,
     onRelayout: (p) => {
       rail.laidOut(p.g.side)
       const e = editorNow.current
@@ -224,6 +249,7 @@ export function Page({
     pages: () => (pager && laidOut && screen.current ? { screen: screenOf(screen.current.clientWidth), count: pager.count } : null),
     onStored: reported,
     flushRef,
+    reshapeRef,
     closingRef,
   })
 
@@ -261,7 +287,7 @@ export function Page({
     onUndoPast: () => undoPast(),
     onClose(state) {
       // A page split or rejoined holds text that is no longer the section's: its history goes with it.
-      if (!saving?.sealed()) keepUndo(sectionId, state)
+      closeUndo(sectionId, state, !!saving?.sealed())
     },
     onSelection(view, tr) {
       const e = editorNow.current
@@ -360,11 +386,12 @@ export function Page({
     if (railed && rail.open) live.reread()
   }, [railed, rail.open, live.reread])
 
-  // Closing the tools closes what was opened from them; the focus goes back to the page button.
+  // Closing the tools closes what was opened from them; the focus goes back to the page button, unless it is in the text:
+  // looked at again a frame later, as a sheet's is, so a caret there stays and the keyboard with it.
   const closeTools = useCallback((): void => {
     setSheet(null)
     setTools(false)
-    requestAnimationFrame(() => pageButton.current?.focus())
+    if (fromTools()) requestAnimationFrame(() => (fromTools() ? pageButton.current?.focus() : undefined))
   }, [])
 
   // A sheet from the phone's tools bar sits above it; one from the desktop head drops under the control
@@ -382,9 +409,9 @@ export function Page({
     setSheet(null)
     const back = opener.current
     opener.current = null
-    // Only from the sheet: the focus left in the text stays there, and the keyboard with it.
-    const active = document.activeElement
-    if (back && (!active || active === document.body || active.closest('.sheet'))) requestAnimationFrame(() => back.focus())
+    // Only from the sheet: the focus left in the text stays there, and the keyboard with it. Looked at again a
+    // frame later, when the sheet has gone: a caret put in the text since is kept, and no key typed there is lost.
+    if (back && fromSheet()) requestAnimationFrame(() => (fromSheet() ? back.focus() : undefined))
   }, [])
 
   // Contents drops under the head; pressed again, the running head closes it.
@@ -395,13 +422,21 @@ export function Page({
     }
     opener.current = from
     setContentsFocus(document.activeElement === from)
+    setDaysFrom(from.closest('.tools') ? 'tools' : 'head')
     setAnchor(undefined)
     setSheet('contents')
     live.reread()
   }
 
-  // The chapter before or after this one in the book as it stands now.
+  // A day not begun has no section yet: the app opens it by its date.
+  const dayId = (day: Day): string => day.sectionId ?? day.iso
+
+  // The chapter before or after this one in the book as it stands now, or the day in the journal.
   function chapterBeyond(dir: 1 | -1): string | undefined {
+    if (journal) {
+      const day = dayBeyond(days, dayOpen, dir)
+      return day && dayId(day)
+    }
     if (!book) return undefined
     const { sections } = live.outline
     const here = sections.findIndex((s) => s.sectionId === sectionId)
@@ -415,6 +450,59 @@ export function Page({
     if (keyboard) raiseKeyboard()
     onOpenSection(chosen, writing, at)
   }
+
+  // The Time Machine stands over the page, which stays as it is: only the tools fold, and the focus is
+  // remembered for the way back. In the text, the caret comes back by itself (useFocusOnOpen).
+  function lookBack(): void {
+    if (!editor) return
+    focus.leaving()
+    const active = document.activeElement as HTMLElement | null
+    if (!editor.view.hasFocus()) backFromLooking.current = active?.closest('.tools') ? pageButton.current : active
+    setTools(false)
+    setSheet(null)
+    const { chapters, pages } = listed(phone ? 'phone' : 'desktop')
+    onTimeMachine({
+      content: editor.markdown(),
+      title: titles.title.current?.textContent ?? '',
+      name,
+      subtitle: titles.subtitle.current?.textContent ?? '',
+      ...(book && { contents: { chapters, ...(pages !== undefined && { pages }) } }),
+    })
+  }
+  const lookBackNow = useRef(lookBack)
+  lookBackNow.current = lookBack
+  useEffect(() => {
+    if (covered) return
+    backFromLooking.current?.focus()
+    backFromLooking.current = null
+    const onKey = (e: KeyboardEvent): void => {
+      if (!isTimeMachineKey(e)) return
+      e.preventDefault()
+      lookBackNow.current()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [covered])
+
+  // Words brought back from the Time Machine go in as soon as the page shows, after the focus above has gone back.
+  useBringPart({
+    editor,
+    pager,
+    bringing: opened.bringing,
+    covered,
+    writer,
+    onBrought(from) {
+      moved.current = true
+      backFromLooking.current = null
+      const text = `Brought back from ${from}.`
+      setBrought(text)
+      setLine(text)
+      setSaid({ text, over: announcement })
+    },
+    onRefused() {
+      setRefused('Couldn’t bring that back just now. Nothing has changed.')
+    },
+  })
 
   // A chapter chosen in Contents opens at its opening page.
   function openChapter(chosen: string): void {
@@ -496,18 +584,28 @@ export function Page({
     })
   }
 
-  // Escape closes what is open, innermost first: a sheet, then the tools. One listener reads what
-  // is open now from a ref: re-attached on each change, an Escape pressed right after one (Done,
-  // then Escape) would reach the listener from before it.
-  const open = useRef({ tools, sheet, anchor })
-  open.current = { tools, sheet, anchor }
+  // Back to the library. Pressed, it leaves the caret where it is, so the place kept is the caret's.
+  const home = (): void => {
+    focus.leaving()
+    onLibrary()
+  }
+
+  // Escape closes what is open, innermost first: a sheet, then the tools. With nothing open, on desktop, it
+  // goes back to the library; a selection is something the writer is doing, and a held key is not a press.
+  // One listener reads what is open now from a ref: re-attached on each change, an Escape pressed right
+  // after one (Done, then Escape) would reach the listener from before it.
+  const selected = !!selection?.rect
+  const open = useRef({ tools, sheet, anchor, selected, phone, home })
+  open.current = { tools, sheet, anchor, selected, phone, home }
   useEffect(() => {
     if (covered) return
     const onKey = (e: KeyboardEvent): void => {
       if (e.key !== 'Escape') return
       if (open.current.sheet) closeSheet()
       else if (open.current.tools) closeTools()
-      else return
+      // Not by whether it was answered: the editor answers every Escape. The rail keeps its own.
+      else if (open.current.phone || open.current.selected || e.repeat || e.isComposing || (e.target as Element).closest('.rail')) return
+      else open.current.home()
       e.preventDefault()
     }
     window.addEventListener('keydown', onKey)
@@ -525,6 +623,16 @@ export function Page({
     window.addEventListener('pointerdown', onDown)
     return () => window.removeEventListener('pointerdown', onDown)
   }, [covered, closeSheet])
+
+  /** The line the page opened with, or one said after a passage was brought back, is calm: secondary, with no surface, and the folio stands aside for it. */
+  const calm = line !== null && (line === opened.line || line === brought) && writer !== 'elsewhere' && !failed
+
+  // What was said of a passage that did not come back stays a few seconds, as any line does.
+  useEffect(() => {
+    if (!refused) return
+    const t = setTimeout(() => setRefused(null), 8000)
+    return () => clearTimeout(t)
+  }, [refused])
 
   // A calm line at the foot for a few seconds.
   useEffect(() => {
@@ -558,11 +666,13 @@ export function Page({
   // to keep the keyboard up, and iOS paints its caret above the sheet, so the page's fields hide it (styles.css).
   // A sheet from the desktop head stands beside the page while the writer types, and leaves the caret alone.
   const sheetOver = sheet === 'contents' ? phone : sheet !== null && !anchor
+  // A journal's count goes by the day on the page.
+  const dayShown = journal ? { day: dayShort(dayOpen, deps.clock.now()) } : {}
 
   return (
     <div
       ref={screen}
-      className={piece.kind === 'journal' ? 'page-screen journal' : 'page-screen'}
+      className={journal ? 'page-screen journal' : 'page-screen'}
       data-keyboard={keyboard || undefined}
       data-tools={tools || undefined}
       data-sheet={sheetOver || undefined}
@@ -570,21 +680,25 @@ export function Page({
       aria-hidden={covered}
     >
       <div ref={head} className="head" data-scrolled={scrolled || undefined}>
-        {/* Pressed, § leaves the caret where it is, so the place kept is the caret's. On desktop the
-            piece's name follows it; a phone shows § alone. */}
+        {/* On desktop § and *Library*, then the piece's name; a phone shows § alone. */}
         <div className="head-path">
-          <Path
-            crumbs={[{ word: (piece.kind === 'essay' ? heading : name).trim() || 'Untitled' }]}
-            keepFocus
-            onHome={() => {
-              focus.leaving()
-              onLibrary()
-            }}
-          />
-          {railed ? <RailToggle open={rail.open} onToggle={rail.toggle} buttonRef={railToggle} /> : null}
+          <Path crumbs={[{ word: (piece.kind === 'essay' ? heading : name).trim() || 'Untitled' }]} keepFocus onHome={home} />
+          {railed ? <RailToggle label={journal ? 'Days' : 'Contents'} open={rail.open} onToggle={rail.toggle} buttonRef={railToggle} /> : null}
         </div>
         {/* In the head, so the toggle's next stop is what it opens, then the tools. */}
-        {railed ? (
+        {railed && journal ? (
+          <DaysRail
+            days={days}
+            current={dayOpen}
+            today={today}
+            open={rail.open}
+            onOpen={(day) => openChapter(dayId(day))}
+            onLeave={() => {
+              rail.letGo()
+              railToggle.current?.focus()
+            }}
+          />
+        ) : railed ? (
           <ContentsRail
             {...listed('desktop')}
             current={sectionId}
@@ -599,9 +713,10 @@ export function Page({
             {newChapter}
           </ContentsRail>
         ) : null}
-        {book && phone && !(titlePage && page === 0) ? (
+        {phone && (book ? !(titlePage && page === 0) : journal && page > openingAt) ? (
           // A chapter's opening page carries its title already: its head names the book, and Contents stays in reach.
-          <RunningHeadControl title={openingPage ? name : heading} open={sheet === 'contents'} onOpen={openContents} />
+          // A day's has no head: its date is on the page, and the count opens Days (DESIGN.md, The journal).
+          <RunningHeadControl title={openingPage ? name : heading} label={journal ? 'Days' : 'Contents'} open={sheet === 'contents'} onOpen={openContents} />
         ) : page > openingAt ? (
           <div className="running-head">{heading}</div>
         ) : null}
@@ -609,9 +724,11 @@ export function Page({
           page={shown.page}
           count={shown.pages}
           words={shown.words}
+          {...dayShown}
           sheet={anchor && sheet !== 'contents' ? sheet : null}
           onTextSettings={(from) => openSheet('text', from)}
           onExport={(from) => openSheet('export', from)}
+          onTimeMachine={lookBack}
         />
       </div>
 
@@ -674,20 +791,34 @@ export function Page({
         page={shown.page}
         count={shown.pages}
         words={shown.words}
-        journal={piece.kind === 'journal'}
+        {...dayShown}
+        journal={journal}
         titlePage={titlePage && page === 0}
         tools={tools}
         keyboard={keyboard}
+        quiet={calm}
         pageButtonRef={pageButton}
         onOpenTools={() => setTools(true)}
         onCloseTools={closeTools}
         onTextSettings={() => openSheet('text')}
         onExport={() => openSheet('export')}
-        onContents={book ? openContents : undefined}
+        onTimeMachine={lookBack}
+        onContents={book || journal ? openContents : undefined}
         contentsOpen={sheet === 'contents'}
       />
 
-      {sheet === 'contents' && phone ? (
+      {sheet === 'contents' && phone && journal ? (
+        <DaysSheet
+          days={days}
+          current={dayOpen}
+          today={today}
+          last={today}
+          from={daysFrom}
+          takeFocus={contentsFocus}
+          onOpen={(day) => openChapter(dayId(day))}
+          onDone={closeSheet}
+        />
+      ) : sheet === 'contents' && phone ? (
         <ContentsSheet
           {...listed('phone')}
           name={name}
@@ -703,7 +834,7 @@ export function Page({
       {sheet === 'text' ? <TextSettings onDone={closeSheet} style={anchor} /> : null}
       {sheet === 'export' ? (
         <ExportSheet
-          title={heading || (piece.kind === 'journal' ? piece.title : 'Untitled')}
+          title={heading || (journal ? piece.title : 'Untitled')}
           style={anchor}
           onMarkdown={async () => {
             const name = await exportMarkdown()
@@ -715,7 +846,7 @@ export function Page({
       ) : null}
 
       {/* shortcut: Save a copy holds the unsaved section only, not the whole piece. */}
-      <StatusLine writer={writer} failed={failed} line={line} onWriteHere={onWriteHere} onSaveCopy={() => void exportMarkdown()} />
+      <StatusLine writer={writer} failed={failed} line={line} note={refused} calm={calm} onWriteHere={onWriteHere} onSaveCopy={() => void exportMarkdown()} />
 
       <div className="visually-hidden" aria-live="polite">
         {said?.over === announcement ? said.text : announcement}
@@ -725,6 +856,17 @@ export function Page({
 }
 
 /** A sheet's place under the head control that opened it, right-aligned to it. */
+/** The focus is on nothing, or still on the sheet that is closing. */
+function fromSheet(): boolean {
+  const active = document.activeElement
+  return !active || active === document.body || !!active.closest('.sheet')
+}
+
+function fromTools(): boolean {
+  const active = document.activeElement
+  return fromSheet() || !!active?.closest('.tools')
+}
+
 function below(control: HTMLElement): CSSProperties {
   const box = control.getBoundingClientRect()
   return {

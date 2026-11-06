@@ -11,7 +11,7 @@ It opens on one page and nothing else, like a book you are writing in.
 Behind that page it quietly remembers your writing as it grows, so you can walk back through it and bring back anything you lost, with no save button and no version control to learn.
 
 It runs in the browser, installs on phone, tablet or desktop, and works offline.  
-Your writing stays on your device as plain Markdown and goes nowhere unless you choose a place to keep a copy.
+Your writing stays on your device as plain Markdown and goes nowhere unless you connect a place of your own.
 
 Read **[why we are building it](MANIFESTO.md)**.
 

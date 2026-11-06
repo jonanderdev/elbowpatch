@@ -20,7 +20,8 @@ interface Options {
   viewport: RefObject<HTMLDivElement | null>
   /** On a page with no text (a book's title page), a turn takes the caret into the book's title. */
   bookTitle: RefObject<HTMLHeadingElement | null>
-  editor: Editor | null
+  /** The text: an editor, or the Time Machine's reader, which is read only and takes no caret. */
+  editor: Pick<Editor, 'view'> | null
   pager: Pager | null
   covered: boolean
   readOnly: boolean

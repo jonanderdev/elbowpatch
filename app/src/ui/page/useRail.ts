@@ -1,8 +1,6 @@
 import { useCallback, useState } from 'react'
+import { RAIL_WIDTH } from '../../page/pager'
 import { update, useSettings } from '../stores/settings'
-
-/** The rail's width (DESIGN.md, Layout). */
-const RAIL_WIDTH = 336
 
 /** The last layout's answer: each chapter opens a new page, which must not start from a guess and slide. */
 let roomLastSeen: boolean | undefined
@@ -17,9 +15,9 @@ export interface Rail {
 }
 
 /**
- * Whether the rail is open. Open or folded is remembered on this device. Where the window has no room
- * for it beside the text it never pushes the text, so it starts folded, and opens over the text for
- * this page alone.
+ * Whether the rail is open. Open or folded is remembered on this device. Where the window has room for
+ * it, it takes its place and the page centres right of it (geometry). Where it has none it starts folded,
+ * and opens over the text for this page alone.
  */
 export function useRail(): Rail {
   const { railFolded } = useSettings()

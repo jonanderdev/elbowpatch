@@ -106,3 +106,13 @@ test('on the shelf a long word shrinks the title to fit, not broken in two', asy
   // Never below the line under it: past that, the word breaks.
   expect((await size('Unquestionably')).size).toBe(12)
 })
+
+test('on desktop Escape goes back one place: an area to Settings, Settings to the library', async ({ page }) => {
+  test.skip(page.viewportSize()!.width < 700, 'Escape is the desktop way back')
+  await page.goto('/#/settings/about')
+  await expect(page.getByRole('heading', { name: 'About & privacy' })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('navigation', { name: 'Library' })).toBeVisible()
+})

@@ -26,6 +26,26 @@ export function keepUndo(sectionId: string, state: EditorState): void {
   histories.set(sectionId, state)
 }
 
+/** Sections whose page was sealed by a change to another section: the next close of that page keeps its history. */
+const unchanged = new Set<string>()
+
+/**
+ * The page on this section is sealed while another section is brought back (0003: other sections keep their
+ * history). The text it holds is still the section's, so its next close keeps its history.
+ */
+export function keepThroughSeal(sectionId: string): void {
+  unchanged.add(sectionId)
+}
+
+/**
+ * A section's page closes. A page sealed by a split or rejoin holds text that is no longer the section's, and keeps
+ * no history, unless the seal was for another section's bring back.
+ */
+export function closeUndo(sectionId: string, state: EditorState, sealed: boolean): void {
+  const same = unchanged.delete(sectionId)
+  if (!sealed || same) histories.set(sectionId, state)
+}
+
 /**
  * The history to reopen a section with, if it ended on the very text the page opens with. On any other
  * text (the section changed in another window, or by a rejoin) its steps would double or lose words.
@@ -58,4 +78,13 @@ export function forgetChapter(sectionId: string): void {
   histories.delete(sectionId)
   splits.delete(sectionId)
   for (const [id, split] of splits) if (split.into === sectionId) splits.delete(id)
+}
+
+/**
+ * A bring back changed what the section holds (0003): its history ends for the session, and so does how it was
+ * split off or split into, for the text it now holds may be that of a moment before the split. The text it
+ * replaced is a moment, not an undo step.
+ */
+export function forgetUndo(sectionId: string): void {
+  forgetChapter(sectionId)
 }

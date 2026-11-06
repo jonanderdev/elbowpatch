@@ -11,6 +11,7 @@ import {
   storedPiece,
   takeMoment,
   withChapter,
+  withDay,
   write,
 } from '../../domain/pieces'
 import type { Store } from '../../domain/ports'
@@ -67,6 +68,92 @@ async function openBook() {
 afterEach(() => {
   for (const u of unsaved.all()) unsaved.saved(u.sectionId)
   vi.useRealTimers()
+})
+
+describe('a day of a journal, stored only by its first words', () => {
+  /** A journal open on a day with nothing in it, on the page that also carries its title page. */
+  function openDay(journal: Piece, deps: ReturnType<typeof journalDeps>, day: string) {
+    const { piece, sectionId } = withDay(deps, journal, day)
+    const page = { held: { markdown: '', title: null, bookTitle: journal.title, subtitle: '' } as Held }
+    const saving = createSaving({
+      deps,
+      piece,
+      sectionId,
+      stored: { markdown: '', title: day, bookTitle: journal.title, subtitle: '' },
+      read: () => page.held,
+      readOnly: () => false,
+      place: () => undefined,
+      pages: () => ({ screen: 'phone', count: 1 }),
+      onStored: () => {},
+      onFailed: () => {},
+      closing: () => Promise.resolve(),
+    })
+    return { page, saving, sectionId }
+  }
+  const journalDeps = () => {
+    let n = 0
+    return { store: memoryStore(), clock: { now: () => 1_000_000 }, ids: { next: () => `id${++n}` } }
+  }
+  const named = (o: ReturnType<typeof openDay>, bookTitle: string) => {
+    o.page.held = { ...o.page.held, bookTitle }
+    o.saving.touch()
+    return o.saving.flush()
+  }
+  const firstWords = (o: ReturnType<typeof openDay>, markdown: string) => {
+    o.page.held = { ...o.page.held, markdown }
+    o.saving.touch()
+    return o.saving.flush()
+  }
+
+  it('naming a journal never stored keeps the name, and not the day it was named on', async () => {
+    const deps = journalDeps()
+    const o = openDay(newPiece(deps, 'journal', 'en'), deps, '2026-10-04')
+    await named(o, 'Dream journal')
+    const found = (await openPiece(deps, (await deps.store.transaction((tx) => tx.pieces()))[0]!.id))!
+    expect(found.piece.title).toBe('Dream journal')
+    expect(found.piece.sections).toEqual([])
+  })
+
+  it('words written after naming a journal never stored join it on their day', async () => {
+    const deps = journalDeps()
+    const o = openDay(newPiece(deps, 'journal', 'en'), deps, '2026-10-04')
+    await named(o, 'Dream journal')
+    await firstWords(o, 'Written late.')
+    const id = (await deps.store.transaction((tx) => tx.pieces()))[0]!.id
+    const found = (await openPiece(deps, id))!
+    expect(found.piece.sections.map((s) => s.title)).toEqual(['2026-10-04'])
+    expect(found.sections[0]!.content).toBe('Written late.')
+  })
+
+  it('a day before all the others, its journal renamed on its title page, still takes its first words', async () => {
+    const deps = journalDeps()
+    const journal = newPiece(deps, 'journal', 'en')
+    const later = withDay(deps, journal, '2026-10-28')
+    await write(deps, later.piece, later.sectionId, 'A later day.')
+    const stored = (await openPiece(deps, journal.id))!.piece
+    const o = openDay(stored, deps, '2026-10-04')
+    await named(o, 'Dream journal')
+    expect((await openPiece(deps, journal.id))!.piece.sections.map((s) => s.title)).toEqual(['2026-10-28'])
+    await firstWords(o, 'Written late.')
+    const found = (await openPiece(deps, journal.id))!
+    expect(found.piece.sections.map((s) => s.title)).toEqual(['2026-10-04', '2026-10-28'])
+    expect(found.sections.map((s) => s.content)).toEqual(['Written late.', 'A later day.'])
+  })
+
+  it('words left in the unsaved journal after such a renaming return on their day', async () => {
+    const deps = journalDeps()
+    const journal = newPiece(deps, 'journal', 'en')
+    const later = withDay(deps, journal, '2026-10-28')
+    await write(deps, later.piece, later.sectionId, 'A later day.')
+    const o = openDay((await openPiece(deps, journal.id))!.piece, deps, '2026-10-04')
+    await named(o, 'Dream journal')
+    o.page.held = { ...o.page.held, markdown: 'Held when the page hid.' }
+    o.saving.journal()
+    await replayJournal(deps, { hold: async () => ({ release() {} }) } as never)
+    const found = (await openPiece(deps, journal.id))!
+    expect(found.piece.sections.map((s) => s.title)).toEqual(['2026-10-04', '2026-10-28'])
+    expect(found.sections[0]!.content).toBe('Held when the page hid.')
+  })
 })
 
 describe('a split through the page that holds the text', () => {

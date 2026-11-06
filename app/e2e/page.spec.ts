@@ -682,7 +682,7 @@ test('§ and the tools: text edge on a phone, the head within the frame on deskt
   await newEssay(page)
   await page.keyboard.type('Words.')
   const width = page.viewportSize()!.width
-  const home = (await page.locator('.head .home span').boundingBox())!
+  const home = (await page.locator('.head .home span').first().boundingBox())!
   const text = (await page.locator('.pager').boundingBox())!
   if (width < 700) {
     expect(Math.abs(home.x - text.x)).toBeLessThan(3)

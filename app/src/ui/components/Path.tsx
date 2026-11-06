@@ -7,14 +7,17 @@ export interface Crumb {
 }
 
 /**
- * The way back (DESIGN.md, Control): §, the app's mark, goes home to the library; a slash in
- * secondary grey, then each place you came from. `keepFocus`: pressing § leaves the focus where it is.
+ * The way back (DESIGN.md, Control): §, the app's mark, goes home to the library, and on desktop says
+ * so in a word; a slash in secondary grey, then each place you came from. `keepFocus`: pressing § leaves the focus where it is.
  */
 export function Path({ crumbs = [], onHome, keepFocus }: { crumbs?: Crumb[]; onHome(): void; keepFocus?: boolean }): ReactElement {
   return (
     <nav className="path" aria-label="Path">
       <button type="button" className="home" aria-label="Library" onClick={onHome} onMouseDown={keepFocus ? (e) => e.preventDefault() : undefined}>
         <span aria-hidden="true">§</span>
+        <span className="home-word" aria-hidden="true">
+          Library
+        </span>
       </button>
       {crumbs.length > 0 && (
         <span className="crumbs">

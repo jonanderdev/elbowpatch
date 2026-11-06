@@ -6,7 +6,7 @@
 import { debounced, moments, type Scheduled } from '../../adapters/schedule'
 import { pieceAsMarkdown } from '../../domain/export'
 import type { Piece, Place, Screen } from '../../domain/model'
-import { type Deps, openPiece, rename, renameSection, savePages, savePlace, setSubtitle, takeMoment, write } from '../../domain/pieces'
+import { type Deps, openPiece, rename, renameSection, savePages, savePlace, setSubtitle, takeMoment, withOpenSection, write } from '../../domain/pieces'
 import { settledWithin } from '../app/settled'
 import { type Unsaved, unsaved } from '../stores/unsaved'
 
@@ -135,7 +135,8 @@ export function createSaving(o: SavingOptions): Saving {
       unsaved.saved(sectionId, held.markdown, held.title)
       const found = await openPiece(deps, o.piece.id)
       if (found) {
-        piece = found.piece
+        // A journal renamed on a day still empty: the day stays in the draft, or its first words would not join.
+        piece = found.piece.kind === 'journal' ? withOpenSection(found.piece, piece, sectionId) : found.piece
         o.onStored(found.piece)
       }
       if (failed) {

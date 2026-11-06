@@ -8,18 +8,23 @@ interface PageFootProps {
   page?: number
   count?: number
   words: number
+  /** The day on the page, in a journal: its count goes by it. */
+  day?: string
   journal: boolean
   /** A book's or a journal's title page, which carries no folio. */
   titlePage: boolean
   tools: boolean
   /** The phone keyboard is up: the foot stands on it, at the screen's foot (see Page). */
   keyboard: boolean
+  /** A calm line stands at the foot, where the folio would: the folio stands aside. */
+  quiet?: boolean
   pageButtonRef: RefObject<HTMLButtonElement | null>
   onOpenTools(): void
   onCloseTools(): void
   onTextSettings(): void
   onExport(): void
-  /** A book's count opens Contents. */
+  onTimeMachine(): void
+  /** A book's count opens Contents, and a journal's Days. */
   onContents?(from: HTMLElement): void
   contentsOpen: boolean
 }
@@ -32,19 +37,22 @@ export function PageFoot({
   page,
   count,
   words,
+  day,
   journal,
   titlePage,
   tools,
   keyboard,
+  quiet = false,
   pageButtonRef,
   onOpenTools,
   onCloseTools,
   onTextSettings,
   onExport,
+  onTimeMachine,
   onContents,
   contentsOpen,
 }: PageFootProps): ReactElement {
-  const folio = page !== undefined && !journal && !titlePage && !tools && !keyboard
+  const folio = page !== undefined && !journal && !titlePage && !tools && !keyboard && !quiet
   const said = pageLine(page, count)
   return (
     <>
@@ -62,11 +70,13 @@ export function PageFoot({
             page={page}
             count={count}
             words={words}
+            {...(day ? { day } : {})}
             onContents={onContents}
             contentsOpen={contentsOpen}
             onClose={onCloseTools}
             onTextSettings={onTextSettings}
             onExport={onExport}
+            onTimeMachine={onTimeMachine}
           />
         ) : (
           <button
@@ -89,16 +99,20 @@ interface StatusLineProps {
   failed: boolean
   /** A calm line for a few seconds ("Saved as …"). */
   line: string | null
+  /** The line is a calm one after an action: secondary, with no surface. */
+  calm?: boolean
+  /** Said ahead of "Open in another window", when what the writer asked for was not done because of it. */
+  note?: string | null
   onWriteHere(): void
   onSaveCopy(): void
 }
 
 /** One line at the foot, most important first: another window writes, a save failed, or a calm note. */
-export function StatusLine({ writer, failed, line, onWriteHere, onSaveCopy }: StatusLineProps): ReactElement | null {
+export function StatusLine({ writer, failed, line, calm = false, note, onWriteHere, onSaveCopy }: StatusLineProps): ReactElement | null {
   if (writer === 'elsewhere')
     return (
       <div className="line surface" role="status">
-        Open in another window ·
+        {note ? `${note} ` : null}Open in another window ·
         <button type="button" onClick={onWriteHere}>
           Write here
         </button>
@@ -115,7 +129,7 @@ export function StatusLine({ writer, failed, line, onWriteHere, onSaveCopy }: St
     )
   if (!line) return null
   return (
-    <div className="line surface" role="status">
+    <div className={calm ? 'line calm' : 'line surface'} role="status">
       {line}
     </div>
   )

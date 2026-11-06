@@ -1,5 +1,7 @@
-import { type ReactElement, useCallback, useEffect, useRef, useState } from 'react'
+import { type ComponentProps, type ReactElement, useCallback, useEffect, useRef, useState } from 'react'
+import { keepCopy } from '../../domain/copies'
 import { pieceAsMarkdown } from '../../domain/export'
+import type { Moment } from '../../domain/lookBack'
 import type { Kind, Piece } from '../../domain/model'
 import {
   type Deps,
@@ -27,17 +29,26 @@ import { raiseKeyboard } from '../page/useFocusOnOpen'
 import { waiting } from '../settings/PutAway'
 import { type Area, Settings } from '../settings/Settings'
 import { readLast, writeLast } from '../stores/last'
+import { type BringBackLine, type BringBackRequest, type PartBack, TimeMachine } from '../timeMachine/TimeMachine'
+import { bringSectionBack } from './bringBack'
 import { askToPersist } from './persist'
 import { replayJournal } from './replay'
 import { settled } from './settled'
+import { thinningGate } from './thinningGate'
 import { useBookNumbers } from './useBookNumbers'
 import { useRoute } from './useRoute'
+import { useTimeMachine } from './useTimeMachine'
 import { useWriterLock } from './useWriterLock'
 
 /** Counts the sections read from storage, so each reading opens a new page. */
 let reads = 0
+/** A journal's day not stored yet is asked for by its date. */
+const DATE = /^\d{4}-\d{2}-\d{2}$/
 /** The least time the launch screen shows, from its first frame, in ms. */
 const MIN_LAUNCH = 1000
+
+/** When the app has a moment to spare. */
+const whenIdle = (f: () => void): void => void (window.requestIdleCallback ?? ((g: () => void) => setTimeout(g, 3000)))(() => f())
 
 const AREAS: Record<string, Area> = {
   '/settings/export': 'export',
@@ -53,6 +64,8 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
   const [pieces, setPieces] = useState<Piece[]>([])
   const [opened, setOpened] = useState<Opened | null>(null)
   const today = isoDay(new Date())
+  // Thinning and the end of put-away pieces' 30 days, which wait while the Time Machine is open.
+  const [thinning] = useState(() => thinningGate((held) => forgetPutAway(deps).then(() => thin(deps, held)), whenIdle))
 
   const [everything, setEverything] = useState<Piece[]>([])
   const refresh = useCallback(async () => {
@@ -61,7 +74,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
   }, [deps])
 
   const open = useCallback(
-    /** Opens a piece: at the section asked for, else the writer's place, else the first chapter. A journal opens on today. */
+    /** Opens a piece: at the section asked for, else the writer's place, else the first chapter. A journal opens on the day asked for, else today. */
     async (pieceId: string, wanted?: string): Promise<Opened | null> => {
       const found = await openPiece(deps, pieceId)
       // A put-away piece waits in Settings; a URL or the Back button does not open it.
@@ -69,8 +82,8 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
       let piece = found.piece
       let sectionId: string
       if (piece.kind === 'journal') {
-        // The journal opens on today.
-        ;({ piece, sectionId } = withDay(deps, piece, isoDay(new Date())))
+        const day = piece.sections.find((s) => s.sectionId === wanted)?.title ?? (wanted && DATE.test(wanted) ? wanted : isoDay(new Date()))
+        ;({ piece, sectionId } = withDay(deps, piece, day))
       } else {
         const sections = piece.sections
         const there = (id: string | undefined): boolean => sections.some((s) => s.sectionId === id)
@@ -104,13 +117,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
       setReady(true)
       document.getElementById('launch')?.setAttribute('hidden', '')
       // Thinning and the end of put-away pieces' 30 days run afterwards, when idle (0010).
-      const idle = window.requestIdleCallback ?? ((f: () => void) => setTimeout(f, 3000))
-      idle(
-        () =>
-          void forgetPutAway(deps)
-            .then(() => thin(deps))
-            .catch(() => {}),
-      )
+      whenIdle(thinning.start)
     })()
   }, [])
 
@@ -150,10 +157,53 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
 
   const flushPage = useRef<(() => Promise<void>) | null>(null)
   const closing = useRef<Promise<void>>(Promise.resolve())
-  const { writer, writeHere } = useWriterLock(lock, opened?.piece.id, flushPage, closing)
+  const reshapePage = useRef<ComponentProps<typeof Page>['reshapeRef']['current']>(null)
+  const { writer, holds, writeHere } = useWriterLock(lock, opened?.piece.id, flushPage, closing)
 
   /** The open page saved, and the last one's closing save done; never waiting long for either. */
   const saveFirst = () => Promise.race([Promise.all([flushPage.current?.(), settled(closing.current)]), new Promise((r) => setTimeout(r, 1500))])
+  const timeMachine = useTimeMachine(thinning, saveFirst)
+
+  // A section brought back to a moment (#77, Bring back). The page stores what it holds and is sealed, one transaction
+  // brings the text back, and the page reopens on that section by name: stored and at hand, at its opening page, with
+  // the line. Until then the page stays covered, whatever closes the Time Machine meanwhile, and a second press waits for nothing.
+  const [bringing, setBringing] = useState(false)
+  const bringingNow = useRef(false)
+  const bringBackTo = async (moment: BringBackRequest, line: BringBackLine): Promise<void> => {
+    if (!opened || bringingNow.current) return
+    bringingNow.current = true
+    setBringing(true)
+    let landed = false
+    try {
+      const done = await bringSectionBack(
+        { deps, pieceId: opened.piece.id, pageSectionId: opened.sectionId, reshape: () => reshapePage.current, writes: holds },
+        moment,
+      )
+      if (!done) return void timeMachine.leave()
+      landed = true
+      timeMachine.leave(() => {
+        ++chosen.current
+        going.current = ''
+        setOpened({
+          piece: done.piece,
+          sectionId: done.sectionId,
+          content: done.content,
+          updatedAt: done.updatedAt,
+          at: 'opening',
+          line: typeof line === 'function' ? line(done.piece) : line,
+          readAt: ++reads,
+        })
+        bringingNow.current = false
+        setBringing(false)
+      })
+      void refresh().catch(() => {})
+    } finally {
+      if (!landed) {
+        bringingNow.current = false
+        setBringing(false)
+      }
+    }
+  }
 
   // Another section of the open piece. The lock is the piece's, so it stays. The last chapter chosen
   // wins, should the writer choose again while a save runs.
@@ -169,8 +219,30 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
     const next = await open(draft.id, sectionId).catch(() => undefined)
     if (going.current === where) going.current = ''
     if (next === undefined || turn !== chosen.current) return
-    const there = next ?? { piece: neverStored(draft), sectionId, content: '', readAt: ++reads }
+    // Nothing stored yet: a journal's day joins an empty draft, by its date; a book keeps its first chapter.
+    const unstored = draft.kind === 'journal' ? withDay(deps, { ...draft, sections: [] }, sectionId) : { piece: neverStored(draft), sectionId }
+    const there = next ?? { ...unstored, content: '', readAt: ++reads }
     setOpened({ ...there, at, writing })
+  }
+
+  // A passage brought back from the Time Machine: the Time Machine closes onto the page, and the page puts it in.
+  // The page that has the section already has it in at once; another section opens first, saved as any is.
+  const bringPart = ({ sectionId, passage, from }: PartBack): void => {
+    if (bringingNow.current || !holds()) return
+    const bringing = { passage, from }
+    timeMachine.leave(() => {
+      if (!opened) return
+      if (opened.sectionId === sectionId) {
+        setOpened((now) => now && { ...now, bringing })
+        return
+      }
+      const turn = ++chosen.current
+      void (async () => {
+        await saveFirst()
+        const next = await open(opened.piece.id, sectionId).catch(() => undefined)
+        if (next && turn === chosen.current) setOpened({ ...next, bringing })
+      })()
+    })
   }
 
   // A new chapter at the end of the book or right after a chapter, read from what is stored once the
@@ -214,6 +286,28 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
     setOpened({ piece, sectionId, content, updatedAt: piece.updatedAt, readAt: ++reads })
   }
 
+  // A moment kept as a new essay: stored whole first, so a failure leaves nothing made. It opens at once, from
+  // what was just written, once the Time Machine and its history entry are gone; the route follows in the same step.
+  const keepCopyOf = async (pieceId: string, from: Moment, line: string): Promise<void> => {
+    const copy = await keepCopy(deps, pieceId, from)
+    const section = copy.sections[0]!
+    timeMachine.leave(() => {
+      ++chosen.current
+      going.current = ''
+      setOpened({ piece: copy, sectionId: section.sectionId, content: from.content, updatedAt: copy.updatedAt, readAt: ++reads, line })
+      go(`/p/${copy.id}`)
+      void refresh().catch(() => {})
+    })
+  }
+
+  // Save first, so the library already lists what was just written; never wait long for it.
+  // The first save also opens the database; a stuck one never holds the writer on the page for long.
+  const toLibrary = async (): Promise<void> => {
+    await saveFirst()
+    await refresh().catch(() => {})
+    go('/')
+  }
+
   const startNew = (kind: Kind) => {
     raiseKeyboard()
     let piece = newPiece(deps, kind, navigator.language || 'en')
@@ -248,22 +342,18 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
             })
           }
           flushRef={flushPage}
+          reshapeRef={reshapePage}
           closingRef={closing}
-          covered={inLibrary || inSettings}
+          covered={inLibrary || inSettings || !!timeMachine.looking || bringing}
           counted={counted}
-          onLibrary={async () => {
-            // Save first, so the library already lists what was just written; never wait long for it.
-            // The first save also opens the database; a stuck one never holds the writer on the page for long.
-            await saveFirst()
-            await refresh().catch(() => {})
-            go('/')
-          }}
+          onLibrary={() => void toLibrary()}
           onOpenSection={(sectionId, writing, at) => void openSection(opened.piece, sectionId, writing, at)}
           onNewChapter={(after) => void newChapter(opened.piece, after)}
           onChapterStarted={chapterStarted}
           onChapterRejoined={chapterRejoined}
           onChapterRemoved={chapterRemoved}
           onReopen={(piece, content) => chapterReopened(piece, opened.sectionId, content)}
+          onTimeMachine={(now) => timeMachine.open(opened.piece, opened.sectionId, now)}
           onChange={(piece) => {
             askToPersist()
             setPieces((all) => {
@@ -272,6 +362,20 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
               return all.some((p) => p.id === piece.id) ? all.map((p) => (p.id === piece.id ? piece : p)) : [piece, ...all]
             })
           }}
+        />
+      )}
+      {timeMachine.onScreen && (
+        <TimeMachine
+          key={timeMachine.onScreen.key}
+          deps={deps}
+          looking={timeMachine.onScreen.looking}
+          leaving={timeMachine.onScreen.leaving}
+          writes={writer === 'here'}
+          onBringBack={bringBackTo}
+          onKeepCopy={(moment, line) => keepCopyOf(timeMachine.onScreen!.looking.piece.id, moment, line)}
+          onBack={() => timeMachine.leave()}
+          onBringPart={bringPart}
+          onHome={() => timeMachine.leave(() => void toLibrary())}
         />
       )}
       {/* The page changed under a screen reader: it hears which chapter it is in. Here, for a live region
@@ -335,8 +439,10 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
             return file.name
           }}
           onOpen={(piece) => {
-            // The piece behind the library is already laid out: Continue is instant.
-            if (opened?.piece.id === piece.id) go(`/p/${piece.id}`)
+            // The piece behind the library is already laid out: Continue is instant. Not a journal left
+            // on another day: opening one lands on today (DESIGN.md, The journal).
+            const elsewhere = piece.kind === 'journal' && opened?.piece.sections.find((s) => s.sectionId === opened.sectionId)?.title !== today
+            if (opened?.piece.id === piece.id && !elsewhere) go(`/p/${piece.id}`)
             else
               void open(piece.id).then((next) => {
                 if (!next) return

@@ -489,6 +489,10 @@ button {
   position: relative;
   top: -1px;
 }
+/* What § does, in a word: on desktop only, where nothing else says it (DESIGN.md, Control). */
+.path .home-word {
+  display: none;
+}
 .path .crumbs {
   /* A long path wraps rather than cutting, and never leaves the rail. */
   max-width: 224px;
@@ -615,6 +619,10 @@ button {
 }
 .running-control .icon {
   flex: none;
+}
+/* While its sheet is open the arrow points up: tapped again it closes (DESIGN.md, Control). It turns at once. */
+.running-control[aria-expanded='true'] .icon {
+  transform: scaleY(-1);
 }
 
 .pager {
@@ -843,6 +851,10 @@ button.count:active,
 button.count[aria-expanded='true'] {
   background: var(--pressed);
 }
+/* The month stands right above it, and is tint enough (Figma, days open as a month). */
+.journal button.count[aria-expanded='true']:not(:active) {
+  background: none;
+}
 @media (min-width: 700px) {
   .count {
     padding: 0 10px 0 12px;
@@ -865,6 +877,14 @@ button.count[aria-expanded='true'] {
   line-height: 1.4;
   color: var(--title);
   z-index: 3;
+}
+/* A calm line after an action (DESIGN.md, The Time Machine): secondary, no surface, no action, level with the
+   page button and as wide as the room beside it; the folio stands aside for it. */
+.line.calm {
+  padding: 0;
+  left: var(--side);
+  max-width: calc(100% - var(--side) - 60px);
+  color: var(--secondary);
 }
 /* The tools bar stands where the line does: the line waits above it, so the bar can still be pressed. */
 .page-screen[data-tools] .line {
@@ -1557,6 +1577,103 @@ button.count[aria-expanded='true'] {
   bottom: 0;
   padding: 0 10px;
 }
+/* Days on a phone: a month. Above the tools bar it opened from, as any sheet; from the running head, under the head. */
+.sheet.days {
+  gap: 0;
+  padding: 14px 12px 16px;
+}
+.sheet.days[data-from='head'] {
+  top: 56px;
+  bottom: auto;
+  max-height: calc(var(--visible-height, 100dvh) - 136px - var(--rise));
+}
+.month-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+}
+.month-title {
+  font-size: 17px;
+  line-height: 1.4;
+}
+.month-arrow.before .icon {
+  transform: rotate(90deg);
+}
+.month-arrow.after .icon {
+  transform: rotate(-90deg);
+}
+.month-weekdays,
+.month-grid {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  justify-items: center;
+}
+.month-weekdays {
+  padding-bottom: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--secondary);
+}
+.month-grid {
+  row-gap: 2px;
+}
+.month-day {
+  width: 40px;
+  height: 40px;
+  border: 1px solid transparent;
+  border-radius: 20px;
+  font-size: 15px;
+  line-height: 1;
+  font-variant-numeric: lining-nums tabular-nums;
+  color: var(--title);
+}
+.month-day[data-state='written'] {
+  font-weight: 560;
+}
+.month-day[data-state='empty'] {
+  color: var(--secondary);
+}
+/* Disabled and meant to recede: the contrast floor does not apply (DESIGN.md, Colour). */
+.month-day[data-state='future'] {
+  color: var(--surface-line);
+}
+.month-day[data-state='today'] {
+  background: var(--pressed);
+  border-color: var(--surface-line);
+}
+.month-day:not(:disabled):active {
+  background: var(--pressed);
+}
+@media (hover: hover) {
+  .month-day:not(:disabled):hover {
+    background: var(--pressed);
+  }
+}
+.month-foot {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 14px;
+  padding: 12px 8px 0;
+  border-top: 1px solid var(--surface-line);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--secondary);
+}
+.month-foot .text-link {
+  margin: -4px 0;
+  position: relative;
+}
+/* The word stays small; the finger gets 44px. */
+.month-foot .text-link::after {
+  content: '';
+  position: absolute;
+  inset: -9px 0;
+}
 .contents-foot {
   flex: none;
   display: flex;
@@ -2129,15 +2246,33 @@ button.count[aria-expanded='true'] {
     right: -10px;
     min-width: 0;
   }
+  .head .path .home-word,
+  .settings-head .path .home-word {
+    display: inline;
+    top: 0;
+    margin-left: 8px;
+    font-size: 15px;
+    font-weight: 400;
+    line-height: 20px;
+    color: var(--text);
+  }
+  .head .path .home:hover .home-word,
+  .settings-head .path .home:hover .home-word {
+    color: var(--title);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  /* The rail's width, less *Library* and the toggle: the path never leaves the rail. */
   .head .path .crumbs {
     display: block;
+    max-width: 162px;
     padding-top: 8px;
     font-size: 15px;
   }
   /* Still centred over the column, but clear of the path and the tools (about 330px from each edge),
      cut with "…" where a narrow window brings them close. */
   .running-head {
-    padding: 0 max(0px, calc(330px - var(--side)));
+    padding: 0 max(0px, calc(330px - var(--head-room)));
   }
   .head-tools {
     display: flex;
@@ -2335,6 +2470,10 @@ button.count[aria-expanded='true'] {
     /* A hairline, the journal's line: the surface line (DESIGN.md, Layout). Decorative only. */
     border-right: 1px solid var(--surface-line);
   }
+  /* A journal's own margin rule is its line: the rail beside it draws none (DESIGN.md, The journal). */
+  .days-rail {
+    border-right: 0;
+  }
   /* The head's line: under it the places start 76px from the top, as the right column does. */
   .rail-top {
     display: flex;
@@ -2412,6 +2551,29 @@ button.count[aria-expanded='true'] {
     z-index: 0;
     padding: 76px 12px 24px 20px;
   }
+  .days-month {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .days-month + .days-month {
+    margin-top: 16px;
+  }
+  .days-month-name {
+    margin: 0 0 4px;
+    font-size: 13px;
+    font-style: italic;
+    font-weight: 400;
+    color: var(--secondary);
+  }
+  .days-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
   .contents-rail[data-folded] {
     visibility: hidden;
     transform: translateX(-100%);
@@ -2462,8 +2624,14 @@ button.count[aria-expanded='true'] {
     max-width: 296px;
     overflow-wrap: anywhere;
   }
-  /* It stands 12px above *+ New chapter*, which a long book holds at the rail's foot (24px up, 31px tall). */
-  .page-screen:has(.contents-rail:not([data-folded]) .new-chapter) .line {
+  /* A calm line stands under the text column, where the folio does, and keeps to its width. Its text starts 54px
+     above the bottom edge, as the frames draw it (the line is 44px tall, its text centred). */
+  .page-screen .line.calm {
+    max-width: var(--measure-px);
+    bottom: 23px;
+  }
+  /* A line in the rail stands 12px above *+ New chapter*, which a long book holds at the rail's foot (24px up, 31px tall). */
+  .page-screen:has(.contents-rail:not([data-folded]) .new-chapter) .line:not(.calm) {
     bottom: calc(24px + 31px + 12px);
   }
   /* A long list can still scroll its last rows clear of the line. The room is out of flow, so nothing in
@@ -2496,5 +2664,278 @@ button.count[aria-expanded='true'] {
 @media (min-width: 700px) {
   .page-screen.journal::before {
     top: 0;
+    left: calc(var(--side) - 28px * var(--k, 1));
+  }
+}
+
+/* ——— The Time Machine (DESIGN.md) ——— */
+
+/* It stands over the page, as its own screen. A book's and a journal's running head shows on every page here, page 1
+   included; an essay's, as on its page, from page 2 on. */
+.time-machine .head {
+  z-index: 2;
+}
+/* Fading out over the page, once left: it takes nothing, and stays where it was rather than becoming fixed as a covered page does. */
+.page-screen.time-machine[inert] {
+  position: absolute;
+}
+.time-machine .title {
+  cursor: text;
+}
+/* The bar over selected old words: two words to press, in the selection menu's frame. */
+.bar.part-menu {
+  position: fixed;
+  z-index: 4;
+  gap: 0;
+  padding: 0 4px;
+}
+.part-menu .bar-separator {
+  margin: 0 6px;
+}
+.part-action {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 18px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--title);
+  white-space: nowrap;
+  transition: background-color 160ms;
+}
+.part-action:active {
+  background: var(--pressed);
+}
+@media (hover: hover) {
+  .part-action:hover {
+    background: var(--pressed);
+  }
+}
+/* Fixed to the window: in a window smaller than the page the bar stays on screen, in every state, ✕ included, and
+   the page scrolls under it. The page ends above it, so scrolled to its end no text stands under the bar. */
+.moment-bar {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: calc(var(--rise) + 24px);
+  height: 130px;
+  padding: 12px 0 4px;
+  border-radius: 22px;
+  z-index: 2;
+}
+.moment-bar[data-state='error'] {
+  height: 98px;
+  padding: 14px 0 2px;
+}
+.moment-bar[data-state='nothing'] {
+  bottom: calc(var(--rise) + 15px);
+  height: 62px;
+  padding: 14px 0 10px;
+}
+.moment-name {
+  height: 22px;
+  margin: 0;
+  padding: 0 44px;
+  text-align: center;
+  font-size: 15px;
+  font-style: italic;
+  line-height: 22px;
+  color: var(--title);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.moment-bar[data-loading] .moment-name {
+  color: var(--secondary);
+}
+.moment-note {
+  margin: 0;
+  padding: 0 44px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--secondary);
+}
+.moment-again {
+  display: block;
+  width: 100%;
+  height: 44px;
+  font-size: 13px;
+  color: var(--title);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+/* A 44px target at the bar's top right, in every state. */
+.moment-close {
+  position: absolute;
+  top: 0;
+  right: 2px;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* The tape: the ticks slide under the hairline, which stays. */
+/* Dragged or swiped on its own: the browser takes no pan or zoom from it, and a long press selects nothing. */
+.tape {
+  position: relative;
+  height: 46px;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.tape:active {
+  cursor: grabbing;
+}
+/* The ticks fade at the edges, to show the tape goes on. Only over the ticks: the labels never fade. */
+.tape::before {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 29px;
+  background: linear-gradient(to right, var(--surface), transparent 24px, transparent calc(100% - 24px), var(--surface));
+  pointer-events: none;
+}
+.tape::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: calc(50% - 0.75px);
+  width: 1.5px;
+  height: 24px;
+  background: var(--title);
+  pointer-events: none;
+}
+.tape:focus-visible {
+  outline: 2px solid var(--title);
+  outline-offset: -2px;
+  border-radius: 8px;
+}
+.tape-ticks {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+}
+.tick {
+  position: absolute;
+  top: 18px;
+  width: 1px;
+  height: 8px;
+  margin-left: -0.5px;
+  background: var(--secondary);
+}
+.tick[data-tall] {
+  top: 10px;
+  height: 16px;
+}
+.tick[data-kept] {
+  background: var(--title);
+}
+.tick-label {
+  position: absolute;
+  top: 29px;
+  transform: translateX(-50%);
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--secondary);
+  white-space: nowrap;
+}
+
+/* Two equal halves: weight says which one the bar is for. */
+.moment-actions {
+  display: flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 4px;
+}
+.moment-actions .bar-separator {
+  margin: 0 6px;
+}
+.moment-action {
+  position: relative;
+  isolation: isolate;
+  flex: 1 1 0;
+  height: 44px;
+  font-size: 13px;
+  color: var(--title);
+}
+/* The tint is 36px inside the 44px target, so it stays clear of the tape's labels above it. */
+.moment-action::before {
+  content: '';
+  position: absolute;
+  inset: 4px 0;
+  z-index: -1;
+  border-radius: 18px;
+  transition: background-color 160ms;
+}
+.moment-action.leading {
+  font-weight: 500;
+}
+.moment-action:active::before {
+  background: var(--pressed);
+}
+@media (hover: hover) {
+  .moment-action:hover::before {
+    background: var(--pressed);
+  }
+}
+.moment-bar[data-loading] .moment-action,
+.moment-action[aria-disabled='true'] {
+  color: var(--secondary);
+}
+.moment-action[aria-disabled='true']:active::before {
+  background: none;
+}
+@media (hover: hover) {
+  .moment-action[aria-disabled='true']:hover::before {
+    background: none;
+  }
+}
+
+@media (min-width: 700px) {
+  .moment-bar,
+  .moment-bar[data-state='nothing'] {
+    right: auto;
+    left: calc(var(--side) + var(--measure-px) / 2 - 179px);
+    bottom: calc(var(--rise) + 20px);
+    width: 358px;
+  }
+  /* The moment stands whole, and the piece's name shortens: the path stays inside the rail's width, room left for its
+     toggle. An essay has no toggle, and keeps the same limit: its path ends by x316 (DESIGN.md, The Time Machine). */
+  /* It has ✕ for the way out, and the moment needs the room. */
+  .time-machine .head .path .home-word {
+    display: none;
+  }
+  .time-machine .path .crumbs {
+    display: flex;
+    max-width: 238px;
+  }
+  .time-machine[data-kind='essay'] .path .crumbs {
+    max-width: 284px;
+  }
+  .time-machine .path .crumb {
+    flex: none;
+    white-space: nowrap;
+  }
+  .time-machine .path .crumb:first-child:not(:last-child) {
+    flex: 0 1 auto;
+    min-width: 0;
+    display: flex;
+  }
+  .time-machine .path .crumb:first-child .crumb-word {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .time-machine .path .crumb:last-child:not(:first-child) .crumb-word {
+    font-style: italic;
   }
 }

@@ -43,7 +43,8 @@ export function write(deps: Pick<Deps, 'store' | 'clock'>, draft: Piece, section
     const working = await tx.working(sectionId)
     if (stored && working?.content === content) return
     // A section new in the draft, with nothing in it yet, is not stored: left empty, it was never here.
-    if (stored && content === '' && !stored.sections.some((s) => s.sectionId === sectionId)) return
+    // A journal's day, even in a journal not stored yet; a book or an essay is stored with its first section.
+    if (content === '' && (stored ? !stored.sections.some((s) => s.sectionId === sectionId) : draft.kind === 'journal')) return
     const piece = stored ?? draft
     // A section new in the draft (today, in a journal, a new chapter) joins the piece with its first words.
     const sections = joined(piece, draft, sectionId)
@@ -59,12 +60,15 @@ export function write(deps: Pick<Deps, 'store' | 'clock'>, draft: Piece, section
   })
 }
 
+/** A piece stored by its name alone: a journal's open day still waits for its first words. */
+const firstStored = (draft: Piece): Piece => (draft.kind === 'journal' ? { ...draft, sections: [] } : draft)
+
 /** Saves the piece's title like a working copy; the next moment keeps it in an outline version. */
 export function rename(deps: Pick<Deps, 'store' | 'clock'>, draft: Piece, title: string): Promise<void> {
   return deps.store.transaction(async (tx) => {
     const stored = await tx.piece(draft.id)
     if (stored?.title === title) return
-    await tx.putPiece({ ...(stored ?? draft), title, updatedAt: deps.clock.now() })
+    await tx.putPiece({ ...(stored ?? firstStored(draft)), title, updatedAt: deps.clock.now() })
   })
 }
 
@@ -73,7 +77,7 @@ export function setSubtitle(deps: Pick<Deps, 'store' | 'clock'>, draft: Piece, s
   return deps.store.transaction(async (tx) => {
     const stored = await tx.piece(draft.id)
     if ((stored?.subtitle ?? '') === subtitle) return
-    await tx.putPiece({ ...(stored ?? draft), subtitle, updatedAt: deps.clock.now() })
+    await tx.putPiece({ ...(stored ?? firstStored(draft)), subtitle, updatedAt: deps.clock.now() })
   })
 }
 
@@ -138,6 +142,8 @@ export function bookPages(piece: Piece, screen: Screen): number | undefined {
 /** A line of Contents. Its start page is unknown while a chapter before it has not been laid out on this screen's page. */
 export interface ContentsChapter extends OutlineSection {
   startPage?: number
+  /** Contents as it was: the chapter is not in the book now. */
+  removed?: boolean
 }
 
 /** The open chapter as it stands on the page, newer than what is stored. */
@@ -284,7 +290,16 @@ export function takeMoment(deps: Deps, pieceId: string, opts: { kept?: boolean }
   return deps.store.transaction((tx) => momentIn(tx, deps, pieceId, opts))
 }
 
-async function momentIn(tx: Tx, deps: Pick<Deps, 'clock' | 'ids'>, pieceId: string, opts: { kept?: boolean } = {}): Promise<number> {
+/**
+ * One moment inside a transaction already running (`takeMoment` is this alone). `beforeBringBack` names the section
+ * about to be replaced: its version is written even if nothing changed, and marked, like `kept` but for it alone.
+ */
+export async function momentIn(
+  tx: Tx,
+  deps: Pick<Deps, 'clock' | 'ids'>,
+  pieceId: string,
+  opts: { kept?: boolean; beforeBringBack?: string } = {},
+): Promise<number> {
   const piece = await tx.piece(pieceId)
   if (!piece) return 0
 
@@ -296,7 +311,7 @@ async function momentIn(tx: Tx, deps: Pick<Deps, 'clock' | 'ids'>, pieceId: stri
     const parent = working.baseVersionId ? await tx.version(working.baseVersionId) : undefined
     if (parent) at = Math.max(at, parent.createdAt + 1)
     const unchanged = parent ? parent.content === working.content : working.content === ''
-    if (!unchanged || (opts.kept && parent)) changes.push({ working, parent })
+    if (!unchanged || (opts.kept && parent) || (opts.beforeBringBack === working.sectionId && parent)) changes.push({ working, parent })
   }
   const outline = piece.outlineId ? await tx.outline(piece.outlineId) : undefined
   const outlineChanged =
@@ -315,6 +330,7 @@ async function momentIn(tx: Tx, deps: Pick<Deps, 'clock' | 'ids'>, pieceId: stri
       createdAt: at,
       content: working.content,
       ...(opts.kept ? { kept: true } : {}),
+      ...(opts.beforeBringBack === working.sectionId ? { beforeBringBack: true } : {}),
     }
     await tx.putVersion(version)
     await tx.putWorking({ ...working, baseVersionId: version.id })
@@ -573,7 +589,7 @@ function joinIn(before: string, content: string): Pick<Place, 'paragraph' | 'off
 }
 
 /** A changed section's count no longer holds on any screen: it is unknown until it is laid out again. */
-function withoutCounts(pages: Piece['pages'], sectionIds: string[]): Piece['pages'] {
+export function withoutCounts(pages: Piece['pages'], sectionIds: string[]): Piece['pages'] {
   if (!pages) return pages
   const left = (counts: Record<string, number> | undefined): Record<string, number> =>
     Object.fromEntries(Object.entries(counts ?? {}).filter(([id]) => !sectionIds.includes(id)))
@@ -581,7 +597,7 @@ function withoutCounts(pages: Piece['pages'], sectionIds: string[]): Piece['page
 }
 
 /** A place's snippet: the first paragraph's words, as the page shows them. */
-function openingWords(markdown: string): string {
+export function openingWords(markdown: string): string {
   const first = parse(markdown)[0]
   return first ? wordsIn(first).slice(0, 160) : ''
 }
@@ -625,7 +641,7 @@ export function storedSection(deps: Pick<Deps, 'store'>, pieceId: string, sectio
   }))
 }
 
-async function current(tx: Tx, sectionId: string): Promise<{ content: string; updatedAt: number }> {
+export async function current(tx: Tx, sectionId: string): Promise<{ content: string; updatedAt: number }> {
   const working = await tx.working(sectionId)
   if (working) return { content: working.content, updatedAt: working.updatedAt }
   const version = latest(await tx.versionsOf(sectionId))
