@@ -1127,8 +1127,10 @@ test('pressed again while the screen is leaving, Keep a copy makes no second cop
   await expect(oldText(page)).toHaveText('One.')
   // The Time Machine is slow to close: the second press comes after the copy was made, before the screen is gone.
   await page.evaluate(() => {
-    const back = history.back.bind(history)
-    history.back = () => void ((window as unknown as { closeNow: () => void }).closeNow = back)
+    const back = window.history.back.bind(window.history)
+    window.history.back = () => {
+      ;(window as unknown as { closeNow: () => void }).closeNow = back
+    }
   })
   const pieces = () => stored(page, 'pieces')
   const before = (await pieces()).length

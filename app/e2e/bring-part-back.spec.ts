@@ -305,9 +305,12 @@ test('a passage whose window loses the piece on the way back says it did not com
   await select(page, 'Old words')
   // The Time Machine is slow to close, so another window can take the piece between the press and the page.
   await page.evaluate(() => {
-    const back = history.back.bind(history)
-    ;(window as unknown as { closeNow: () => void }).closeNow = () => void 0
-    history.back = () => void ((window as unknown as { closeNow: () => void }).closeNow = back)
+    const back = window.history.back.bind(window.history)
+    const later = window as unknown as { closeNow: () => void }
+    later.closeNow = () => void 0
+    window.history.back = () => {
+      later.closeNow = back
+    }
   })
   await menu(page).getByRole('button', { name: 'Bring part back' }).click()
 
