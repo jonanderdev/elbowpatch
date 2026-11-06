@@ -1,11 +1,11 @@
 import type { Kind } from '../domain/model'
-import { geometry, type Pager } from './pager'
+import { aboveMomentBar, geometry, type Pager } from './pager'
 
 /** The screen's height with no keyboard up, and the tallest the window has been, at this width: on a touch screen the keyboard shortens the window, never the page. */
 let tallest = { width: 0, height: 0, window: 0 }
 
-/** Lays the pages out: the page fitted to the screen, at the text settings. */
-export function layOut(pager: Pager, screen: HTMLElement, kind: Kind): void {
+/** Lays the pages out: the page fitted to the screen, at the text settings. `short`: it ends above the moment bar. */
+export function layOut(pager: Pager, screen: HTMLElement, kind: Kind, short = false): void {
   const width = screen.clientWidth
   let height = screen.clientHeight
   if (matchMedia('(pointer: coarse)').matches) {
@@ -27,7 +27,8 @@ export function layOut(pager: Pager, screen: HTMLElement, kind: Kind): void {
     // The screen keeps that height, and the page's scroller its length.
     screen.style.setProperty('--page-height', `${height}px`)
   }
-  const g = geometry(width, height, document.documentElement.dataset.measure === 'wide', kind === 'journal')
+  const fit = geometry(width, height, document.documentElement.dataset.measure === 'wide', kind === 'journal')
+  const g = short ? aboveMomentBar(fit, height) : fit
   const set = (name: string, px: number): void => screen.style.setProperty(name, `${px}px`)
   screen.style.setProperty('--k', `${g.k}`)
   set('--side', g.side)

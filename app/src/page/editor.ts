@@ -76,7 +76,7 @@ export function createEditor(mount: HTMLElement, options: EditorOptions): Editor
       // Pasted plain text is read as Markdown, with the same rules as typing (0003).
       // Markdown outside the v1 marks, headings included, arrives as plain paragraphs.
       clipboardTextParser: (text) => new Slice(Fragment.from(toDoc(parse(text).map(plainIfRaw)).content), 0, 0),
-      clipboardTextSerializer: (slice) => serialize(toBlocks(schema.nodes.doc.create(null, slice.content.size ? slice.content : undefined))),
+      clipboardTextSerializer: asMarkdown,
       // The pager turns to the caret; nothing scrolls by itself.
       handleKeyDown: (v, e) => options.onKey?.(v, e) ?? false,
       handleScrollToSelection: (v) => {
@@ -123,6 +123,37 @@ export function createEditor(mount: HTMLElement, options: EditorOptions): Editor
     },
     destroy: () => view.destroy(),
   }
+}
+
+/** Text copied from the page is Markdown. */
+function asMarkdown(slice: Slice): string {
+  return serialize(toBlocks(schema.nodes.doc.create(null, slice.content.size ? slice.content : undefined)))
+}
+
+/** Old text on the page (DESIGN.md, The Time Machine). */
+export interface Reader {
+  view: EditorView
+  /** Shows this text in place of what it held. */
+  show(markdown: string): void
+  destroy(): void
+}
+
+/**
+ * Text to read and not change, through the editor's own schema, so it looks exactly like the page. It
+ * has none of the editor's plugins: no caret, no history, and night dims nothing here.
+ */
+export function createReader(mount: HTMLElement, content: string, lang: string): Reader {
+  const stateOf = (markdown: string): EditorState => EditorState.create({ doc: toDoc(parse(markdown)) })
+  const view = new EditorView(
+    { mount },
+    {
+      state: stateOf(content),
+      editable: () => false,
+      attributes: { class: 'body', lang, 'aria-label': 'Text' },
+      clipboardTextSerializer: asMarkdown,
+    },
+  )
+  return { view, show: (markdown) => view.updateState(stateOf(markdown)), destroy: () => view.destroy() }
 }
 
 function markActive(state: EditorState, type: MarkType): boolean {

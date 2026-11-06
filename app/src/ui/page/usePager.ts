@@ -25,6 +25,8 @@ interface Options {
   settings: Settings
   /** The phone keyboard is up: the page keeps the height it was laid out at. */
   keyboard: boolean
+  /** The page ends above the moment bar. */
+  short?: boolean
   /** After the pages were laid out again: show the caret's page. */
   onRelayout(pager: Pager): void
   /** What a turn to this page says, when it is read out. */
@@ -35,7 +37,7 @@ interface Options {
  * The pager for the page: the text in CSS columns, one per page (docs/decisions/0003). Laid out
  * before the first paint, and again when the window, the fonts or the text settings change.
  */
-export function usePager({ screen, viewport, flow, columns, kind, settings, keyboard, onRelayout, say }: Options): PagerState {
+export function usePager({ screen, viewport, flow, columns, kind, settings, keyboard, short = false, onRelayout, say }: Options): PagerState {
   const [pager, setPager] = useState<Pager | null>(null)
   const [page, setPage] = useState(0)
   const [count, setCount] = useState(1)
@@ -46,6 +48,8 @@ export function usePager({ screen, viewport, flow, columns, kind, settings, keyb
   onRelayoutNow.current = onRelayout
   const sayNow = useRef(say)
   sayNow.current = say
+  const shortNow = useRef(short)
+  shortNow.current = short
 
   useLayoutEffect(() => {
     const viewportEl = viewport.current
@@ -60,11 +64,11 @@ export function usePager({ screen, viewport, flow, columns, kind, settings, keyb
       if (!p.opening && shown !== -1 && next !== shown) setAnnouncement(sayNow.current(next, total))
       shown = next
     })
-    layOut(p, screenEl, kind)
+    layOut(p, screenEl, kind, shortNow.current)
     setPager(p)
 
     const relayout = (): void => {
-      layOut(p, screenEl, kind)
+      layOut(p, screenEl, kind, shortNow.current)
       onRelayoutNow.current(p)
     }
     // Laid out again once the fonts are in, so page breaks do not move after load (0011).
@@ -93,11 +97,11 @@ export function usePager({ screen, viewport, flow, columns, kind, settings, keyb
     const screenEl = screen.current
     if (!pager || !screenEl) return
     const frame = requestAnimationFrame(() => {
-      layOut(pager, screenEl, kind)
+      layOut(pager, screenEl, kind, short)
       onRelayoutNow.current(pager)
     })
     return () => cancelAnimationFrame(frame)
-  }, [pager, screen, kind, size, leading, measure, align, dropcap, indent, keyboard])
+  }, [pager, screen, kind, size, leading, measure, align, dropcap, indent, keyboard, short])
 
   return { pager, page, count, laidOut, announcement }
 }

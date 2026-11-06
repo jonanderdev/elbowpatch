@@ -15,6 +15,7 @@ export function ToolsBar(props: {
   onClose(): void
   onTextSettings(): void
   onExport(): void
+  onTimeMachine(): void
 }): ReactElement {
   const settings = useSettings()
   const night = theme(settings) === 'night'
@@ -52,6 +53,7 @@ export function ToolsBar(props: {
       )}
       <span className="bar-separator" />
       <IconButton icon="export" label="Export" onClick={props.onExport} />
+      <IconButton icon="history" label="Time Machine" onClick={props.onTimeMachine} />
       <button type="button" className="icon-button" aria-label="Text settings" onClick={props.onTextSettings}>
         <span className="aa" aria-hidden="true">
           Aa
@@ -75,6 +77,7 @@ export function HeadTools(props: {
   sheet: 'text' | 'export' | null
   onTextSettings(from: HTMLElement): void
   onExport(from: HTMLElement): void
+  onTimeMachine(): void
 }): ReactElement {
   return (
     <div className="head-tools" role="toolbar" aria-label="Tools">
@@ -92,6 +95,7 @@ export function HeadTools(props: {
       >
         <Icon name="export" />
       </button>
+      <IconButton icon="history" label="Time Machine" quiet onClick={props.onTimeMachine} />
       <button
         type="button"
         className="icon-button quiet"
