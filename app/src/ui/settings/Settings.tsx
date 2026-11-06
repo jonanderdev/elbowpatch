@@ -4,6 +4,7 @@ import type { Deps } from '../../domain/pieces'
 import { longDate, number } from '../../domain/words'
 import { Path } from '../components/Path'
 import { APP_VERSION } from '../components/project'
+import { ScrollMark } from '../components/ScrollMark'
 import { useScrolled } from '../components/useScrolled'
 import { lastExport } from '../files/everything'
 import { About } from './About'
@@ -66,6 +67,7 @@ export function Settings(props: Props): ReactElement {
         {props.area === 'home-screen' && <HomeScreen />}
         {props.area === 'about' && <About />}
       </div>
+      <ScrollMark scroller={scroller} />
     </main>
   )
 }
