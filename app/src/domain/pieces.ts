@@ -278,7 +278,7 @@ export function savePlace(deps: Pick<Deps, 'store'>, pieceId: string, place: Pla
  * A moment: every section whose text changed since its last version gets a new
  * version, and a changed title or section list a new outline version, all with
  * one timestamp. Nothing changed, nothing written — so running it twice is safe.
- * `kept` ("keep this moment") always writes, and is never thinned.
+ * `kept` ("keep this moment") always writes, and neither it nor the outline in force is thinned.
  */
 export function takeMoment(deps: Deps, pieceId: string, opts: { kept?: boolean } = {}): Promise<number> {
   return deps.store.transaction((tx) => momentIn(tx, deps, pieceId, opts))
@@ -289,8 +289,12 @@ async function momentIn(tx: Tx, deps: Pick<Deps, 'clock' | 'ids'>, pieceId: stri
   if (!piece) return 0
 
   const changes: { working: Working; parent: Version | undefined }[] = []
+  // One timestamp for the moment, later than anything in the piece before it, whatever the clock says:
+  // so the outline in force at a moment can be told from the one after it (outlineAt).
+  let at = deps.clock.now()
   for (const working of await tx.workingOf(pieceId)) {
     const parent = working.baseVersionId ? await tx.version(working.baseVersionId) : undefined
+    if (parent) at = Math.max(at, parent.createdAt + 1)
     const unchanged = parent ? parent.content === working.content : working.content === ''
     if (!unchanged || (opts.kept && parent)) changes.push({ working, parent })
   }
@@ -299,9 +303,6 @@ async function momentIn(tx: Tx, deps: Pick<Deps, 'clock' | 'ids'>, pieceId: stri
     !outline || outline.title !== piece.title || (outline.subtitle ?? '') !== (piece.subtitle ?? '') || !sameSections(outline.sections, piece.sections)
   if (changes.length === 0 && !outlineChanged) return 0
 
-  // One timestamp for the moment, never earlier than anything it follows: clocks jump.
-  let at = deps.clock.now()
-  for (const { parent } of changes) if (parent) at = Math.max(at, parent.createdAt + 1)
   if (outline) at = Math.max(at, outline.createdAt + 1)
 
   for (const { working, parent } of changes) {
@@ -662,6 +663,11 @@ export function history(versions: Version[]): Version[] {
 
 export function latest(versions: Version[]): Version | undefined {
   return history(versions).at(-1)
+}
+
+/** The outline in force at a moment: the one that moment wrote, else the last before it (0005). */
+export function outlineAt(outlines: Outline[], at: number): Outline | undefined {
+  return [...outlines].sort((a, b) => b.seq - a.seq).find((o) => o.createdAt <= at)
 }
 
 /**
