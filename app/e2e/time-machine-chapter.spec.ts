@@ -202,6 +202,23 @@ test('on desktop the rail of a short book stays as it is while the line shows', 
   await expect(rowsOf(page).first()).toBeInViewport({ ratio: 1 })
 })
 
+test('on desktop the calm line stands where the frame draws it, under the text column, with its text 54px above the bottom', async ({ page }) => {
+  test.skip(!onDesktop(page), 'the frame is the desktop one')
+  await importBook(page, THREE)
+  await goTo(page, 'Two')
+  await keepMoment(page)
+  await typeAtEnd(page, ' Changed since.')
+  await open(page)
+  await machine(page).getByRole('button', { name: 'Bring chapter back' }).click()
+  await expect(machine(page)).toHaveCount(0)
+  await expect(line(page)).toBeVisible()
+  const box = (await line(page).boundingBox())!
+  const text = (await page.locator('.page-screen:not(.time-machine) .body').boundingBox())!
+  // The line is 44px tall with its one line of text centred: the text starts 13px (rounded) below the top of the box.
+  expect(Math.round(box.y + (44 - 18.2) / 2)).toBe(846)
+  expect(box.x).toBe(text.x)
+})
+
 test('a chapter removed since returns in its old place with its old title, in a later outline, and stays through a reload', async ({ page }) => {
   await twoRemoved(page)
   await typeAtEnd(page, ' Then more.')
