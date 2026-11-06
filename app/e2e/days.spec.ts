@@ -365,10 +365,10 @@ test('the rail folds as a book’s does, and gives way to the keyboard', async (
   await expect(rail(page)).toBeHidden()
 })
 
-test('a rail has no edge of its own: the journal’s margin rule is the line', async ({ page }) => {
+test('the rail keeps its own edge beside the journal, whose margin rule now stands with the text', async ({ page }) => {
   desktopOnly(page)
   await openJournal(page)
-  await expect(rail(page)).toHaveCSS('border-right-width', '0px')
+  await expect(rail(page)).toHaveCSS('border-right-width', '1px')
 })
 
 test('turning past a day’s last page goes to the next day, and back to the day’s last page', async ({ page }) => {

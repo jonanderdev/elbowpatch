@@ -215,6 +215,7 @@ export function Page({
     kind: piece.kind,
     settings,
     keyboard,
+    rail: railed && !settings.railFolded,
     onRelayout: (p) => {
       rail.laidOut(p.g.side)
       const e = editorNow.current
@@ -577,18 +578,28 @@ export function Page({
     })
   }
 
-  // Escape closes what is open, innermost first: a sheet, then the tools. One listener reads what
-  // is open now from a ref: re-attached on each change, an Escape pressed right after one (Done,
-  // then Escape) would reach the listener from before it.
-  const open = useRef({ tools, sheet, anchor })
-  open.current = { tools, sheet, anchor }
+  // Back to the library. Pressed, it leaves the caret where it is, so the place kept is the caret's.
+  const home = (): void => {
+    focus.leaving()
+    onLibrary()
+  }
+
+  // Escape closes what is open, innermost first: a sheet, then the tools. With nothing open, on desktop, it
+  // goes back to the library; a selection is something the writer is doing, and a held key is not a press.
+  // One listener reads what is open now from a ref: re-attached on each change, an Escape pressed right
+  // after one (Done, then Escape) would reach the listener from before it.
+  const selected = !!selection?.rect
+  const open = useRef({ tools, sheet, anchor, selected, phone, home })
+  open.current = { tools, sheet, anchor, selected, phone, home }
   useEffect(() => {
     if (covered) return
     const onKey = (e: KeyboardEvent): void => {
       if (e.key !== 'Escape') return
       if (open.current.sheet) closeSheet()
       else if (open.current.tools) closeTools()
-      else return
+      // Not by whether it was answered: the editor answers every Escape. The rail keeps its own.
+      else if (open.current.phone || open.current.selected || e.repeat || e.isComposing || (e.target as Element).closest('.rail')) return
+      else open.current.home()
       e.preventDefault()
     }
     window.addEventListener('keydown', onKey)
@@ -656,17 +667,9 @@ export function Page({
       aria-hidden={covered}
     >
       <div ref={head} className="head" data-scrolled={scrolled || undefined}>
-        {/* Pressed, § leaves the caret where it is, so the place kept is the caret's. On desktop the
-            piece's name follows it; a phone shows § alone. */}
+        {/* On desktop § and *Library*, then the piece's name; a phone shows § alone. */}
         <div className="head-path">
-          <Path
-            crumbs={[{ word: (piece.kind === 'essay' ? heading : name).trim() || 'Untitled' }]}
-            keepFocus
-            onHome={() => {
-              focus.leaving()
-              onLibrary()
-            }}
-          />
+          <Path crumbs={[{ word: (piece.kind === 'essay' ? heading : name).trim() || 'Untitled' }]} keepFocus onHome={home} />
           {railed ? <RailToggle label={journal ? 'Days' : 'Contents'} open={rail.open} onToggle={rail.toggle} buttonRef={railToggle} /> : null}
         </div>
         {/* In the head, so the toggle's next stop is what it opens, then the tools. */}

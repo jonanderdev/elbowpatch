@@ -126,7 +126,7 @@ interface ContentsRailProps extends ContentsListProps {
 export const RAIL_ID = 'contents-rail'
 
 /**
- * Contents on desktop: the rail, which folds away and never moves the text (DESIGN.md, Layout). Folded,
+ * Contents on desktop: the rail, which folds away, and the text centres in what it leaves (DESIGN.md, Layout). Folded,
  * it stays out of the way of the keyboard and of a screen reader.
  */
 export function ContentsRail({ chapters, current, removable, still, pages, open, onOpen, onRemove, onLeave, children }: ContentsRailProps): ReactElement {

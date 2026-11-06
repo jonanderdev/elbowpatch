@@ -33,6 +33,8 @@ export const PHONE_BELOW = 700
 export function screenOf(width: number): Screen {
   return width < PHONE_BELOW ? 'phone' : 'desktop'
 }
+/** The rail's width (DESIGN.md, Layout). */
+export const RAIL_WIDTH = 336
 /** The most a screen scales the page up: past it the type outgrows reading size, and a big screen shows more room around the page instead. */
 export const MAX_SCALE = 1.3
 
@@ -51,9 +53,10 @@ export interface Fit extends Geometry {
  * The screen's page at the largest scale that fits it, up to MAX_SCALE. The text fits between the head and
  * the foot, which keep their size, and sits centred between them. On a phone the page fills the screen's
  * width and the text all the height between the head and the foot: only the width scales it. The stride
- * stays whole pixels, so page 300 lands where page 1 does.
+ * stays whole pixels, so page 300 lands where page 1 does. `rail`: an open rail stands at the left, and where there
+ * is room for it the page centres in the width right of it. The page keeps its scale, so its breaks stay.
  */
-export function geometry(screenWidth: number, screenHeight: number, wide = false, journal = false): Fit {
+export function geometry(screenWidth: number, screenHeight: number, wide = false, journal = false, rail = false): Fit {
   const stride = Math.floor(screenWidth)
   const phone = screenOf(stride) === 'phone'
   const page = PAGES[phone ? 'phone' : 'desktop']
@@ -65,9 +68,10 @@ export function geometry(screenWidth: number, screenHeight: number, wide = false
   // The text's height in the page's own px.
   const text = phone ? room / k : designed
   const top = page.top + (room - text * k) / 2
+  const side = (stride - page.width * k) / 2 + left * k
   return {
     measure: (page.width - left - right) * k,
-    side: (stride - page.width * k) / 2 + left * k,
+    side: rail && side >= RAIL_WIDTH ? side + RAIL_WIDTH / 2 : side,
     stride,
     k,
     top,

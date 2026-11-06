@@ -172,6 +172,7 @@ export function TimeMachine({ deps, looking, writes, onBringBack, onKeepCopy, on
     settings,
     keyboard: false,
     short: !nothing,
+    rail: book && !phone && !settings.railFolded,
     onRelayout: (p) => rail.laidOut(p.g.side),
     say: (at, total) => pageLine(at + 1, total) || 'Page turned',
   })

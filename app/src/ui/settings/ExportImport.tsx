@@ -112,10 +112,13 @@ export function ExportImport({ deps, beforeExport, onChanged }: Props): ReactEle
     if (!sheetOpen) return
     ;(sheet.current?.querySelector('[aria-checked="true"]') as HTMLElement | null)?.focus()
     const esc = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') setLoose(null)
+      if (e.key !== 'Escape') return
+      e.preventDefault()
+      setLoose(null)
     }
-    window.addEventListener('keydown', esc)
-    return () => window.removeEventListener('keydown', esc)
+    // Before Settings hears it, so Escape closes the sheet and not the area.
+    window.addEventListener('keydown', esc, true)
+    return () => window.removeEventListener('keydown', esc, true)
   }, [sheetOpen])
 
   return (
