@@ -396,7 +396,8 @@ test('a book’s and a journal’s page 1 keep the running head here, which an e
     await saved(page, 'Some words.')
     await page.keyboard.press('Control+Alt+z')
     await expect(machine(page)).toBeVisible()
-    await expect(machine(page).locator('.running-head')).toHaveCount(1)
+    // A phone's book has it as the control that opens Contents.
+    await expect(machine(page).locator('.running-head, .running-control')).toHaveCount(1)
     await page.keyboard.press('Escape')
     await expect(machine(page)).toHaveCount(0)
   }
