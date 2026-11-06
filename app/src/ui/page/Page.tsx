@@ -406,9 +406,9 @@ export function Page({
     setSheet(null)
     const back = opener.current
     opener.current = null
-    // Only from the sheet: the focus left in the text stays there, and the keyboard with it.
-    const active = document.activeElement
-    if (back && (!active || active === document.body || active.closest('.sheet'))) requestAnimationFrame(() => back.focus())
+    // Only from the sheet: the focus left in the text stays there, and the keyboard with it. Looked at again a
+    // frame later, when the sheet has gone: a caret put in the text since is kept, and no key typed there is lost.
+    if (back && fromSheet()) requestAnimationFrame(() => (fromSheet() ? back.focus() : undefined))
   }, [])
 
   // Contents drops under the head; pressed again, the running head closes it.
@@ -843,6 +843,12 @@ export function Page({
 }
 
 /** A sheet's place under the head control that opened it, right-aligned to it. */
+/** The focus is on nothing, or still on the sheet that is closing. */
+function fromSheet(): boolean {
+  const active = document.activeElement
+  return !active || active === document.body || !!active.closest('.sheet')
+}
+
 function below(control: HTMLElement): CSSProperties {
   const box = control.getBoundingClientRect()
   return {

@@ -237,8 +237,6 @@ test('a chapter removed since says so where its number would be, and opens and r
   await contents(page).getByRole('button', { name: 'Remove chapter' }).click()
   await expect(rowsOf(page)).toHaveCount(2)
   await closeSheet(page)
-  // On a phone, something after a removal takes the focus back for a moment, and cuts typing short: let it settle.
-  await page.waitForTimeout(500)
   await typeAtEnd(page, ' Then more.')
   await open(page)
   await expect(tape(page)).toBeVisible()
@@ -454,8 +452,6 @@ test('a chapter removed since offers Copy alone', async ({ page }) => {
   await contents(page).getByRole('button', { name: 'Remove chapter' }).click()
   await expect(rowsOf(page)).toHaveCount(2)
   await closeSheet(page)
-  // On a phone, something after a removal takes the focus back for a moment, and cuts typing short: let it settle.
-  await page.waitForTimeout(500)
   await typeAtEnd(page, ' Then more.')
   await open(page)
   await expect(tape(page)).toBeVisible()

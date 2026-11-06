@@ -39,8 +39,6 @@ async function closeContents(page: Page) {
   if (onDesktop(page) || !(await contents(page).isVisible())) return
   await contents(page).getByRole('button', { name: 'Done' }).click()
   await expect(contents(page)).toBeHidden()
-  // Closing gives the focus back a frame later: keys pressed before that would land on the count.
-  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))
 }
 
 async function goTo(page: Page, name: string) {
@@ -203,6 +201,23 @@ test('the writer keeps typing in the open chapter straight after, and the words 
   await page.keyboard.type(' After.')
   await saved(page, 'Third. After.')
   await storedTitles(page).toEqual(['One', 'Three'])
+})
+
+test('the focus Done gives back does not take the caret from words the writer already put it in', async ({ page }) => {
+  test.skip(onDesktop(page), 'Contents is a sheet on a phone only')
+  await bookWithEmptied(page, 'Three')
+  await removes(page).click()
+  await expect(rows(page)).toHaveCount(2)
+  // Done, then the caret into the text before the next frame: a key pressed then must reach the text.
+  await contents(page)
+    .getByRole('button', { name: 'Done' })
+    .evaluate((done: HTMLElement) => {
+      done.click()
+      document.querySelector<HTMLElement>('.body')?.focus()
+    })
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(done)))))
+  await expect(page.locator('.body')).toBeFocused()
+  await expect(contents(page)).toHaveCount(0)
 })
 
 test('removing the open chapter opens the one before it at its opening page, and the page closing does not bring it back', async ({ page }) => {
