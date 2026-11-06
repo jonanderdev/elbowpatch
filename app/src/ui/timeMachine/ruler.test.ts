@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { nearestTick, tapeLabels, tickSpacing } from './ruler'
+import { glideTime, MAX_THROW, nearestTick, settleOn, tapeLabels, tickSpacing, ticksInReach } from './ruler'
 
 const at = (day: number, hour = 12): number => new Date(2026, 10, day, hour).getTime()
 const NOW = at(6, 15)
@@ -47,5 +47,55 @@ describe('a tap on the tape', () => {
   it('stays on the tape', () => {
     expect(nearestTick(1, 3, 44, 500)).toBe(2)
     expect(nearestTick(1, 3, 44, -500)).toBe(0)
+  })
+})
+
+describe('where the tape settles when let go', () => {
+  it('on the nearest tick when it was still', () => {
+    expect(settleOn(5 * 11 + 4, 0, 11, 20)).toBe(5)
+    expect(settleOn(5 * 11 + 6, 0, 11, 20)).toBe(6)
+  })
+
+  it('further on in the way it was going, by how fast it was', () => {
+    expect(settleOn(100, 0.5, 11, 40)).toBeGreaterThan(settleOn(100, 0.1, 11, 40))
+    expect(settleOn(100, -0.5, 11, 40)).toBeLessThan(settleOn(100, -0.1, 11, 40))
+  })
+
+  it('never far enough to leave the ticks that are drawn', () => {
+    expect(settleOn(1000, 50, 11, 500)).toBe(Math.round(1000 / 11) + MAX_THROW)
+    expect(settleOn(1000, -50, 11, 500)).toBe(Math.round(1000 / 11) - MAX_THROW)
+  })
+
+  it('stays on the tape', () => {
+    expect(settleOn(10, -5, 11, 20)).toBe(0)
+    expect(settleOn(200, 5, 11, 20)).toBe(19)
+    expect(settleOn(-30, 0, 11, 20)).toBe(0)
+  })
+})
+
+describe('how long a glide takes', () => {
+  it('is none when there is nowhere to go', () => {
+    expect(glideTime(0)).toBe(0)
+  })
+
+  it('is short for a tick and longer for a throw, and never past 320ms', () => {
+    expect(glideTime(11)).toBeLessThan(200)
+    expect(glideTime(300)).toBeGreaterThan(glideTime(11))
+    expect(glideTime(100_000)).toBe(320)
+  })
+})
+
+describe('which ticks are drawn', () => {
+  it('is all of them on a short tape', () => {
+    expect(ticksInReach(3, 20)).toEqual({ from: 0, to: 19 })
+  })
+
+  it('is a stretch either side of the tick under the hairline, within the tape', () => {
+    const { from, to } = ticksInReach(500, 1000)
+    expect(from).toBeLessThan(500 - 50)
+    expect(to).toBeGreaterThan(500 + 50)
+    expect(to - from).toBeLessThan(300)
+    expect(ticksInReach(2, 1000).from).toBe(0)
+    expect(ticksInReach(998, 1000).to).toBe(999)
   })
 })

@@ -2634,6 +2634,10 @@ button.count[aria-expanded='true'] {
 .time-machine .head {
   z-index: 2;
 }
+/* Fading out over the page, once left: it takes nothing, and stays where it was rather than becoming fixed as a covered page does. */
+.page-screen.time-machine[inert] {
+  position: absolute;
+}
 .time-machine .title {
   cursor: text;
 }
@@ -2704,11 +2708,27 @@ button.count[aria-expanded='true'] {
 }
 
 /* The tape: the ticks slide under the hairline, which stays. */
+/* Dragged or swiped on its own: the browser takes no pan or zoom from it, and a long press selects nothing. */
 .tape {
   position: relative;
   height: 46px;
   overflow: hidden;
   cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+/* The ticks fade at the edges, to show the tape goes on. Only over the ticks: the labels never fade. */
+.tape::before {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 29px;
+  background: linear-gradient(to right, var(--surface), transparent 24px, transparent calc(100% - 24px), var(--surface));
+  pointer-events: none;
 }
 .tape::after {
   content: '';

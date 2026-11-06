@@ -284,8 +284,15 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
           }}
         />
       )}
-      {timeMachine.looking && (
-        <TimeMachine deps={deps} looking={timeMachine.looking} onBack={() => timeMachine.leave()} onHome={() => timeMachine.leave(() => void toLibrary())} />
+      {timeMachine.onScreen && (
+        <TimeMachine
+          key={timeMachine.onScreen.key}
+          deps={deps}
+          looking={timeMachine.onScreen.looking}
+          leaving={timeMachine.onScreen.leaving}
+          onBack={() => timeMachine.leave()}
+          onHome={() => timeMachine.leave(() => void toLibrary())}
+        />
       )}
       {/* The page changed under a screen reader: it hears which chapter it is in. Here, for a live region
           must stand before its words do, and the page is new for each chapter. */}

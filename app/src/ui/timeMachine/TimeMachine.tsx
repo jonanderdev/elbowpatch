@@ -10,6 +10,7 @@ import { usePageTurns } from '../page/usePageTurns'
 import { useSettings } from '../stores/settings'
 import { ErrorBar, LoadingBar, MomentsBar, NothingEarlierBar } from './MomentBar'
 import { EmptyTape, Tape } from './Tape'
+import { useMomentFade, useScreenFade } from './useFades'
 import { useMoments } from './useMoments'
 import { useReader } from './useReader'
 
@@ -34,6 +35,8 @@ export interface Looking {
 interface Props {
   deps: Pick<Deps, 'store' | 'clock'>
   looking: Looking
+  /** Left, and fading out: it no longer answers. */
+  leaving?: boolean
   /** Back to now, at the same place. */
   onBack(): void
   /** § goes home, from here too. */
@@ -47,7 +50,7 @@ const NOTHING = (): void => {}
  * The Time Machine (DESIGN.md): a section as it was at one moment, on a shorter page above the moment bar.
  * It stands over the page, which stays as it was left. It writes nothing: no text, no place, no page counts.
  */
-export function TimeMachine({ deps, looking, onBack, onHome }: Props): ReactElement {
+export function TimeMachine({ deps, looking, leaving = false, onBack, onHome }: Props): ReactElement {
   const { piece, sectionId, today, ready } = looking
   const { read, again } = useMoments(deps, piece.id, sectionId, ready)
   /** The time it stands at, once the writer has moved: it opens on the most recent moment that differs from now. */
@@ -105,14 +108,18 @@ export function TimeMachine({ deps, looking, onBack, onHome }: Props): ReactElem
     reader?.show(content)
     pager?.measure()
   }, [reader, pager, content, title])
+  useMomentFade(viewport, moment?.at)
+  useScreenFade(screen, leaving)
 
   // Read when a key comes; re-attached on each render, an Escape could reach the listener from before it.
   const back = useRef(onBack)
   back.current = onBack
+  const gone = useRef(leaving)
+  gone.current = leaving
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      // Already answered: the rail lets go of the focus first.
-      if (e.key !== 'Escape' || e.defaultPrevented) return
+      // Already answered: the rail lets go of the focus first. And once left, Escape is the page's.
+      if (e.key !== 'Escape' || e.defaultPrevented || gone.current) return
       e.preventDefault()
       back.current()
     }
