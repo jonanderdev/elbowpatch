@@ -336,6 +336,9 @@ const MANY = Array.from({ length: 40 }, (_, i) => `# Chapter ${i + 1}\n\nWords.\
 test('the focus ring on a Contents row stands whole outside it, at the top, the sides and the end of a long list', async ({ page, browserName }) => {
   await importBook(page, MANY)
   await contentsFromCount(page)
+  // The sheet takes the focus just after it shows, from the count that had it: it must not land mid-test.
+  // (On desktop the rail takes none, and in WebKit the count never had it.)
+  if (!onDesktop(page) && browserName !== 'webkit') await expect(rows(page).first()).toBeFocused()
   const list = contents(page).locator('.contents-list')
   /** How far the focused row's ring, 4px round the row, stands inside what the list shows. Never less than 0. */
   const room = () =>
