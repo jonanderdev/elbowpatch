@@ -96,11 +96,7 @@ for (const width of [390, 360]) {
     await page.setViewportSize({ width, height: 800 })
     await essay(page, 'Start.')
     await page.keyboard.press('ControlOrMeta+a')
-    await page.evaluate((text) => {
-      const data = new DataTransfer()
-      data.setData('text/plain', text)
-      document.querySelector('.body')!.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }))
-    }, Array(1040).fill('word').join(' '))
+    await page.keyboard.insertText(Array(1040).fill('word').join(' '))
     await saved(page, 'word word')
     await page.locator('.body').blur()
     await openTools(page)
@@ -172,17 +168,12 @@ test('§ goes home from the Time Machine, and back from there returns to the pie
 })
 
 test('comes back to the page it left, on a long piece', async ({ page }) => {
-  const long = Array.from({ length: 60 }, (_, i) => `Paragraph ${i + 1} goes on for a while, so that the text fills more than one page of the piece.`).join(
-    '\n\n',
-  )
   await essay(page, 'Short.')
   await caretToEnd(page)
   await page.keyboard.press('ControlOrMeta+a')
-  await page.evaluate((text) => {
-    const data = new DataTransfer()
-    data.setData('text/plain', text)
-    document.querySelector('.body')!.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }))
-  }, long)
+  await page.keyboard.insertText(
+    Array.from({ length: 60 }, (_, i) => `Paragraph ${i + 1} goes on for a while, so that the text fills more than one page.`).join(' '),
+  )
   await saved(page, 'Paragraph 60')
   await page.keyboard.press('PageDown')
   await page.keyboard.press('PageDown')
@@ -192,7 +183,7 @@ test('comes back to the page it left, on a long piece', async ({ page }) => {
   await expect(machine(page)).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(machine(page)).toHaveCount(0)
-  expect(await page.locator('.pager').evaluate((el) => el.scrollLeft)).toBe(left)
+  await expect.poll(() => page.locator('.pager').evaluate((el) => el.scrollLeft)).toBe(left)
 })
 
 test('a new piece has nothing earlier: one line, today’s text, and the writing page', async ({ page }) => {
@@ -334,14 +325,19 @@ test('old text keeps the type, never runs under the bar, turns by key, and saves
   expect(after[0]!.pages).toEqual(before[0]!.pages)
 })
 
-test('old text cannot be changed and has no caret', async ({ page }) => {
-  await history(page, ['Before.', 'After.'])
+test('old text can be selected but not changed, and has no caret', async ({ page }) => {
+  await history(page, ['Before these words were here.', 'After.'])
   await open(page)
-  await expect(oldText(page)).toHaveText('Before.')
+  await expect(oldText(page)).toHaveText('Before these words were here.')
   await expect(oldText(page)).toHaveAttribute('contenteditable', 'false')
-  await oldText(page).click()
+  const line = (await oldText(page).locator('p').boundingBox())!
+  await page.mouse.move(line.x + 2, line.y + line.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(line.x + 120, line.y + line.height / 2, { steps: 6 })
+  await page.mouse.up()
+  expect(await page.evaluate(() => getSelection()?.toString())).toContain('Before')
   await page.keyboard.type('x')
-  await expect(oldText(page)).toHaveText('Before.')
+  await expect(oldText(page)).toHaveText('Before these words were here.')
   await expect(machine(page).locator('.earlier')).toHaveCount(0)
 })
 
@@ -477,7 +473,14 @@ test('the desktop path keeps the moment whole and shortens the name', async ({ p
   const moment = machine(page).locator('.crumb').nth(1).locator('.crumb-word')
   await expect(moment).toHaveText('Just now')
   await expect(moment).toHaveCSS('font-style', 'italic')
-  expect(await moment.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true)
+  // The name gives way, not the moment.
+  expect(
+    await machine(page)
+      .locator('.crumb')
+      .first()
+      .locator('.crumb-word')
+      .evaluate((el) => el.scrollWidth > el.clientWidth),
+  ).toBe(true)
   // The toggle ends where the rail's rows do, with the path inside it.
   const toggle = (await machine(page).getByRole('button', { name: 'Pages' }).boundingBox())!
   expect(toggle.x + toggle.width).toBeLessThanOrEqual(316)
