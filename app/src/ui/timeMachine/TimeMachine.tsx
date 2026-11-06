@@ -281,6 +281,8 @@ export function TimeMachine({ deps, looking, onBringBack, onKeepCopy, onBack, on
         working.current = false
         if (alive.current && fresh.some((m) => m.at === was.at && m.content === was.content)) bringBack()
         else if (alive.current) {
+          // The moment has gone: the Time Machine opens on the most recent moment that is left, as when it was opened.
+          setChosen(undefined)
           setBusy(false)
           setBringFailed(false)
         }
