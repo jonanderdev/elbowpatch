@@ -288,7 +288,16 @@ export function takeMoment(deps: Deps, pieceId: string, opts: { kept?: boolean }
   return deps.store.transaction((tx) => momentIn(tx, deps, pieceId, opts))
 }
 
-async function momentIn(tx: Tx, deps: Pick<Deps, 'clock' | 'ids'>, pieceId: string, opts: { kept?: boolean } = {}): Promise<number> {
+/**
+ * One moment inside a transaction already running (`takeMoment` is this alone). `beforeBringBack` names the section
+ * about to be replaced: its version is written even if nothing changed, and marked, like `kept` but for it alone.
+ */
+export async function momentIn(
+  tx: Tx,
+  deps: Pick<Deps, 'clock' | 'ids'>,
+  pieceId: string,
+  opts: { kept?: boolean; beforeBringBack?: string } = {},
+): Promise<number> {
   const piece = await tx.piece(pieceId)
   if (!piece) return 0
 
@@ -300,7 +309,7 @@ async function momentIn(tx: Tx, deps: Pick<Deps, 'clock' | 'ids'>, pieceId: stri
     const parent = working.baseVersionId ? await tx.version(working.baseVersionId) : undefined
     if (parent) at = Math.max(at, parent.createdAt + 1)
     const unchanged = parent ? parent.content === working.content : working.content === ''
-    if (!unchanged || (opts.kept && parent)) changes.push({ working, parent })
+    if (!unchanged || (opts.kept && parent) || (opts.beforeBringBack === working.sectionId && parent)) changes.push({ working, parent })
   }
   const outline = piece.outlineId ? await tx.outline(piece.outlineId) : undefined
   const outlineChanged =
@@ -319,6 +328,7 @@ async function momentIn(tx: Tx, deps: Pick<Deps, 'clock' | 'ids'>, pieceId: stri
       createdAt: at,
       content: working.content,
       ...(opts.kept ? { kept: true } : {}),
+      ...(opts.beforeBringBack === working.sectionId ? { beforeBringBack: true } : {}),
     }
     await tx.putVersion(version)
     await tx.putWorking({ ...working, baseVersionId: version.id })
@@ -577,7 +587,7 @@ function joinIn(before: string, content: string): Pick<Place, 'paragraph' | 'off
 }
 
 /** A changed section's count no longer holds on any screen: it is unknown until it is laid out again. */
-function withoutCounts(pages: Piece['pages'], sectionIds: string[]): Piece['pages'] {
+export function withoutCounts(pages: Piece['pages'], sectionIds: string[]): Piece['pages'] {
   if (!pages) return pages
   const left = (counts: Record<string, number> | undefined): Record<string, number> =>
     Object.fromEntries(Object.entries(counts ?? {}).filter(([id]) => !sectionIds.includes(id)))
@@ -585,7 +595,7 @@ function withoutCounts(pages: Piece['pages'], sectionIds: string[]): Piece['page
 }
 
 /** A place's snippet: the first paragraph's words, as the page shows them. */
-function openingWords(markdown: string): string {
+export function openingWords(markdown: string): string {
   const first = parse(markdown)[0]
   return first ? wordsIn(first).slice(0, 160) : ''
 }
@@ -629,7 +639,7 @@ export function storedSection(deps: Pick<Deps, 'store'>, pieceId: string, sectio
   }))
 }
 
-async function current(tx: Tx, sectionId: string): Promise<{ content: string; updatedAt: number }> {
+export async function current(tx: Tx, sectionId: string): Promise<{ content: string; updatedAt: number }> {
   const working = await tx.working(sectionId)
   if (working) return { content: working.content, updatedAt: working.updatedAt }
   const version = latest(await tx.versionsOf(sectionId))
