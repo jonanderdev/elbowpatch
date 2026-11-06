@@ -29,7 +29,7 @@ import { raiseKeyboard } from '../page/useFocusOnOpen'
 import { waiting } from '../settings/PutAway'
 import { type Area, Settings } from '../settings/Settings'
 import { readLast, writeLast } from '../stores/last'
-import { type BringBackLine, type BringBackRequest, TimeMachine } from '../timeMachine/TimeMachine'
+import { type BringBackLine, type BringBackRequest, type PartBack, TimeMachine } from '../timeMachine/TimeMachine'
 import { bringSectionBack } from './bringBack'
 import { askToPersist } from './persist'
 import { replayJournal } from './replay'
@@ -225,6 +225,26 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
     setOpened({ ...there, at, writing })
   }
 
+  // A passage brought back from the Time Machine: the Time Machine closes onto the page, and the page puts it in.
+  // The page that has the section already has it in at once; another section opens first, saved as any is.
+  const bringPart = ({ sectionId, passage, from }: PartBack): void => {
+    if (bringingNow.current) return
+    const bringing = { passage, from }
+    timeMachine.leave(() => {
+      if (!opened) return
+      if (opened.sectionId === sectionId) {
+        setOpened((now) => now && { ...now, bringing })
+        return
+      }
+      const turn = ++chosen.current
+      void (async () => {
+        await saveFirst()
+        const next = await open(opened.piece.id, sectionId).catch(() => undefined)
+        if (next && turn === chosen.current) setOpened({ ...next, bringing })
+      })()
+    })
+  }
+
   // A new chapter at the end of the book or right after a chapter, read from what is stored once the
   // section left is saved. It is not stored yet: it joins the piece with its first words or title, so one
   // left empty is gone.
@@ -351,6 +371,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
           onBringBack={bringBackTo}
           onKeepCopy={(moment, line) => keepCopyOf(timeMachine.looking!.piece.id, moment, line)}
           onBack={() => timeMachine.leave()}
+          onBringPart={bringPart}
           onHome={() => timeMachine.leave(() => void toLibrary())}
         />
       )}

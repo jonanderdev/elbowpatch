@@ -283,6 +283,25 @@ test('from a day’s second page the running head names the day and drops the mo
   expect((await sheet(page).boundingBox())!.y).toBe(56)
 })
 
+test('the running head’s arrow points down when Days is closed, up while it is open, and tapped again it closes', async ({ page }) => {
+  phoneOnly(page)
+  await openJournal(page)
+  await openMonth(page)
+  await day(page, '26 October, written').click()
+  await expect(page.locator('.title')).toHaveText('Monday 26 October')
+  await page.keyboard.press('PageDown')
+  const head = page.getByRole('button', { name: 'Monday 26 October. Days' })
+  await expect(head).toBeVisible()
+  const arrow = () => head.locator('.icon').evaluate((el) => (getComputedStyle(el).transform === 'none' ? 'down' : 'up'))
+  expect(await arrow()).toBe('down')
+  await head.click()
+  await expect(sheet(page)).toBeVisible()
+  expect(await arrow()).toBe('up')
+  await head.click()
+  await expect(sheet(page)).toHaveCount(0)
+  expect(await arrow()).toBe('down')
+})
+
 test('the month reaches every day by keyboard, and Escape gives the focus back', async ({ page, browserName }) => {
   phoneOnly(page)
   await openJournal(page)

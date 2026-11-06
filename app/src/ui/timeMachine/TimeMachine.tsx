@@ -4,6 +4,7 @@ import type { Piece } from '../../domain/model'
 import { momentInSentence } from '../../domain/momentInSentence'
 import type { ContentsChapter, Deps } from '../../domain/pieces'
 import { dayTitle, momentName, momentShort, pageLine } from '../../domain/words'
+import type { Passage } from '../../page/passage'
 import { type Crumb, Path } from '../components/Path'
 import { usePhone } from '../components/usePhone'
 import { useScrolled } from '../components/useScrolled'
@@ -14,10 +15,12 @@ import { useRail } from '../page/useRail'
 import { useSettings } from '../stores/settings'
 import { ErrorBar, LoadingBar, MomentsBar, NothingEarlierBar } from './MomentBar'
 import { OldTitlePage } from './OldTitlePage'
+import { Part } from './PartMenu'
 import { EmptyTape, Tape } from './Tape'
 import { useContentsAsItWas } from './useContentsAsItWas'
 import { useContentsSheet } from './useContentsSheet'
 import { useKeepCopy } from './useKeepCopy'
+import { usePart } from './usePart'
 import { useReader } from './useReader'
 import { useSections } from './useSections'
 
@@ -41,6 +44,14 @@ export interface Looking {
   today: Today
   /** Done once the page has saved and taken its moment, and thinning has stopped. */
   ready: Promise<unknown>
+}
+
+/** A passage chosen to bring back, and the section it was read in. */
+export interface PartBack {
+  sectionId: string
+  passage: Passage
+  /** The moment it was read at, in the middle of a sentence ("yesterday evening, 21:10"). */
+  from: string
 }
 
 /** One section at one moment, to be brought back: the words are what the writer saw there. */
@@ -67,6 +78,8 @@ interface Props {
   onKeepCopy(moment: Moment, line: string): Promise<void>
   /** Back to now, at the same place. */
   onBack(): void
+  /** The writer brings a selected passage back: the app closes onto the page and puts it in. */
+  onBringPart(part: PartBack): void
   /** § goes home, from here too. */
   onHome(): void
 }
@@ -79,7 +92,7 @@ const NONE: ReadonlySet<string> = new Set()
  * The Time Machine (DESIGN.md): a section as it was at one moment, on a shorter page above the moment bar.
  * It stands over the page, which stays as it was left. It writes nothing: no text, no place, no page counts.
  */
-export function TimeMachine({ deps, looking, onBringBack, onKeepCopy, onBack, onHome }: Props): ReactElement {
+export function TimeMachine({ deps, looking, onBringBack, onKeepCopy, onBack, onBringPart, onHome }: Props): ReactElement {
   const { piece, today, ready } = looking
   /** The section on screen: the page's own until a turn reaches another, at the same time. */
   const sections = useSections(deps, piece.id, looking.sectionId, ready)
@@ -105,7 +118,10 @@ export function TimeMachine({ deps, looking, onBringBack, onKeepCopy, onBack, on
   const stands = chosen ?? momentToOpen(moments)?.at
   /** The piece's outline at that time: the title page's words and the chapters Contents lists. */
   const shape = sections.shape(stands)
-  const here = shape?.sections.find((s) => s.sectionId === sectionId)?.title ?? ''
+  const listed = shape?.sections.find((s) => s.sectionId === sectionId)
+  const here = listed?.title ?? ''
+  /** A chapter no longer in the piece has no text to go back into. The page's piece may be older than a removal made on it. */
+  const removedSince = listed ? listed.removed : !piece.sections.some((s) => s.sectionId === sectionId)
   // A section reached by a turn was listed at this time: with no moment yet it reads as empty.
   const reading = readingAt(moments, stands, piece.kind === 'essay' ? (shape?.title ?? '') : piece.kind === 'journal' ? dayTitle(here) : here)
   const index = reading.index
@@ -128,7 +144,13 @@ export function TimeMachine({ deps, looking, onBringBack, onKeepCopy, onBack, on
   const noBookTitle = useRef<HTMLHeadingElement>(null)
 
   // Before the pager, so its first layout already has the text.
-  const reader = useReader(mount, today.content, piece.lang)
+  const selected = usePart(viewport)
+  /** Words were just copied: said once, for those words. */
+  const [copied, setCopied] = useState(false)
+  const chosenWords = selected.part?.passage.markdown
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new selection starts afresh.
+  useEffect(() => setCopied(false), [chosenWords])
+  const reader = useReader(mount, today.content, piece.lang, selected.follow)
   const { pager, page, announcement } = usePager({
     screen,
     viewport,
@@ -191,6 +213,11 @@ export function TimeMachine({ deps, looking, onBringBack, onKeepCopy, onBack, on
     onCross: cross,
   })
 
+  // A turn of the page moves the selected words, and the part menu with them.
+  const { look } = selected
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the page turning is the reason to look again.
+  useEffect(look, [page, look])
+
   // Before paint, so the words of one moment never stand on the pages of another.
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new title's height moves the page breaks too, and a section reached opens on its own page even when its words read the same.
   useLayoutEffect(() => {
@@ -250,6 +277,7 @@ export function TimeMachine({ deps, looking, onBringBack, onKeepCopy, onBack, on
   }, [hasTape])
 
   const step = (next: number): void => {
+    setCopied(false)
     setChosen(timeOf(moments, next))
     setSaidOver(announcement)
     setCrossedOver(undefined)
@@ -320,7 +348,7 @@ export function TimeMachine({ deps, looking, onBringBack, onKeepCopy, onBack, on
       },
     )
   }
-  const said = crossedOver === announcement ? heading : moment && saidOver === announcement ? momentName(moment.at, now) : announcement
+  const said = copied ? 'Copied' : crossedOver === announcement ? heading : moment && saidOver === announcement ? momentName(moment.at, now) : announcement
 
   return (
     <div
@@ -407,6 +435,14 @@ export function TimeMachine({ deps, looking, onBringBack, onKeepCopy, onBack, on
       ) : (
         <NothingEarlierBar onBack={leave} />
       )}
+
+      {/* Today's text, while moments load or when there are none, is not a past to bring from; and a chapter no longer in the piece has no text to go back into. Copy stays. */}
+      <Part
+        part={selected.part}
+        canBring={!!moment && !removedSince}
+        onCopied={() => setCopied(true)}
+        onBring={(passage) => moment && !working.current && onBringPart({ sectionId, passage, from: momentInSentence(moment.at, now) })}
+      />
 
       <div className="visually-hidden" aria-live="polite">
         {said}

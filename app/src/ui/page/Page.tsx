@@ -27,6 +27,7 @@ import { PageFoot, StatusLine } from './PageFoot'
 import { SectionTitle, TitlePage } from './Titles'
 import { HeadTools, TextSettings } from './Tools'
 import { isTimeMachineKey } from './timeMachineKey'
+import { useBringPart } from './useBringPart'
 import { useCaretFollowing, useCaretKeys } from './useCaret'
 import { useChapterStart } from './useChapterStart'
 import { useEditor } from './useEditor'
@@ -138,6 +139,8 @@ export function Page({
   /** Where Days was opened from, which is where it stands. */
   const [daysFrom, setDaysFrom] = useState<'head' | 'tools'>('head')
   const [line, setLine] = useState<string | null>(opened.line ?? null)
+  /** The line said after a passage was brought back (Brought back from Sunday evening.): calm, as the line a page opens with is. */
+  const [brought, setBrought] = useState<string | null>(null)
   const [words, setWords] = useState(() => countWords(content))
   const [blank, setBlank] = useState(() => !content.trim())
   const today = isoDay(new Date(deps.clock.now()))
@@ -477,6 +480,23 @@ export function Page({
     return () => window.removeEventListener('keydown', onKey)
   }, [covered])
 
+  // Words brought back from the Time Machine go in as soon as the page shows, after the focus above has gone back.
+  useBringPart({
+    editor,
+    pager,
+    bringing: opened.bringing,
+    covered,
+    writer,
+    onBrought(from) {
+      moved.current = true
+      backFromLooking.current = null
+      const text = `Brought back from ${from}.`
+      setBrought(text)
+      setLine(text)
+      setSaid({ text, over: announcement })
+    },
+  })
+
   // A chapter chosen in Contents opens at its opening page.
   function openChapter(chosen: string): void {
     if (!editor || !pager) return
@@ -587,8 +607,8 @@ export function Page({
     return () => window.removeEventListener('pointerdown', onDown)
   }, [covered, closeSheet])
 
-  /** The line the page opened with is calm: secondary, with no surface, and the folio stands aside for it. */
-  const calm = line !== null && line === opened.line && writer !== 'elsewhere' && !failed
+  /** The line the page opened with, or one said after a passage was brought back, is calm: secondary, with no surface, and the folio stands aside for it. */
+  const calm = line !== null && (line === opened.line || line === brought) && writer !== 'elsewhere' && !failed
 
   // A calm line at the foot for a few seconds.
   useEffect(() => {
