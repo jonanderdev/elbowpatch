@@ -21,7 +21,7 @@ export interface BringBackSeams {
 export class NotBroughtBack extends Error {}
 
 /** One section at one moment, as the Time Machine shows it. */
-export type MomentOf = Pick<BringBack, 'sectionId' | 'at' | 'content'>
+export type MomentOf = Pick<BringBack, 'sectionId' | 'at' | 'content' | 'listedAt'>
 
 /**
  * Brings a section back to a moment, by its id (0005, 0008). The order is what protects the words (#77): the page

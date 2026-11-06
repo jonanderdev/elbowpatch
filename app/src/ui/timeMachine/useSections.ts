@@ -12,6 +12,11 @@ export interface Sections {
   /** A section could not be read when it was reached: the one on screen is as it was, and `again` tries it once more. */
   failed: boolean
   again(): void
+  /**
+   * Reads the section on screen and the piece's listing again, as stored now: another window's thinning may have taken a moment
+   * the tape still shows. Resolves with what it found, which the tape shows from then on; rejects, changing nothing, if it cannot.
+   */
+  reread(): Promise<Moment[]>
   /** The piece's outline at that time: its title page and its sections, which are what Contents lists. None until it is read. */
   shape(at: number | undefined): Shape | undefined
   /** The section a turn past this one's end reaches at that time, or none. */
@@ -102,6 +107,18 @@ export function useSections(deps: Pick<Deps, 'store'>, pieceId: string, first: s
     setTries((n) => n + 1)
   }, [failed, reach])
 
+  const reread = useCallback(async (): Promise<Moment[]> => {
+    const [moments, found] = await Promise.all([momentsOf(deps, pieceId, sectionId), listingOf(deps, pieceId)])
+    if (alive.current) {
+      listing.current = found
+      // The others are read again as they are reached.
+      known.current.clear()
+      known.current.set(sectionId, moments)
+      setRead({ state: 'read', moments })
+    }
+    return moments
+  }, [deps, pieceId, sectionId])
+
   // The listing is in hand once the first section is read, and stays: it is small, and fixed while the Time Machine is open.
   const shape = (at: number | undefined): Shape | undefined => (listing.current && at !== undefined ? shapeAt(listing.current, at) : undefined)
   const beyond = (dir: 1 | -1, at: number | undefined): string | undefined => {
@@ -109,5 +126,5 @@ export function useSections(deps: Pick<Deps, 'store'>, pieceId: string, first: s
     return found && sectionBeyond(found.sections, sectionId, dir)
   }
 
-  return { sectionId, read, failed, again, shape, beyond, reach }
+  return { sectionId, read, failed, again, reread, shape, beyond, reach }
 }

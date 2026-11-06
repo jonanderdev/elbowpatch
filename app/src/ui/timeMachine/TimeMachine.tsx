@@ -62,7 +62,12 @@ export interface BringBackRequest {
   sectionId: string
   at: number
   content: string
+  /** The time Contents stood at, for a chapter removed since: it returns where it stood then. */
+  listedAt?: number
 }
+
+/** The line at the page's foot after a bring back: said once the piece is known, for a chapter's number is its place in the book now. */
+export type BringBackLine = string | ((piece: Piece) => string)
 
 interface Props {
   deps: Pick<Deps, 'store' | 'clock'>
@@ -71,7 +76,7 @@ interface Props {
    * Brings the section on screen back to the moment on screen, and closes onto the page with `line` at its foot.
    * Settles once that is done; rejects with everything as it was. Left out, the action does nothing yet.
    */
-  onBringBack?(request: BringBackRequest, line: string): Promise<void>
+  onBringBack?(request: BringBackRequest, line: BringBackLine): Promise<void>
   /** A copy of this moment, opened as a new essay with this line at its foot; rejects with nothing made. */
   onKeepCopy(moment: Moment, line: string): Promise<void>
   /** Whether this window writes the piece. Another window writing it leaves looking back as it is, but nothing can be brought back. */
@@ -315,16 +320,48 @@ export function TimeMachine({ deps, looking, writes, onBringBack, onKeepCopy, on
   }
   const bringBack = (): void => {
     if (!moment || !onBringBack || !writes || working.current) return
+    start()
+  }
+  // Another try, after the moment on screen may have gone: the moments are read again first, and the moment that failed is brought
+  // back only if it is still stored. If it is not, the tape shows what is, and the writer chooses again.
+  const bringAgain = (): void => {
+    if (!moment || !onBringBack || !writes || working.current) return
+    const was = moment
+    working.current = true
+    setBusy(true)
+    sections.reread().then(
+      (fresh) => {
+        working.current = false
+        if (alive.current && fresh.some((m) => m.at === was.at && m.content === was.content)) bringBack()
+        else if (alive.current) {
+          // The moment has gone: the Time Machine opens on the most recent moment that is left, as when it was opened.
+          setChosen(undefined)
+          setBusy(false)
+          setBringFailed(false)
+        }
+      },
+      () => {
+        working.current = false
+        if (alive.current) setBusy(false)
+      },
+    )
+  }
+  function start(): void {
+    if (!moment || !onBringBack) return
     working.current = true
     setBusy(true)
     setBringFailed(false)
     // An essay has no rest: the line says what is kept instead. A day says the rest of the journal is as it was (DESIGN.md).
     const from = momentInSentence(moment.at, now)
-    const line =
+    // A chapter is called by its number in the book as it is once it is back.
+    const line: BringBackLine =
       piece.kind === 'journal'
         ? `${title.trim() || 'This day'} brought back from ${from}. The rest of the journal is as it was.`
-        : `Brought back from ${from}. Today’s text is kept as a moment.`
-    onBringBack({ sectionId, at: moment.at, content: moment.content }, line).then(
+        : book
+          ? (back) => `Chapter ${back.sections.findIndex((s) => s.sectionId === sectionId) + 1} brought back from ${from}. The rest of the book is as it was.`
+          : `Brought back from ${from}. Today’s text is kept as a moment.`
+    const listedAt = stands !== undefined && Number.isFinite(stands) ? stands : undefined
+    onBringBack({ sectionId, at: moment.at, content: moment.content, ...(listedAt !== undefined && { listedAt }) }, line).then(
       () => {
         working.current = false
       },
@@ -428,7 +465,7 @@ export function TimeMachine({ deps, looking, writes, onBringBack, onKeepCopy, on
       ) : copy.failed ? (
         <ErrorBar line="Couldn’t keep a copy just now. Nothing has changed." onAgain={() => copy.keep(copy.failed!)} onBack={leave} />
       ) : moment && bringFailed && !busy ? (
-        <ErrorBar line="Couldn’t bring that back just now. Nothing has changed." onAgain={bringBack} onBack={leave} />
+        <ErrorBar line="Couldn’t bring that back just now. Nothing has changed." onAgain={bringAgain} onBack={leave} />
       ) : moment ? (
         <MomentsBar
           kind={piece.kind}
