@@ -1,8 +1,9 @@
 import { type ReactElement, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { momentToOpen } from '../../domain/lookBack'
+import { type Moment, momentToOpen } from '../../domain/lookBack'
 import type { Piece } from '../../domain/model'
+import { momentInSentence } from '../../domain/momentInSentence'
 import type { Deps } from '../../domain/pieces'
-import { momentName, momentPhrase, momentShort, pageLine } from '../../domain/words'
+import { momentName, momentShort, pageLine } from '../../domain/words'
 import { type Crumb, Path } from '../components/Path'
 import { useScrolled } from '../components/useScrolled'
 import { usePager } from '../page/usePager'
@@ -10,6 +11,7 @@ import { usePageTurns } from '../page/usePageTurns'
 import { useSettings } from '../stores/settings'
 import { ErrorBar, LoadingBar, MomentsBar, NothingEarlierBar } from './MomentBar'
 import { EmptyTape, Tape } from './Tape'
+import { useKeepCopy } from './useKeepCopy'
 import { useMoments } from './useMoments'
 import { useReader } from './useReader'
 
@@ -46,6 +48,8 @@ interface Props {
    * Settles once that is done; rejects with everything as it was. Left out, the action does nothing yet.
    */
   onBringBack?(request: BringBackRequest, line: string): Promise<void>
+  /** A copy of this moment, opened as a new essay with this line at its foot; rejects with nothing made. */
+  onKeepCopy(moment: Moment, line: string): Promise<void>
   /** Back to now, at the same place. */
   onBack(): void
   /** § goes home, from here too. */
@@ -59,7 +63,7 @@ const NOTHING = (): void => {}
  * The Time Machine (DESIGN.md): a section as it was at one moment, on a shorter page above the moment bar.
  * It stands over the page, which stays as it was left. It writes nothing: no text, no place, no page counts.
  */
-export function TimeMachine({ deps, looking, onBringBack, onBack, onHome }: Props): ReactElement {
+export function TimeMachine({ deps, looking, onBringBack, onKeepCopy, onBack, onHome }: Props): ReactElement {
   const { piece, sectionId, today, ready } = looking
   const { read, again } = useMoments(deps, piece.id, sectionId, ready)
   /** The time it stands at, once the writer has moved: it opens on the most recent moment that differs from now. */
@@ -68,6 +72,7 @@ export function TimeMachine({ deps, looking, onBringBack, onBack, onHome }: Prop
   const [saidOver, setSaidOver] = useState('')
   const settings = useSettings()
   const now = deps.clock.now()
+  const copy = useKeepCopy((m) => onKeepCopy(m, `A copy of ${momentInSentence(m.at, now)}, kept as a new essay.`))
 
   const moments = read.state === 'read' ? read.moments : []
   const stands = chosen ?? momentToOpen(moments)?.at
@@ -170,13 +175,17 @@ export function TimeMachine({ deps, looking, onBringBack, onBack, onHome }: Prop
   const word = (piece.kind === 'essay' ? title : today.name).trim() || 'Untitled'
   const crumbs: Crumb[] = moment ? [{ word, onClick: leave }, { word: momentShort(moment.at, now) }] : [{ word, onClick: leave }]
   const heading = title.trim() || 'Untitled'
+  // A copy waits while a bring back runs: two ways out of the Time Machine at once would fight over the page.
+  const keepCopy = (): void => {
+    if (moment && !working.current) copy.keep(moment)
+  }
   const bringBack = (): void => {
     if (!moment || !onBringBack || working.current) return
     working.current = true
     setBusy(true)
     setFailed(false)
     // An essay has no rest: the line says what is kept instead (DESIGN.md).
-    const line = `Brought back from ${momentPhrase(moment.at, now)}. Today’s text is kept as a moment.`
+    const line = `Brought back from ${momentInSentence(moment.at, now)}. Today’s text is kept as a moment.`
     onBringBack({ sectionId, at: moment.at, content: moment.content }, line).then(
       () => {
         working.current = false
@@ -219,6 +228,8 @@ export function TimeMachine({ deps, looking, onBringBack, onBack, onHome }: Prop
         <ErrorBar line="Can’t read your moments right now. Your words are still here." onAgain={again} onBack={leave} />
       ) : read.state === 'loading' ? (
         <LoadingBar kind={piece.kind} tape={<EmptyTape />} onBack={leave} />
+      ) : copy.failed ? (
+        <ErrorBar line="Couldn’t keep a copy just now. Nothing has changed." onAgain={() => copy.keep(copy.failed!)} onBack={leave} />
       ) : moment && failed && !busy ? (
         <ErrorBar line="Couldn’t bring that back just now. Nothing has changed." onAgain={bringBack} onBack={leave} />
       ) : moment ? (
@@ -228,6 +239,7 @@ export function TimeMachine({ deps, looking, onBringBack, onBack, onHome }: Prop
           tape={<Tape moments={moments} index={index} now={now} tapeRef={tape} onMoment={step} />}
           {...(onBringBack ? { onBringBack: bringBack } : {})}
           busy={busy}
+          onKeepCopy={keepCopy}
           onBack={leave}
         />
       ) : (

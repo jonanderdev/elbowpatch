@@ -19,17 +19,19 @@ export interface BarActions {
   onBringBack?(): void
   /** It is under way: a second press waits for nothing and does nothing. */
   busy?: boolean
+  /** Keep a copy of the moment on screen. */
+  onKeepCopy?(): void
 }
 
 /** The bar's two actions. */
-function Actions({ kind, onBringBack, busy }: { kind: Kind } & BarActions): ReactElement {
+function Actions({ kind, onBringBack, busy, onKeepCopy }: { kind: Kind } & BarActions): ReactElement {
   return (
     <div className="moment-actions">
       <button type="button" className="moment-action leading" aria-busy={busy || undefined} onClick={busy ? undefined : onBringBack}>
         {BRING_BACK[kind]}
       </button>
       <span className="bar-separator" />
-      <button type="button" className="moment-action">
+      <button type="button" className="moment-action" onClick={onKeepCopy}>
         Keep a copy
       </button>
     </div>
@@ -37,7 +39,18 @@ function Actions({ kind, onBringBack, busy }: { kind: Kind } & BarActions): Reac
 }
 
 /** The moment bar with moments: the moment named, the tape under it (passed in), then the actions. */
-export function MomentsBar({ kind, name, tape, onBack, ...actions }: { kind: Kind; name: string; tape: ReactNode; onBack(): void } & BarActions): ReactElement {
+export function MomentsBar({
+  kind,
+  name,
+  tape,
+  onBack,
+  ...actions
+}: {
+  kind: Kind
+  name: string
+  tape: ReactNode
+  onBack(): void
+} & BarActions): ReactElement {
   return (
     <div className="moment-bar surface">
       <p className="moment-name">{name}</p>

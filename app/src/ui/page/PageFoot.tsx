@@ -16,6 +16,8 @@ interface PageFootProps {
   tools: boolean
   /** The phone keyboard is up: the foot stands on it, at the screen's foot (see Page). */
   keyboard: boolean
+  /** A calm line stands at the foot, where the folio would: the folio stands aside. */
+  quiet?: boolean
   pageButtonRef: RefObject<HTMLButtonElement | null>
   onOpenTools(): void
   onCloseTools(): void
@@ -25,8 +27,6 @@ interface PageFootProps {
   /** A book's count opens Contents, and a journal's Days. */
   onContents?(from: HTMLElement): void
   contentsOpen: boolean
-  /** A calm line stands beside the page button: the folio gives way to it. */
-  noted?: boolean
 }
 
 /**
@@ -42,6 +42,7 @@ export function PageFoot({
   titlePage,
   tools,
   keyboard,
+  quiet = false,
   pageButtonRef,
   onOpenTools,
   onCloseTools,
@@ -50,9 +51,8 @@ export function PageFoot({
   onTimeMachine,
   onContents,
   contentsOpen,
-  noted,
 }: PageFootProps): ReactElement {
-  const folio = page !== undefined && !journal && !titlePage && !tools && !keyboard && !noted
+  const folio = page !== undefined && !journal && !titlePage && !tools && !keyboard && !quiet
   const said = pageLine(page, count)
   return (
     <>
@@ -99,14 +99,14 @@ interface StatusLineProps {
   failed: boolean
   /** A calm line for a few seconds ("Saved as …"). */
   line: string | null
-  /** What came back from the Time Machine: a calm line in the secondary colour with no surface, as the Time Machine draws them. */
-  note?: string | null
+  /** The line is a calm one after an action: secondary, with no surface. */
+  calm?: boolean
   onWriteHere(): void
   onSaveCopy(): void
 }
 
 /** One line at the foot, most important first: another window writes, a save failed, or a calm note. */
-export function StatusLine({ writer, failed, line, note, onWriteHere, onSaveCopy }: StatusLineProps): ReactElement | null {
+export function StatusLine({ writer, failed, line, calm = false, onWriteHere, onSaveCopy }: StatusLineProps): ReactElement | null {
   if (writer === 'elsewhere')
     return (
       <div className="line surface" role="status">
@@ -125,15 +125,9 @@ export function StatusLine({ writer, failed, line, note, onWriteHere, onSaveCopy
         </button>
       </div>
     )
-  if (note)
-    return (
-      <div className="line calm" role="status">
-        {note}
-      </div>
-    )
   if (!line) return null
   return (
-    <div className="line surface" role="status">
+    <div className={calm ? 'line calm' : 'line surface'} role="status">
       {line}
     </div>
   )

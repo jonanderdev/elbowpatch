@@ -870,11 +870,12 @@ button.count[aria-expanded='true'] {
   color: var(--title);
   z-index: 3;
 }
-/* What came back from the Time Machine: words in the secondary colour beside the page button, no surface (DESIGN.md). */
+/* A calm line after an action (DESIGN.md, The Time Machine): secondary, no surface, no action, level with the
+   page button and as wide as the room beside it; the folio stands aside for it. */
 .line.calm {
   padding: 0;
-  width: 306px;
-  max-width: calc(100% - 2 * var(--edge) - 56px);
+  left: var(--side);
+  max-width: calc(100% - var(--side) - 60px);
   color: var(--secondary);
 }
 /* The tools bar stands where the line does: the line waits above it, so the bar can still be pressed. */
@@ -2596,6 +2597,10 @@ button.count[aria-expanded='true'] {
   .page-screen .line {
     max-width: 296px;
     overflow-wrap: anywhere;
+  }
+  /* A calm line stands under the text column, where the folio does, and keeps to its width. */
+  .page-screen .line.calm {
+    max-width: var(--measure-px);
   }
   /* It stands 12px above *+ New chapter*, which a long book holds at the rail's foot (24px up, 31px tall). */
   .page-screen:has(.contents-rail:not([data-folded]) .new-chapter) .line {

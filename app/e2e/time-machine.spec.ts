@@ -231,18 +231,6 @@ test('the bar stands where the frames draw it, and names what it brings back', a
   expect(back.y - box.y).toBe(1)
 })
 
-test('Keep a copy does nothing yet', async ({ page }) => {
-  await history(page, ['Before.', 'After.'])
-  await open(page)
-  await expect(oldText(page)).toHaveText('Before.')
-  const before = await stored(page, 'versions')
-  await machine(page).getByRole('button', { name: 'Keep a copy' }).click()
-  await expect(oldText(page)).toHaveText('Before.')
-  expect(await stored(page, 'versions')).toEqual(before)
-  await close(page)
-  await expect(page.locator('.body')).toHaveText('After.')
-})
-
 test('the path keeps the longest names of a moment whole, and ends by x316', async ({ page }) => {
   test.skip(phone(page), 'the path is desktop’s')
   await essay(page, 'Before.', 'A very long title that could never fit beside the moment in the rail')

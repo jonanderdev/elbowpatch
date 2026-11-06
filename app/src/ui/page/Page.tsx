@@ -137,9 +137,7 @@ export function Page({
   const [contentsFocus, setContentsFocus] = useState(false)
   /** Where Days was opened from, which is where it stands. */
   const [daysFrom, setDaysFrom] = useState<'head' | 'tools'>('head')
-  const [line, setLine] = useState<string | null>(null)
-  /** What came back from the Time Machine, said as the page opens. */
-  const [note, setNote] = useState<string | null>(opened.note ?? null)
+  const [line, setLine] = useState<string | null>(opened.line ?? null)
   const [words, setWords] = useState(() => countWords(content))
   const [blank, setBlank] = useState(() => !content.trim())
   const today = isoDay(new Date(deps.clock.now()))
@@ -582,11 +580,8 @@ export function Page({
     return () => window.removeEventListener('pointerdown', onDown)
   }, [covered, closeSheet])
 
-  useEffect(() => {
-    if (!note) return
-    const t = setTimeout(() => setNote(null), 4000)
-    return () => clearTimeout(t)
-  }, [note])
+  /** The line the page opened with is calm: secondary, with no surface, and the folio stands aside for it. */
+  const calm = line !== null && line === opened.line && writer !== 'elsewhere' && !failed
 
   // A calm line at the foot for a few seconds.
   useEffect(() => {
@@ -758,6 +753,7 @@ export function Page({
         titlePage={titlePage && page === 0}
         tools={tools}
         keyboard={keyboard}
+        quiet={calm}
         pageButtonRef={pageButton}
         onOpenTools={() => setTools(true)}
         onCloseTools={closeTools}
@@ -766,7 +762,6 @@ export function Page({
         onTimeMachine={lookBack}
         onContents={book || journal ? openContents : undefined}
         contentsOpen={sheet === 'contents'}
-        noted={!!note && writer !== 'elsewhere' && !failed}
       />
 
       {sheet === 'contents' && phone && journal ? (
@@ -808,7 +803,7 @@ export function Page({
       ) : null}
 
       {/* shortcut: Save a copy holds the unsaved section only, not the whole piece. */}
-      <StatusLine writer={writer} failed={failed} line={line} note={note} onWriteHere={onWriteHere} onSaveCopy={() => void exportMarkdown()} />
+      <StatusLine writer={writer} failed={failed} line={line} calm={calm} onWriteHere={onWriteHere} onSaveCopy={() => void exportMarkdown()} />
 
       <div className="visually-hidden" aria-live="polite">
         {said?.over === announcement ? said.text : announcement}

@@ -1,5 +1,7 @@
 import { type ComponentProps, type ReactElement, useCallback, useEffect, useRef, useState } from 'react'
+import { keepCopy } from '../../domain/copies'
 import { pieceAsMarkdown } from '../../domain/export'
+import type { Moment } from '../../domain/lookBack'
 import type { Kind, Piece } from '../../domain/model'
 import {
   type Deps,
@@ -167,7 +169,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
   // the line. Until then the page stays covered, whatever closes the Time Machine meanwhile, and a second press waits for nothing.
   const [bringing, setBringing] = useState(false)
   const bringingNow = useRef(false)
-  const bringBackTo = async (moment: BringBackRequest, note: string): Promise<void> => {
+  const bringBackTo = async (moment: BringBackRequest, line: string): Promise<void> => {
     if (!opened || bringingNow.current) return
     bringingNow.current = true
     setBringing(true)
@@ -179,7 +181,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
       timeMachine.leave(() => {
         ++chosen.current
         going.current = ''
-        setOpened({ piece: done.piece, sectionId: done.sectionId, content: done.content, updatedAt: done.updatedAt, at: 'opening', note, readAt: ++reads })
+        setOpened({ piece: done.piece, sectionId: done.sectionId, content: done.content, updatedAt: done.updatedAt, at: 'opening', line, readAt: ++reads })
         bringingNow.current = false
         setBringing(false)
       })
@@ -253,6 +255,20 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
     setOpened({ piece, sectionId, content, updatedAt: piece.updatedAt, readAt: ++reads })
   }
 
+  // A moment kept as a new essay: stored whole first, so a failure leaves nothing made. It opens at once, from
+  // what was just written, once the Time Machine and its history entry are gone; the route follows in the same step.
+  const keepCopyOf = async (pieceId: string, from: Moment, line: string): Promise<void> => {
+    const copy = await keepCopy(deps, pieceId, from)
+    const section = copy.sections[0]!
+    timeMachine.leave(() => {
+      ++chosen.current
+      going.current = ''
+      setOpened({ piece: copy, sectionId: section.sectionId, content: from.content, updatedAt: copy.updatedAt, readAt: ++reads, line })
+      go(`/p/${copy.id}`)
+      void refresh().catch(() => {})
+    })
+  }
+
   // Save first, so the library already lists what was just written; never wait long for it.
   // The first save also opens the database; a stuck one never holds the writer on the page for long.
   const toLibrary = async (): Promise<void> => {
@@ -322,6 +338,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
           deps={deps}
           looking={timeMachine.looking}
           {...(timeMachine.looking.piece.kind === 'essay' ? { onBringBack: bringBackTo } : {})}
+          onKeepCopy={(moment, line) => keepCopyOf(timeMachine.looking!.piece.id, moment, line)}
           onBack={() => timeMachine.leave()}
           onHome={() => timeMachine.leave(() => void toLibrary())}
         />

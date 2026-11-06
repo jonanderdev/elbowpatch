@@ -30,5 +30,5 @@ Date: 2026-10-27 · Status: accepted
 
 ## Drafts in v1
 *Updated 2026-11-05:* keep a copy is in v1 after all, as the moment bar has always drawn it; on 2026-11-04 the brief had moved it after daily use. It stays one section, and comparing drafts waits. It works like this:
-- "Keep a copy" creates a **new essay piece** from the section being looked at (an essay, one journal day or one chapter), named for what it came from, like "Salt on the windows, draft 2". Its history starts at that moment. It keeps no link back to where it came from in v1: the name says it, and the page stays quieter.
+- "Keep a copy" creates a **new essay piece** from the section being looked at (an essay, one journal day or one chapter), named for what it came from, like "Salt on the windows, draft 2". Its history starts now, with today's date, since a copy is a piece in its own right and its first moment is the day it was made (decided on 2026-11-06). The numbering goes up past any name in use, put-away pieces included, and an essay's copy is named from the title of that moment. It keeps no link back to where it came from in v1: the name says it, and the page stays quieter.
 - No comparing or switching drafts inside one piece, and no merging, in v1.

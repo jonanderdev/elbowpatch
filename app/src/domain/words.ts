@@ -138,15 +138,6 @@ export function momentName(at: number, now: number): string {
   return time ? `${name}, ${time}` : name
 }
 
-/**
- * A moment inside a sentence: "from yesterday evening, 21:10", "from just now". Relative words go lowercase;
- * weekdays and dates stay as they are ("from Sunday evening", "from 14 October 2025").
- */
-export function momentPhrase(at: number, now: number): string {
-  const name = momentName(at, now)
-  return DAYS.some((day) => name.startsWith(day)) ? name : name.charAt(0).toLowerCase() + name.slice(1)
-}
-
 /** A moment without its clock time, for the desktop path, where it must stand whole in little room. */
 export function momentShort(at: number, now: number): string {
   return named(at, now).name
