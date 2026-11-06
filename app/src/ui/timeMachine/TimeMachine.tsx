@@ -44,9 +44,21 @@ export interface PartBack {
   from: string
 }
 
+/** One section at one moment, to be brought back: the words are what the writer saw there. */
+export interface BringBackRequest {
+  sectionId: string
+  at: number
+  content: string
+}
+
 interface Props {
   deps: Pick<Deps, 'store' | 'clock'>
   looking: Looking
+  /**
+   * Brings the section on screen back to the moment on screen, and closes onto the page with `line` at its foot.
+   * Settles once that is done; rejects with everything as it was. Left out, the action does nothing yet.
+   */
+  onBringBack?(request: BringBackRequest, line: string): Promise<void>
   /** A copy of this moment, opened as a new essay with this line at its foot; rejects with nothing made. */
   onKeepCopy(moment: Moment, line: string): Promise<void>
   /** Back to now, at the same place. */
@@ -64,7 +76,7 @@ const NOTHING = (): void => {}
  * The Time Machine (DESIGN.md): a section as it was at one moment, on a shorter page above the moment bar.
  * It stands over the page, which stays as it was left. It writes nothing: no text, no place, no page counts.
  */
-export function TimeMachine({ deps, looking, onKeepCopy, onBack, onBringPart, onHome }: Props): ReactElement {
+export function TimeMachine({ deps, looking, onBringBack, onKeepCopy, onBack, onBringPart, onHome }: Props): ReactElement {
   const { piece, sectionId, today, ready } = looking
   const { read, again } = useMoments(deps, piece.id, sectionId, ready)
   /** The time it stands at, once the writer has moved: it opens on the most recent moment that differs from now. */
@@ -135,9 +147,27 @@ export function TimeMachine({ deps, looking, onKeepCopy, onBack, onBringPart, on
     pager?.measure()
   }, [reader, pager, content, title])
 
+  // A bring back under way: the way out waits for it, so a page it is about to replace is never left under way.
+  const working = useRef(false)
+  const [busy, setBusy] = useState(false)
+  const [failed, setFailed] = useState(false)
+  const alive = useRef(true)
+  useEffect(() => {
+    alive.current = true
+    return () => {
+      alive.current = false
+    }
+  }, [])
+  const leave = (): void => {
+    if (!working.current) onBack()
+  }
+  const home = (): void => {
+    if (!working.current) onHome()
+  }
+
   // Read when a key comes; re-attached on each render, an Escape could reach the listener from before it.
-  const back = useRef(onBack)
-  back.current = onBack
+  const back = useRef(leave)
+  back.current = leave
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       // Already answered: the rail lets go of the focus first.
@@ -168,8 +198,31 @@ export function TimeMachine({ deps, looking, onKeepCopy, onBack, onBringPart, on
 
   const scrolled = useScrolled()
   const word = (piece.kind === 'essay' ? title : today.name).trim() || 'Untitled'
-  const crumbs: Crumb[] = moment ? [{ word, onClick: onBack }, { word: momentShort(moment.at, now) }] : [{ word, onClick: onBack }]
+  const crumbs: Crumb[] = moment ? [{ word, onClick: leave }, { word: momentShort(moment.at, now) }] : [{ word, onClick: leave }]
   const heading = title.trim() || 'Untitled'
+  // A copy waits while a bring back runs: two ways out of the Time Machine at once would fight over the page.
+  const keepCopy = (): void => {
+    if (moment && !working.current) copy.keep(moment)
+  }
+  const bringBack = (): void => {
+    if (!moment || !onBringBack || working.current) return
+    working.current = true
+    setBusy(true)
+    setFailed(false)
+    // An essay has no rest: the line says what is kept instead (DESIGN.md).
+    const line = `Brought back from ${momentInSentence(moment.at, now)}. Today’s text is kept as a moment.`
+    onBringBack({ sectionId, at: moment.at, content: moment.content }, line).then(
+      () => {
+        working.current = false
+      },
+      () => {
+        working.current = false
+        if (!alive.current) return
+        setBusy(false)
+        setFailed(true)
+      },
+    )
+  }
   const said = copied ? 'Copied' : moment && saidOver === announcement ? momentName(moment.at, now) : announcement
 
   return (
@@ -181,7 +234,7 @@ export function TimeMachine({ deps, looking, onKeepCopy, onBack, onBringPart, on
     >
       <div className="head" data-scrolled={scrolled || undefined}>
         <div className="head-path">
-          <Path crumbs={crumbs} onHome={onHome} />
+          <Path crumbs={crumbs} onHome={home} />
         </div>
         {/* As on the writing page, an essay's first page has none: its title stands there. A book's and a journal's keep theirs. */}
         {piece.kind !== 'essay' || page > 0 ? <div className="running-head">{heading}</div> : null}
@@ -197,21 +250,25 @@ export function TimeMachine({ deps, looking, onKeepCopy, onBack, onBringPart, on
       </div>
 
       {read.state === 'error' ? (
-        <ErrorBar line="Can’t read your moments right now. Your words are still here." onAgain={again} onBack={onBack} />
+        <ErrorBar line="Can’t read your moments right now. Your words are still here." onAgain={again} onBack={leave} />
       ) : read.state === 'loading' ? (
-        <LoadingBar kind={piece.kind} tape={<EmptyTape />} onBack={onBack} />
+        <LoadingBar kind={piece.kind} tape={<EmptyTape />} onBack={leave} />
       ) : copy.failed ? (
-        <ErrorBar line="Couldn’t keep a copy just now. Nothing has changed." onAgain={() => copy.keep(copy.failed!)} onBack={onBack} />
+        <ErrorBar line="Couldn’t keep a copy just now. Nothing has changed." onAgain={() => copy.keep(copy.failed!)} onBack={leave} />
+      ) : moment && failed && !busy ? (
+        <ErrorBar line="Couldn’t bring that back just now. Nothing has changed." onAgain={bringBack} onBack={leave} />
       ) : moment ? (
         <MomentsBar
           kind={piece.kind}
           name={momentName(moment.at, now)}
           tape={<Tape moments={moments} index={index} now={now} tapeRef={tape} onMoment={step} />}
-          onKeepCopy={() => copy.keep(moment)}
-          onBack={onBack}
+          {...(onBringBack ? { onBringBack: bringBack } : {})}
+          busy={busy}
+          onKeepCopy={keepCopy}
+          onBack={leave}
         />
       ) : (
-        <NothingEarlierBar onBack={onBack} />
+        <NothingEarlierBar onBack={leave} />
       )}
 
       {/* Today's text, while moments load or when there are none, is not a past to bring from; and a chapter no longer in the piece has no text to go back into. Copy stays. */}
@@ -219,7 +276,7 @@ export function TimeMachine({ deps, looking, onKeepCopy, onBack, onBringPart, on
         part={selected.part}
         canBring={!!moment && piece.sections.some((s) => s.sectionId === sectionId)}
         onCopied={() => setCopied(true)}
-        onBring={(passage) => moment && onBringPart({ sectionId, passage, from: momentInSentence(moment.at, now) })}
+        onBring={(passage) => moment && !working.current && onBringPart({ sectionId, passage, from: momentInSentence(moment.at, now) })}
       />
 
       <div className="visually-hidden" aria-live="polite">

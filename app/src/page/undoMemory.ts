@@ -59,3 +59,12 @@ export function forgetChapter(sectionId: string): void {
   splits.delete(sectionId)
   for (const [id, split] of splits) if (split.into === sectionId) splits.delete(id)
 }
+
+/**
+ * A bring back changed what the section holds (0003): its history ends for the session, and so does how it was
+ * split off or split into, for the text it now holds may be that of a moment before the split. The text it
+ * replaced is a moment, not an undo step.
+ */
+export function forgetUndo(sectionId: string): void {
+  forgetChapter(sectionId)
+}

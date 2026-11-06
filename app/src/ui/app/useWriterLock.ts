@@ -14,6 +14,8 @@ export type Writer = 'waiting' | 'here' | 'elsewhere'
  */
 export interface WriterLockState {
   writer: Writer
+  /** Whether this window holds the piece right now: read inside an action, past any wait, never from a render. */
+  holds(): boolean
   writeHere(reload: () => Promise<void>): Promise<void>
 }
 
@@ -28,7 +30,12 @@ export function useWriterLock(
   const held = useRef<Held | null>(null)
   const pieceIdNow = useRef(pieceId)
   pieceIdNow.current = pieceId
-  const setWriter = useCallback((state: Writer, id = pieceIdNow.current) => setWriterOf({ pieceId: id, state }), [])
+  /** Set as the lock changes, not as the page renders: an action under way asks it. */
+  const writes = useRef(false)
+  const setWriter = useCallback((state: Writer, id = pieceIdNow.current) => {
+    writes.current = state === 'here' && id === pieceIdNow.current
+    setWriterOf({ pieceId: id, state })
+  }, [])
 
   // Another window asks for the piece: save here first, then let it write.
   const onAsked = useCallback(async () => {
@@ -66,6 +73,7 @@ export function useWriterLock(
     })()
     return () => {
       alive = false
+      writes.current = false
       const h = held.current
       held.current = null
       // Let go after the closing page's last save, so no other window writes alongside it, but
@@ -92,5 +100,6 @@ export function useWriterLock(
     [lock, onAsked, follow],
   )
 
-  return { writer: writerOf.pieceId === pieceId ? writerOf.state : 'waiting', writeHere }
+  const holds = useCallback(() => writes.current, [])
+  return { writer: writerOf.pieceId === pieceId ? writerOf.state : 'waiting', holds, writeHere }
 }

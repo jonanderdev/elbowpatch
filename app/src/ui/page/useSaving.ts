@@ -20,6 +20,8 @@ interface Options {
   onStored(piece: Piece): void
   /** Lets the app ask the page to save now, before another window takes the piece. */
   flushRef: { current: (() => Promise<void>) | null }
+  /** Lets the app reshape what the page holds (a bring back), once it is stored and held still (see `Saving.reshape`). */
+  reshapeRef: { current: Saving['reshape'] | null }
   /** The closing pages' last saves, so the app lets go of the piece, and the text is reshaped, only after them. */
   closingRef: { current: Promise<void> }
 }
@@ -29,7 +31,7 @@ interface Options {
  * hiding or closing the window, the words not stored yet go to the journal first. Declare it
  * before useEditor: its last save, as the page closes, reads the editor's text.
  */
-export function useSaving({ deps, opened, editor, titles, readOnly, place, pages, onStored, flushRef, closingRef }: Options): {
+export function useSaving({ deps, opened, editor, titles, readOnly, place, pages, onStored, flushRef, reshapeRef, closingRef }: Options): {
   saving: Saving | null
   failed: boolean
 } {
@@ -38,10 +40,10 @@ export function useSaving({ deps, opened, editor, titles, readOnly, place, pages
   // Read when a save runs, long after this render.
   const now = useRef({ editor, titles, readOnly, place, pages, onStored })
   now.current = { editor, titles, readOnly, place, pages, onStored }
-  const first = useRef({ deps, opened, flushRef, closingRef })
+  const first = useRef({ deps, opened, flushRef, reshapeRef, closingRef })
 
   useLayoutEffect(() => {
-    const { deps, opened, flushRef, closingRef } = first.current
+    const { deps, opened, flushRef, reshapeRef, closingRef } = first.current
     const { piece, sectionId } = opened
     const read = (): Held => {
       const f = now.current.titles
@@ -70,8 +72,10 @@ export function useSaving({ deps, opened, editor, titles, readOnly, place, pages
     if (keptFor(opened)) s.touch()
     setSaving(s)
     flushRef.current = () => s.flush()
+    reshapeRef.current = (change) => s.reshape(change)
     return () => {
       flushRef.current = null
+      reshapeRef.current = null
       closingRef.current = closingAfter(closingRef.current, s.close())
     }
     // One saving per page, made when it opens: the page is remounted for each section.
