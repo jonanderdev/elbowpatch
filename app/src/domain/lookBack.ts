@@ -199,6 +199,52 @@ export function wordsAt(deps: Pick<Deps, 'store'>, sectionIds: readonly string[]
   })
 }
 
+/** What a section's text rests on over time, read once: which text it held at a time, named, and the words each name stands for. */
+export interface TextIndex {
+  /** Names the text held at this time. The same words are the same name, so a count made of them can be kept; a time before the first version names the empty text. */
+  keyAt(at: number): string
+  /** The words a name stands for. */
+  read(key: string): Promise<string>
+}
+
+/** The working copy, when it has words no version holds. */
+const WORKING = 'working'
+
+/**
+ * A section's text named by what it rests on, so the tape can move through a history without every step
+ * reading and laying out each chapter again: a chapter that did not change between two times has the same name
+ * at both, and the numbers made of it stay. Names are light and the words are read only when a name is new.
+ * As `textAt` reads it. What a section held is fixed while the Time Machine is open (nothing is written).
+ */
+export async function textIndexOf(deps: Pick<Deps, 'store'>, sectionId: string): Promise<TextIndex> {
+  // What the transaction returns is copied, so it holds data only.
+  const { runs, newest } = await deps.store.transaction(async (tx) => {
+    const versions = history(await tx.versionsOf(sectionId))
+    const working = await tx.working(sectionId)
+    // One stretch for each run of the same words: it is named by the first version that held them.
+    const runs: { createdAt: number; id: string }[] = []
+    let words: string | undefined
+    for (const v of versions) {
+      if (v.content === words) continue
+      words = v.content
+      runs.push({ createdAt: v.createdAt, id: v.id })
+    }
+    const newest = working && working.content !== (words ?? '') ? { key: `${WORKING}:${working.updatedAt}`, content: working.content } : undefined
+    return { runs, newest }
+  })
+  return {
+    keyAt(at) {
+      if (at === Number.POSITIVE_INFINITY) return newest?.key ?? runs.at(-1)?.id ?? ''
+      return runs.findLast((r) => r.createdAt <= at)?.id ?? ''
+    },
+    read(key) {
+      if (key === '') return Promise.resolve('')
+      if (key === newest?.key) return Promise.resolve(newest.content)
+      return deps.store.transaction(async (tx) => (await tx.version(key))?.content ?? '')
+    },
+  }
+}
+
 /**
  * The moment the Time Machine opens on: the most recent that differs from now, or none, which is
  * *Nothing earlier*. Each moment differs from the one after it, so that is the one before now.

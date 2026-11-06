@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { memoryStore } from '../adapters/memory-store'
-import { listingOf, momentsOf, momentToOpen, readingAt, sectionBeyond, sectionsAt, shapeAt, textAt, timeOf, wordsAt } from './lookBack'
+import { listingOf, momentsOf, momentToOpen, readingAt, sectionBeyond, sectionsAt, shapeAt, textAt, textIndexOf, timeOf, wordsAt } from './lookBack'
 import type { Piece } from './model'
 import { newPiece, removeChapter, rename, renameSection, setSubtitle, takeMoment, withChapter, withDay, write } from './pieces'
 import { thin } from './thinning'
@@ -410,6 +410,63 @@ describe('a section’s text at a time, read alone', () => {
     const { book, a, first, second } = await twoChapters(s)
     const moments = await momentsOf(s.deps, book.id, a)
     for (const at of [first, second, Number.POSITIVE_INFINITY]) expect(await textAt(s.deps, a, at)).toBe(readingAt(moments, at, '').content)
+  })
+})
+
+describe('a section’s text named by what it rests on', () => {
+  it('names the same text the same at any time it holds, and another text another', async () => {
+    const s = setup()
+    const { book, a, first, second } = await twoChapters(s)
+    const index = await textIndexOf(s.deps, a)
+    // Chapter one has not changed between the two moments.
+    expect(index.keyAt(first)).toBe(index.keyAt(second))
+    s.clock.set(s.clock.now() + 60_000)
+    await write(s.deps, book, a, 'chapter one, longer')
+    await takeMoment(s.deps, book.id)
+    const later = await textIndexOf(s.deps, a)
+    expect(later.keyAt(first)).toBe(later.keyAt(second))
+    expect(later.keyAt(Number.POSITIVE_INFINITY)).not.toBe(later.keyAt(first))
+    // The text is the same from one moment to the next when it was not changed: a moment of another chapter's own.
+    expect(later.keyAt(first)).toBe(index.keyAt(first))
+  })
+
+  it('reads what a key names, as textAt reads it, now and before the first version too', async () => {
+    const s = setup()
+    const { book, a, b, first, second } = await twoChapters(s)
+    s.clock.set(s.clock.now() + 60_000)
+    await write(s.deps, book, b, 'chapter two, longer')
+    for (const id of [a, b]) {
+      const index = await textIndexOf(s.deps, id)
+      for (const at of [first - 1, first, second, Number.POSITIVE_INFINITY]) expect(await index.read(index.keyAt(at))).toBe(await textAt(s.deps, id, at))
+    }
+  })
+
+  it('names the same words again once they come back as the same text, apart from a text between, as another', async () => {
+    const s = setup()
+    const { piece, sectionId } = await essay(s, ['one', 'two', 'one'])
+    const index = await textIndexOf(s.deps, sectionId)
+    const [a, b, c] = (await momentsOf(s.deps, piece.id, sectionId)).map((m) => index.keyAt(m.at))
+    expect(a).not.toBe(b)
+    expect(c).not.toBe(b)
+    expect(await index.read(a!)).toBe('one')
+    expect(await index.read(c!)).toBe('one')
+  })
+
+  it('is empty with no history at all', async () => {
+    const s = setup()
+    const index = await textIndexOf(s.deps, 'nowhere')
+    expect(await index.read(index.keyAt(5))).toBe('')
+    expect(await index.read(index.keyAt(Number.POSITIVE_INFINITY))).toBe('')
+  })
+
+  it('names the working copy now when it has words no version holds', async () => {
+    const s = setup()
+    const { piece, sectionId } = await essay(s, ['one'])
+    s.clock.set(s.clock.now() + 60_000)
+    await write(s.deps, piece, sectionId, 'one, and more')
+    const index = await textIndexOf(s.deps, sectionId)
+    expect(await index.read(index.keyAt(Number.POSITIVE_INFINITY))).toBe('one, and more')
+    expect(index.keyAt(Number.POSITIVE_INFINITY)).not.toBe(index.keyAt(s.clock.now() - 1))
   })
 })
 

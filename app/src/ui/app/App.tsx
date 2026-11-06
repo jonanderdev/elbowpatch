@@ -364,13 +364,15 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
           }}
         />
       )}
-      {timeMachine.looking && (
+      {timeMachine.onScreen && (
         <TimeMachine
+          key={timeMachine.onScreen.key}
           deps={deps}
-          looking={timeMachine.looking}
+          looking={timeMachine.onScreen.looking}
+          leaving={timeMachine.onScreen.leaving}
           writes={writer === 'here'}
           onBringBack={bringBackTo}
-          onKeepCopy={(moment, line) => keepCopyOf(timeMachine.looking!.piece.id, moment, line)}
+          onKeepCopy={(moment, line) => keepCopyOf(timeMachine.onScreen!.looking.piece.id, moment, line)}
           onBack={() => timeMachine.leave()}
           onBringPart={bringPart}
           onHome={() => timeMachine.leave(() => void toLibrary())}

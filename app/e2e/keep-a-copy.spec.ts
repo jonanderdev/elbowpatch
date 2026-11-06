@@ -121,8 +121,9 @@ test('leaves the Time Machine’s history entry behind: back goes to the piece i
   await expect(title(page)).toHaveText('Salt on the windows, draft 2')
   await page.goBack()
   await expect(title(page)).toHaveText('Salt on the windows')
-  await expect(page.locator('.body')).toHaveText('The second words.')
+  // It fades out over the page for a moment before it is gone.
   await expect(machine(page)).toHaveCount(0)
+  await expect(page.locator('.body')).toHaveText('The second words.')
 })
 
 test('the number goes up with each copy, and the calm line goes after a few seconds', async ({ page }) => {
@@ -170,6 +171,7 @@ test('a copy that cannot be stored leaves nothing made, stays on the moment, and
   })
   await bar(page).getByRole('button', { name: 'Try again' }).click()
   await expect(title(page)).toHaveText('Salt on the windows, draft 2')
+  await expect(machine(page)).toHaveCount(0)
   await expect(page.locator('.body')).toHaveText('The first words.')
   expect((await stored(page)).pieces).toHaveLength(2)
 })

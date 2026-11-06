@@ -52,6 +52,8 @@ async function essayWithAMoment(page: Page): Promise<void> {
   await saved(page, 'Earlier words.')
   await lookBack(page)
   await machine(page).getByRole('button', { name: 'Back to now' }).click()
+  // It fades out over the page for a moment before it is gone.
+  await expect(machine(page)).toHaveCount(0)
   await caretToEnd(page)
   await page.keyboard.press('ControlOrMeta+a')
   await page.keyboard.type('Later words.')
@@ -85,6 +87,7 @@ test('another window can look back, but bring back is off and Copy stands alone'
 
   // Nothing was written: the piece is as the first window left it.
   await second.getByRole('button', { name: 'Back to now' }).click()
+  await expect(machine(second)).toHaveCount(0)
   await expect(second.getByRole('status').filter({ hasText: 'Open in another window' })).toBeVisible()
   await expect(second.getByRole('button', { name: 'Write here' })).toBeVisible()
   await expect(second.locator('.body')).toContainText('Later words.')
@@ -112,6 +115,7 @@ test('losing the piece to another window while looking back turns bring back off
   await bringBack(page).click({ force: true })
   await expect(machine(page)).toBeVisible()
   await page.getByRole('button', { name: 'Back to now' }).click()
+  await expect(machine(page)).toHaveCount(0)
   await expect(page.getByRole('status').filter({ hasText: 'Open in another window' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Write here' })).toBeVisible()
   await expect(page.locator('.body')).toContainText('Later words.')

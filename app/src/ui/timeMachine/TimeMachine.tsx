@@ -22,6 +22,7 @@ import { EmptyTape, Tape } from './Tape'
 import { useContentsAsItWas } from './useContentsAsItWas'
 import { useContentsSheet } from './useContentsSheet'
 import { useDaysAsItWas } from './useDaysAsItWas'
+import { useMomentFade, useScreenFade } from './useFades'
 import { useKeepCopy } from './useKeepCopy'
 import { usePart } from './usePart'
 import { useReader } from './useReader'
@@ -79,6 +80,8 @@ interface Props {
   onBringBack?(request: BringBackRequest, line: BringBackLine): Promise<void>
   /** A copy of this moment, opened as a new essay with this line at its foot; rejects with nothing made. */
   onKeepCopy(moment: Moment, line: string): Promise<void>
+  /** Left, and fading out: it no longer answers. */
+  leaving?: boolean
   /** Whether this window writes the piece. Another window writing it leaves looking back as it is, but nothing can be brought back. */
   writes: boolean
   /** Back to now, at the same place. */
@@ -97,7 +100,7 @@ const NONE: ReadonlySet<string> = new Set()
  * The Time Machine (DESIGN.md): a section as it was at one moment, on a shorter page above the moment bar.
  * It stands over the page, which stays as it was left. It writes nothing: no text, no place, no page counts.
  */
-export function TimeMachine({ deps, looking, writes, onBringBack, onKeepCopy, onBack, onBringPart, onHome }: Props): ReactElement {
+export function TimeMachine({ deps, looking, writes, onBringBack, onKeepCopy, leaving = false, onBack, onBringPart, onHome }: Props): ReactElement {
   const { piece, today, ready } = looking
   /** The section on screen: the page's own until a turn reaches another, at the same time. */
   const sections = useSections(deps, piece.id, looking.sectionId, ready)
@@ -203,15 +206,15 @@ export function TimeMachine({ deps, looking, writes, onBringBack, onKeepCopy, on
     })
   }
 
-  const list =
-    useContentsAsItWas(
-      deps,
-      piece,
-      book && asItWas ? sectionList : undefined,
-      stands,
-      phone ? 'phone' : 'desktop',
-      book && asItWas && (phone ? sheet.open : rail.open),
-    ) ?? today.contents
+  const asItWasList = useContentsAsItWas(
+    deps,
+    piece,
+    book && asItWas ? sectionList : undefined,
+    stands,
+    phone ? 'phone' : 'desktop',
+    book && asItWas && (phone ? sheet.open : rail.open),
+  )
+  const list = asItWasList.contents ?? today.contents
   /** A journal's days as that moment listed them, once their words are read: nothing is marked as today. */
   const daysRead = useDaysAsItWas(deps, journal && asItWas ? sectionList : undefined, stands, journal && asItWas && (phone ? sheet.open : rail.open))
   // Before a moment stands (while moments load, or with none earlier) Days is the journal's own, as a book's Contents is.
@@ -252,12 +255,17 @@ export function TimeMachine({ deps, looking, writes, onBringBack, onKeepCopy, on
     if (pager && arriving) pager.opening = true
     reader?.show(content)
     pager?.measure()
+    // What the page has just laid out is the chapter's count in Contents: no second layout for it.
+    if (pager && asItWas && book) asItWasList.counted(sectionId, pager.count)
     if (pager && arriving) {
       pager.turnTo(arriving === 'last' ? pager.count - 1 : arriving === 'opening' && titlePage ? 1 : 0)
       pager.opening = false
     }
     arrive.current = undefined
   }, [reader, pager, content, title, sectionId, titlePage])
+  // By the time it stands at, not the moment: a turn into another chapter keeps the time, and is a turn, not a change of moment.
+  useMomentFade(viewport, stands)
+  useScreenFade(screen, leaving)
 
   // A bring back under way: the way out waits for it, so a page it is about to replace is never left under way.
   const working = useRef(false)
@@ -280,10 +288,12 @@ export function TimeMachine({ deps, looking, writes, onBringBack, onKeepCopy, on
   // Read when a key comes; re-attached on each render, an Escape could reach the listener from before it.
   const back = useRef(leave)
   back.current = leave
+  const gone = useRef(leaving)
+  gone.current = leaving
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      // Already answered: the rail lets go of the focus first.
-      if (e.key !== 'Escape' || e.defaultPrevented) return
+      // Already answered: the rail lets go of the focus first. And once left, Escape is the page's.
+      if (e.key !== 'Escape' || e.defaultPrevented || gone.current) return
       e.preventDefault()
       back.current()
     }

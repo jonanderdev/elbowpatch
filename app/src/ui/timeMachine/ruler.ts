@@ -41,3 +41,33 @@ export function tapeLabels(ats: number[], now: number, spacing: number): (string
 export function nearestTick(index: number, count: number, spacing: number, fromHairline: number): number {
   return Math.max(0, Math.min(count - 1, index + Math.round(fromHairline / spacing)))
 }
+
+/** How long the tape goes on in the way it was going, in ms of its speed when let go. */
+const COAST = 180
+/** The most ticks a throw can pass, so the glide stays over ticks that are drawn. */
+export const MAX_THROW = 50
+/** How many ticks are drawn each side of the one under the hairline. A year can be thousands, and only a few hundred pixels show. */
+const REACH = 100
+/** How far the tick under the hairline may stray from the middle of what is drawn before the drawing follows. */
+export const RECENTER = 30
+
+/**
+ * The tick the tape settles on when let go at `x` (its distance from the oldest tick, in px) moving at
+ * `velocity` (px per ms, positive towards now): the nearest, a little further if it was going, and never
+ * past the ends or `MAX_THROW` ticks.
+ */
+export function settleOn(x: number, velocity: number, spacing: number, count: number): number {
+  const from = Math.round(x / spacing)
+  const thrown = Math.max(-MAX_THROW, Math.min(MAX_THROW, Math.round((x + velocity * COAST) / spacing) - from))
+  return Math.max(0, Math.min(count - 1, from + thrown))
+}
+
+/** How long a glide over `distance` px takes: a tick's step is quick, a throw longer, none past 300ms. */
+export function glideTime(distance: number): number {
+  return distance === 0 ? 0 : Math.min(300, 160 + Math.abs(distance) * 0.5)
+}
+
+/** The ticks drawn while the one at `center` stands under the hairline. */
+export function ticksInReach(center: number, count: number): { from: number; to: number } {
+  return { from: Math.max(0, center - REACH), to: Math.min(count - 1, center + REACH) }
+}

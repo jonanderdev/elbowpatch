@@ -603,6 +603,8 @@ test('the desktop path keeps the moment whole and shortens the name', async ({ p
   // No moment in the path until there is one.
   await expect(machine(page).locator('.crumb')).toHaveCount(1)
   await page.keyboard.press('Escape')
+  // It fades out over the page for a moment (220ms) before it is gone.
+  await expect(machine(page)).toHaveCount(0)
   await rewrite(page, 'After.')
   await open(page)
   const moment = machine(page).locator('.crumb').nth(1).locator('.crumb-word')
@@ -673,6 +675,340 @@ test('Help explains it and lists its key', async ({ page }) => {
   // A phone has no keys to list, and hides them.
   await expect(page.getByText('⌘/Ctrl + Alt + Z')).toBeAttached()
   await expect(page.getByText('so keep a copy')).toHaveCount(0)
+})
+
+// The tape in the hand, and the Time Machine's fades (#83).
+
+const HOUR = 3_600_000
+const DAY = 24 * HOUR
+
+/** The ages, newest first, of a history thinned as it would be after a year: every moment for an hour, then one an hour, a day, a week. */
+function yearOfAges(): number[] {
+  const ages: number[] = []
+  for (let i = 0; i < 12; i++) ages.push(i * 5 * 60_000)
+  for (let i = 1; i <= 23; i++) ages.push(i * HOUR + HOUR / 2)
+  for (let i = 1; i <= 29; i++) ages.push(i * DAY + DAY / 2)
+  for (let i = 5; i <= 52; i++) ages.push(i * 7 * DAY)
+  return ages
+}
+
+/**
+ * Replaces the piece's history with a chain of moments of these ages (oldest last in `ages`), every `kept`th of them kept,
+ * the newest being the words now. Written directly, with no reload: a restart would thin it, and the Time Machine holds thinning once open.
+ */
+async function seed(page: Page, ages: number[], kept = 0): Promise<void> {
+  await page.evaluate(
+    async ({ ages, kept }) => {
+      const db = await new Promise<IDBDatabase>((done, failed) => {
+        const open = indexedDB.open('elbowpatch')
+        open.onerror = () => failed(open.error)
+        open.onsuccess = () => done(open.result)
+      })
+      const tx = db.transaction(['pieces', 'working', 'versions', 'outlines'], 'readwrite')
+      const all = <T>(store: string) =>
+        new Promise<T[]>((done) => {
+          const r = tx.objectStore(store).getAll()
+          r.onsuccess = () => done(r.result as T[])
+        })
+      const piece = (await all<{ sections: { sectionId: string }[] }>('pieces'))[0]!
+      const sectionId = piece.sections[0]!.sectionId
+      const pieceId = (piece as unknown as { id: string }).id
+      const working = (await all<{ sectionId: string; content: string; baseVersionId: string }>('working')).find((w) => w.sectionId === sectionId)!
+      for (const v of await all<{ id: string; sectionId: string }>('versions')) if (v.sectionId === sectionId) tx.objectStore('versions').delete(v.id)
+      const now = Date.now()
+      const oldest = [...ages].reverse()
+      const first = now - oldest[0]!
+      oldest.forEach((age, i) => {
+        tx.objectStore('versions').put({
+          id: `seed-${i}`,
+          pieceId,
+          sectionId,
+          parentId: i === 0 ? null : `seed-${i - 1}`,
+          seq: i,
+          createdAt: now - age,
+          content: i === oldest.length - 1 ? working.content : `Moment ${i}.`,
+          ...(kept && i % kept === 0 ? { kept: true } : {}),
+        })
+      })
+      for (const o of await all<{ id: string; createdAt: number }>('outlines')) tx.objectStore('outlines').put({ ...o, createdAt: first - 1 })
+      tx.objectStore('working').put({ ...working, baseVersionId: `seed-${oldest.length - 1}` })
+      await new Promise<void>((done, failed) => {
+        tx.oncomplete = () => done()
+        tx.onerror = () => failed(tx.error)
+      })
+      db.close()
+    },
+    { ages, kept },
+  )
+}
+
+/** An essay with this many moments, aged as given, ready to open. */
+async function longHistory(page: Page, ages: number[], kept = 0): Promise<void> {
+  await essay(page, 'Words now.')
+  await seed(page, ages, kept)
+  await open(page)
+  await expect(ticks(page).first()).toBeVisible()
+  await expect(tape(page)).toBeFocused()
+}
+
+/** Where the tape stands: its tick, and whether its layer is at that tick's place and still. */
+const settled = (page: Page) =>
+  tape(page).evaluate((el) => {
+    const layer = el.querySelector('.tape-ticks')!
+    const spacing = 11
+    const x = -new DOMMatrixReadOnly(getComputedStyle(layer).transform).m41
+    return { tick: Number(el.getAttribute('aria-valuenow')), x, spacing, gliding: layer.getAnimations().length > 0 }
+  })
+
+/** A drag along the tape by the mouse, in steps, and let go. */
+async function drag(page: Page, dx: number, steps = 8): Promise<void> {
+  const box = (await tape(page).boundingBox())!
+  const y = box.y + 14
+  const x = box.x + box.width / 2
+  await page.mouse.move(x, y)
+  await page.mouse.down()
+  await page.mouse.move(x + dx, y, { steps })
+  await page.mouse.up()
+}
+
+test('dragging the tape moves it, and it settles on a tick', async ({ page }) => {
+  await longHistory(page, yearOfAges())
+  const count = yearOfAges().length
+  const start = await settled(page)
+  expect(start.tick).toBe(count - 2)
+  // Dragged to the right, older moments come in from the left; still before it is let go, it settles on the nearest tick.
+  await drag(page, 10 * 11 + 3, 8)
+  await expect.poll(async () => (await settled(page)).gliding).toBe(false)
+  const end = await settled(page)
+  expect(end.tick).toBeLessThan(start.tick - 8)
+  expect(end.x).toBe(end.tick * 11)
+  await expect(tape(page)).toHaveAttribute('aria-valuenow', String(end.tick))
+  await expect(oldText(page)).toHaveText(`Moment ${end.tick}.`)
+  // Dragged back past now, it stops at the last moment.
+  await drag(page, -170, 12)
+  await expect.poll(async () => (await settled(page)).gliding).toBe(false)
+  expect((await settled(page)).tick).toBe(count - 1)
+  // A drag is not a tap: it goes nowhere else when the pointer is let go.
+  await expect(oldText(page)).toHaveText('Words now.')
+})
+
+test('a short drag that does not reach a tick comes back to it, and a tap still goes to a tick', async ({ page }) => {
+  await longHistory(page, yearOfAges())
+  const start = (await settled(page)).tick
+  await drag(page, 4, 2)
+  await expect.poll(async () => (await settled(page)).gliding).toBe(false)
+  expect((await settled(page)).tick).toBe(start)
+  const box = (await tape(page).boundingBox())!
+  await tape(page).click({ position: { x: box.width / 2 - 33, y: 14 } })
+  await expect(tape(page)).toHaveAttribute('aria-valuenow', String(start - 3))
+})
+
+test('a year of moments draws only the ticks near the hairline, and the ends are reached by key and by drag', async ({ page }) => {
+  const ages = Array.from({ length: 3000 }, (_, i) => i * 2.9 * HOUR)
+  await longHistory(page, ages)
+  expect(await ticks(page).count()).toBeLessThan(260)
+  expect(await machine(page).locator('.tick-label').count()).toBeLessThan(60)
+  await page.keyboard.press('Home')
+  await expect(oldText(page)).toHaveText('Moment 0.')
+  await expect(tape(page)).toHaveAttribute('aria-valuenow', '0')
+  expect(await ticks(page).count()).toBeLessThan(260)
+  await expect(ticks(page).first()).toBeAttached()
+  await page.keyboard.press('End')
+  await expect(oldText(page)).toHaveText('Words now.')
+  // Thrown hard to the left, a drag goes a good way but never past what is drawn.
+  await drag(page, 170, 5)
+  await expect.poll(async () => (await settled(page)).gliding).toBe(false)
+  const thrown = (await settled(page)).tick
+  expect(thrown).toBeLessThan(3000 - 1)
+  expect(await ticks(page).count()).toBeLessThan(260)
+  expect((await settled(page)).x).toBe(thrown * 11)
+})
+
+test('labels go by age, none meet, now is the last, and a kept moment stands in the title colour', async ({ page }) => {
+  await longHistory(page, yearOfAges(), 7)
+  const labels = machine(page).locator('.tick-label')
+  const texts = await labels.allTextContents()
+  expect(texts.at(-1)).toBe('Now')
+  // Hours have no leading zero; and what is older than the week is a date, or a month once it is a year back.
+  expect(texts.some((t) => /^(0|[1-9]\d?):00$/.test(t))).toBe(true)
+  expect(texts.some((t) => /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)$/.test(t))).toBe(true)
+  expect(texts.some((t) => /^(\d{1,2} )?(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)$/.test(t))).toBe(true)
+  expect(texts.filter((t) => /^0\d:/.test(t))).toEqual([])
+  const boxes = await labels.evaluateAll((els) => els.map((el) => el.getBoundingClientRect()).map((r) => ({ left: r.left, right: r.right })))
+  boxes.sort((a, b) => a.left - b.left)
+  for (let i = 1; i < boxes.length; i++) expect(boxes[i]!.left).toBeGreaterThanOrEqual(boxes[i - 1]!.right)
+  // The tape is in the hand wherever it is: the oldest labels meet no neighbour either.
+  await page.keyboard.press('Home')
+  await expect(tape(page)).toHaveAttribute('aria-valuenow', '0')
+  const old = await labels.evaluateAll((els) => els.map((el) => el.getBoundingClientRect()).map((r) => ({ left: r.left, right: r.right })))
+  old.sort((a, b) => a.left - b.left)
+  for (let i = 1; i < old.length; i++) expect(old[i]!.left).toBeGreaterThanOrEqual(old[i - 1]!.right)
+  const [kept, plain] = await Promise.all([
+    machine(page)
+      .locator('.tick[data-kept]')
+      .first()
+      .evaluate((el) => getComputedStyle(el).backgroundColor),
+    machine(page)
+      .locator('.tick:not([data-kept])')
+      .first()
+      .evaluate((el) => getComputedStyle(el).backgroundColor),
+  ])
+  const colour = (name: string) => page.evaluate((n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim(), name)
+  expect(kept).not.toBe(plain)
+  const probe = (value: string) =>
+    page.evaluate((v) => {
+      const el = document.createElement('i')
+      el.style.color = v
+      document.body.append(el)
+      const c = getComputedStyle(el).color
+      el.remove()
+      return c
+    }, value)
+  expect(kept).toBe(await probe(await colour('--title')))
+  expect(plain).toBe(await probe(await colour('--secondary')))
+})
+
+test('the tape fades at its edges over the ticks, not over the labels', async ({ page }) => {
+  await longHistory(page, yearOfAges())
+  const edge = await tape(page).evaluate((el) => {
+    const s = getComputedStyle(el, '::before')
+    return { image: s.backgroundImage, height: s.height, events: s.pointerEvents }
+  })
+  expect(edge.image).toContain('linear-gradient')
+  expect(edge.height).toBe('29px')
+  expect(edge.events).toBe('none')
+})
+
+/** A finger across the screen, by the browser's own touch input: `from` to `to`, in steps about 16ms apart. */
+async function finger(page: Page, from: { x: number; y: number }, dx: number, steps = 8, hold = 0): Promise<void> {
+  const cdp = await page.context().newCDPSession(page)
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [from] })
+  for (let i = 1; i <= steps; i++) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: from.x + (dx * i) / steps, y: from.y }] })
+    await page.waitForTimeout(16)
+  }
+  // Held still a moment before it lifts, a finger carries no speed: a loaded machine cannot turn a drag into a throw.
+  if (hold) await page.waitForTimeout(hold)
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+  await cdp.detach()
+}
+
+test('a finger on the tape moves the tape and turns no page, and a finger on the page turns', async ({ page, browserName }) => {
+  test.skip(!phone(page) || browserName !== 'chromium', 'a finger is a phone’s, and is sent through Chromium’s own touch input')
+  const long = Array.from({ length: 40 }, (_, i) => `Paragraph ${i + 1} goes on for a while, so that the text fills more than one page.`).join(' ')
+  // Both of the last moments are more than a page, so a page turned by mistake would show.
+  await history(page, ['One.', long, `${long} And more.`, 'Now.'])
+  await open(page)
+  await expect(oldText(page)).toContainText('And more.')
+  await expect(tape(page)).toBeFocused()
+  const left = () =>
+    machine(page)
+      .locator('.pager')
+      .evaluate((el) => el.scrollLeft)
+  const box = (await tape(page).boundingBox())!
+  // Dragged right by a tick (44px with so few), the tape goes to the moment before.
+  await finger(page, { x: box.x + box.width / 2, y: box.y + 14 }, 44, 8, 150)
+  await expect(tape(page)).toHaveAttribute('aria-valuenow', '1')
+  await expect(oldText(page)).not.toContainText('And more.')
+  await expect(oldText(page)).toContainText('Paragraph 40')
+  await page.waitForTimeout(500)
+  expect(await left()).toBe(0)
+  // Swiped left across the page, the page turns and the tape stays.
+  const page1 = (await machine(page).locator('.pager').boundingBox())!
+  await finger(page, { x: page1.x + page1.width * 0.8, y: page1.y + 200 }, -160)
+  await expect.poll(left).toBeGreaterThan(0)
+  await expect(tape(page)).toHaveAttribute('aria-valuenow', '1')
+})
+
+test('a swipe sent as plain touch events on the tape does not reach the page', async ({ page }) => {
+  test.skip(!phone(page), 'a swipe is a phone’s turn')
+  const long = Array.from({ length: 40 }, (_, i) => `Paragraph ${i + 1} goes on for a while, so that the text fills more than one page.`)
+  await history(page, [long.join(' '), 'Short.'])
+  await open(page)
+  await expect(oldText(page)).toContainText('Paragraph 40')
+  const left = () =>
+    machine(page)
+      .locator('.pager')
+      .evaluate((el) => el.scrollLeft)
+  const swipe = (selector: string, dx: number) =>
+    machine(page)
+      .locator(selector)
+      .first()
+      .evaluate((el, dx) => {
+        const touch = (clientX: number) => ({ clientX, clientY: 300 })
+        const send = (type: string, x: number) =>
+          el.dispatchEvent(Object.assign(new Event(type, { bubbles: true }), { touches: [touch(x)], changedTouches: [touch(x)] }))
+        send('touchstart', 200)
+        send('touchend', 200 + dx)
+      }, dx)
+  await swipe('.tape', -150)
+  await page.waitForTimeout(600)
+  expect(await left()).toBe(0)
+  await swipe('.pager', -150)
+  await expect.poll(left).toBeGreaterThan(0)
+  await swipe('.tape', 150)
+  await page.waitForTimeout(600)
+  expect(await left()).toBeGreaterThan(0)
+})
+
+/** What the page animates by script, from here on: where, what, how long. */
+async function recordAnimations(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const seen: { on: string; props: string[]; ms: number }[] = []
+    ;(window as unknown as { __animated: typeof seen }).__animated = seen
+    const animate = Element.prototype.animate
+    Element.prototype.animate = function (this: Element, keyframes, options) {
+      const frames = keyframes as Keyframe[]
+      seen.push({ on: String(this.className), props: Object.keys(frames[0] ?? {}), ms: Number((options as KeyframeAnimationOptions).duration) })
+      return animate.call(this, keyframes, options)
+    }
+  })
+}
+const animated = (page: Page) => page.evaluate(() => (window as unknown as { __animated: { on: string; props: string[]; ms: number }[] }).__animated.slice())
+const clearAnimated = (page: Page) => page.evaluate(() => (window as unknown as { __animated: unknown[] }).__animated.splice(0))
+
+test('it opens and closes as a 220ms cross-fade, and a change of moment is a 120ms fade in place', async ({ page }) => {
+  await recordAnimations(page)
+  await history(page, ['One.', 'Two.', 'Three.'])
+  await clearAnimated(page)
+  await open(page)
+  expect(await animated(page)).toContainEqual({ on: expect.stringContaining('time-machine'), props: ['opacity'], ms: 220 })
+  await expect(oldText(page)).toHaveText('Two.')
+  await expect(tape(page)).toBeFocused()
+  await clearAnimated(page)
+  await page.keyboard.press('ArrowLeft')
+  await expect(oldText(page)).toHaveText('One.')
+  const step = await animated(page)
+  // The text only fades, in place; the tape's own glide is the one thing that moves.
+  expect(step.filter((a) => a.props.includes('opacity')).map((a) => a.ms)).toContain(120)
+  for (const a of step) if (a.props.includes('transform')) expect(a.on).toContain('tape-ticks')
+  expect(step.some((a) => a.props.includes('transform') && !a.on.includes('tape-ticks'))).toBe(false)
+  await clearAnimated(page)
+  await page.keyboard.press('Escape')
+  // Fading out: no longer answering, and then gone.
+  await expect(machine(page)).toHaveAttribute('inert', '')
+  expect(await animated(page)).toContainEqual({ on: expect.stringContaining('time-machine'), props: ['opacity'], ms: 220 })
+  await expect(machine(page)).toHaveCount(0)
+  await expect(page.locator('.body')).toHaveText('Three.')
+})
+
+test('with reduced motion nothing glides or fades, and it is gone at once', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await recordAnimations(page)
+  await essay(page, 'Words now.')
+  await seed(page, yearOfAges())
+  await open(page)
+  await expect(ticks(page).first()).toBeVisible()
+  await expect(tape(page)).toBeFocused()
+  await page.keyboard.press('ArrowLeft')
+  await expect(tape(page)).toHaveAttribute('aria-valuenow', String(yearOfAges().length - 3))
+  await drag(page, 100, 6)
+  const after = await settled(page)
+  expect(after.gliding).toBe(false)
+  expect(after.x).toBe(after.tick * 11)
+  await page.keyboard.press('Escape')
+  await expect(machine(page)).toHaveCount(0)
+  expect(await animated(page)).toEqual([])
 })
 
 type Version = { content: string; seq: number; sectionId: string; kept?: boolean; beforeBringBack?: boolean }
