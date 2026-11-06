@@ -419,7 +419,10 @@ export function rejoinChapter(deps: Deps, pieceId: string, rejoin: ChapterRejoin
     const found = await tx.piece(pieceId)
     if (found?.kind !== 'book') throw new Error('Only a book has chapters.')
     const at = found.sections.findIndex((s) => s.sectionId === sectionId)
-    if (at < 0) return { piece: found, sectionId: into, content: (await current(tx, into)).content }
+    if (at < 0) {
+      if (!found.sections.some((s) => s.sectionId === into)) throw new Error('The chapter it came from has left the book.')
+      return { piece: found, sectionId: into, content: (await current(tx, into)).content }
+    }
     if (found.sections[at - 1]?.sectionId !== into) throw new Error('The chapter it came from is not before it.')
     if ((await current(tx, sectionId)).content !== whole) throw new Error('The words are not stored yet.')
     if (keptAt !== undefined && keptAt > (await current(tx, into)).updatedAt) throw new Error('The chapter it joins has words not stored yet.')
@@ -446,6 +449,86 @@ export function rejoinChapter(deps: Deps, pieceId: string, rejoin: ChapterRejoin
     await tx.putPiece(next)
     return { piece: next, sectionId: into, content }
   })
+}
+
+/** What the page or the unsaved journal holds of a chapter, beyond what is stored. */
+export interface ChapterRemoval {
+  sectionId: string
+  /** Its text, its title, anything not stored yet: any of them not blank refuses. */
+  held: string[]
+}
+
+/** The book without the chapter, and the chapter to open if the page was on it. */
+export interface Removed {
+  piece: Piece
+  sectionId: string
+  content: string
+  /** When that chapter's text was last stored, for words kept for it and newer. */
+  updatedAt: number
+}
+
+const blank = (text: string): boolean => text.trim() === ''
+
+/**
+ * Takes an empty chapter out of the book, in one transaction: a moment first, so the outline before it stays
+ * in history, then the section out of the current outline, and a moment after. Its versions stay, and
+ * earlier outlines still list it. Its working copy stays too, stamped now: words kept for it earlier are older,
+ * and never replay it into the book. Safe to run twice. Refused, with nothing changed and undefined back,
+ * unless its stored text and title and all that is held for it are blank, and another chapter stays.
+ */
+export function removeChapter(deps: Deps, pieceId: string, removal: ChapterRemoval): Promise<Removed | undefined> {
+  return deps.store.transaction(async (tx) => {
+    const { sectionId, held } = removal
+    const found = await tx.piece(pieceId)
+    if (found?.kind !== 'book' || !held.every(blank)) return undefined
+    const at = found.sections.findIndex((s) => s.sectionId === sectionId)
+    if (at < 0) {
+      const there = found.sections.find((s) => s.sectionId === found.place?.sectionId) ?? found.sections[0]!
+      return { piece: found, sectionId: there.sectionId, ...(await current(tx, there.sectionId)) }
+    }
+    if (found.sections.length < 2 || !blank(found.sections[at]!.title) || !blank((await current(tx, sectionId)).content)) return undefined
+
+    await momentIn(tx, deps, pieceId)
+    const piece = (await tx.piece(pieceId))!
+    const now = deps.clock.now()
+    const left = await tx.working(sectionId)
+    await tx.putWorking({ sectionId, pieceId, content: left?.content ?? '', baseVersionId: await baseOf(tx, sectionId), updatedAt: now })
+
+    const sections = piece.sections.filter((s) => s.sectionId !== sectionId)
+    const opens = (piece.sections[at - 1] ?? piece.sections[at + 1])!.sectionId
+    const stands = await current(tx, opens)
+    // The next chapter becomes chapter 1, and the title page is part of it now: its pages are laid out anew.
+    const nowFirst = at === 0 ? sections[0]!.sectionId : undefined
+    const { [sectionId]: _, ...words } = piece.words ?? {}
+    const place = placeAfter(piece.place, sectionId, nowFirst, {
+      sectionId: opens,
+      paragraph: 0,
+      offset: 0,
+      snippet: openingWords(stands.content),
+      // Chapter 1's opening page comes after the title page: the page says which it is, once it has opened there.
+      ...(sections[0]!.sectionId === opens ? {} : { page: 1 }),
+      caret: true,
+      at: now,
+    })
+    await tx.putPiece({
+      ...piece,
+      sections,
+      words,
+      pages: withoutCounts(piece.pages, nowFirst ? [sectionId, nowFirst] : [sectionId]),
+      ...(place ? { place } : {}),
+      updatedAt: now,
+    })
+    await momentIn(tx, deps, pieceId)
+    return { piece: (await tx.piece(pieceId))!, sectionId: opens, ...stands }
+  })
+}
+
+/** Where the writer's place stands once a chapter has gone: `moved`, if it was there. */
+function placeAfter(place: Place | undefined, gone: string, nowFirst: string | undefined, moved: Place): Place | undefined {
+  if (place?.sectionId === gone) return moved
+  if (place?.sectionId !== nowFirst || !place) return place
+  const { page: _, screen: __, ...left } = place
+  return left
 }
 
 /** The version a section's working copy grew from: its own, else the section's latest. */
