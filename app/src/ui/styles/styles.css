@@ -2797,10 +2797,13 @@ button.count[aria-expanded='true'] {
     bottom: calc(var(--rise) + 20px);
     width: 358px;
   }
-  /* The moment stands whole, and the piece's name shortens: the path ends by x316, inside the rail's width, as it does
-     with a toggle after it. An essay has none. */
+  /* The moment stands whole, and the piece's name shortens: the path stays inside the rail's width, room left for its
+     toggle. An essay has no toggle, and keeps the same limit: its path ends by x316 (DESIGN.md, The Time Machine). */
   .time-machine .path .crumbs {
     display: flex;
+    max-width: 238px;
+  }
+  .time-machine[data-kind='essay'] .path .crumbs {
     max-width: 284px;
   }
   .time-machine .path .crumb {

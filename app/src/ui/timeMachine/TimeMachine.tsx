@@ -146,6 +146,7 @@ export function TimeMachine({ deps, looking, onBack, onHome }: Props): ReactElem
     <div
       ref={screen}
       className={piece.kind === 'journal' ? 'page-screen time-machine journal' : 'page-screen time-machine'}
+      data-kind={piece.kind}
       data-nothing={nothing || undefined}
     >
       <div className="head" data-scrolled={scrolled || undefined}>
