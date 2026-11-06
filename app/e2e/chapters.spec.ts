@@ -265,6 +265,196 @@ test('Contents opens with the keyboard up, and the writer stays in the text', as
   await expect(page.locator('.writing-bar')).toBeVisible()
 })
 
+const FIELDS = '.body, .title, .book-title, .subtitle'
+/** The caret's colours in the page's fields, as the browser reads them: one, when all agree. */
+const carets = async (page: Page) => [...new Set(await page.locator(FIELDS).evaluateAll((all) => all.map((field) => getComputedStyle(field).caretColor)))]
+const NONE = 'rgba(0, 0, 0, 0)'
+
+test('a sheet over the page hides the caret and keeps the focus; closing it brings the caret back', async ({ page }) => {
+  phoneOnly(page)
+  await importBook(page, THREE)
+  // The first chapter: its page holds the title page's fields too.
+  await openChapter(page, 'One')
+  await writeHere(page)
+  await page.setViewportSize({ width: 390, height: 500 })
+  await expect(page.locator('.writing-bar')).toBeVisible()
+  await expect(page.locator(FIELDS)).toHaveCount(4)
+  const shown = await carets(page)
+  expect(shown).toHaveLength(1)
+  expect(shown).not.toContain(NONE)
+
+  // Every field, with the focus left where it was, in the text and then in the title.
+  await runningHead(page).click()
+  await expect(contents(page)).toBeVisible()
+  expect(await carets(page)).toEqual([NONE])
+  await expect(page.locator('.body')).toBeFocused()
+  await contents(page).getByRole('button', { name: 'Done' }).click()
+  await expect(contents(page)).toHaveCount(0)
+  expect(await carets(page)).toEqual(shown)
+  await expect(page.locator('.body')).toBeFocused()
+
+  await page.locator('.title').focus()
+  await runningHead(page).click()
+  await expect(contents(page)).toBeVisible()
+  await expect(page.locator('.title')).toHaveCSS('caret-color', NONE)
+  await expect(page.locator('.title')).toBeFocused()
+  // Chosen, a chapter closes the sheet as Done does.
+  await chapter(page, 'Three').click()
+  await expect(page.locator('.title')).toHaveText('Three')
+  expect(await carets(page)).toEqual(shown)
+
+  // Text settings and export take the focus into themselves, under the same rule.
+  await page.locator('.body').focus()
+  await page.locator('.page-button').click()
+  for (const sheet of ['Text settings', 'Export']) {
+    await page.locator('.tools').getByRole('button', { name: sheet }).click()
+    await expect(page.getByRole('dialog', { name: sheet })).toBeVisible()
+    expect(await carets(page)).toEqual([NONE])
+    await page.getByRole('dialog', { name: sheet }).getByRole('button', { name: 'Done' }).click()
+    await expect(page.getByRole('dialog', { name: sheet })).toHaveCount(0)
+    expect(await carets(page)).toEqual(shown)
+  }
+})
+
+test('a sheet from the desktop head leaves the caret alone, for the writer typing beside it', async ({ page }) => {
+  desktopOnly(page)
+  await importBook(page, TWO)
+  await openChapter(page, 'Two')
+  await writeHere(page)
+  const shown = await carets(page)
+  await page.locator('.head-tools').getByRole('button', { name: 'Text settings' }).click()
+  await expect(page.getByRole('dialog', { name: 'Text settings' })).toBeVisible()
+  await page.locator('.body').click()
+  await expect(page.locator('.body')).toBeFocused()
+  await expect(page.getByRole('dialog', { name: 'Text settings' })).toBeVisible()
+  expect(await carets(page)).toEqual(shown)
+})
+
+/** More chapters than a list shows at once. */
+const MANY = Array.from({ length: 40 }, (_, i) => `# Chapter ${i + 1}\n\nWords.\n`).join('\n')
+
+test('the focus ring on a Contents row stands whole outside it, at the top, the sides and the end of a long list', async ({ page, browserName }) => {
+  await importBook(page, MANY)
+  await contentsFromCount(page)
+  // The sheet takes the focus just after it shows, from the count that had it: it must not land mid-test.
+  // (On desktop the rail takes none, and in WebKit the count never had it.)
+  if (!onDesktop(page) && browserName !== 'webkit') await expect(rows(page).first()).toBeFocused()
+  const list = contents(page).locator('.contents-list')
+  /** How far the focused row's ring, 4px round the row, stands inside what the list shows. Never less than 0. */
+  const room = () =>
+    list.evaluate((el) => {
+      const row = document.activeElement!.getBoundingClientRect()
+      const box = el.getBoundingClientRect()
+      return Math.min(row.top - 4 - box.top, box.bottom - row.bottom - 4, row.left - 4 - box.left, box.right - row.right - 4)
+    })
+  await list.evaluate((el) => {
+    el.scrollTop = 0
+  })
+  // A key first, so the ring shows. (Not in WebKit, whose Tab passes over buttons: there the room alone is read.)
+  await page.keyboard.press('Shift')
+  await rows(page).nth(1).focus()
+  await rows(page).first().focus()
+  if (browserName !== 'webkit') {
+    await expect(rows(page).first()).toHaveCSS('outline-offset', '2px')
+    await expect(rows(page).first()).toHaveCSS('outline-width', '2px')
+  }
+  expect(await room()).toBeGreaterThanOrEqual(-0.5)
+  // A row below the fold: the list scrolls to it, and the ring stays whole.
+  await rows(page).nth(25).focus()
+  expect(await list.evaluate((el) => el.scrollTop)).toBeGreaterThan(0)
+  expect(await room()).toBeGreaterThanOrEqual(-0.5)
+  await rows(page).last().focus()
+  await list.evaluate((el) => {
+    el.scrollTop = el.scrollHeight
+  })
+  expect(await room()).toBeGreaterThanOrEqual(-0.5)
+})
+
+test('a long title wraps in the rail, whole, with the page number on its first line', async ({ page }) => {
+  desktopOnly(page)
+  const unbroken = 'Unbroken'.repeat(12)
+  const spaced = 'The windows of the shop had been salted white by the first storm of November'
+  await importBook(page, `# One\n\nFirst.\n\n# ${unbroken}\n\nSecond.\n\n# ${spaced}\n\nThird.\n`)
+  await expect(rows(page).nth(2).locator('.contents-page')).toBeVisible()
+
+  const short = (await rows(page).first().boundingBox())!
+  expect(short.height).toBe(36)
+  expect(short.width).toBe(296)
+  for (const n of [1, 2]) {
+    const row = rows(page).nth(n)
+    const box = (await row.boundingBox())!
+    expect(box.height).toBeGreaterThan(36)
+    expect(box.width).toBe(296)
+    // Nothing cut: the title is as tall as it needs, and no wider than its place.
+    const title = row.locator('.contents-title')
+    expect(await title.evaluate((el) => el.scrollWidth <= el.clientWidth && getComputedStyle(el).whiteSpace !== 'nowrap')).toBe(true)
+    const line = (await title.boundingBox())!
+    const number = (await row.locator('.contents-page').boundingBox())!
+    // On the first line, not the middle of the row.
+    expect(number.y - box.y).toBe((await rows(page).first().locator('.contents-page').boundingBox())!.y - short.y)
+    expect(number.y).toBeLessThan(line.y + 23)
+  }
+})
+
+test('a failed save stands in the rail, above + New chapter, with every word and every chapter in reach', async ({ page }) => {
+  desktopOnly(page)
+  await importBook(page, MANY)
+  await openChapter(page, 'Chapter 2')
+  await writeHere(page)
+  const add = page.getByRole('button', { name: 'New chapter' })
+  const before = (await add.boundingBox())!
+  await page.evaluate(() => {
+    IDBDatabase.prototype.transaction = () => {
+      throw new DOMException('The disk is full.', 'QuotaExceededError')
+    }
+  })
+  await page.keyboard.type(' Not stored.')
+  const line = page.getByRole('alert')
+  await expect(line).toHaveText("Can't save right now. Your words are still here.Save a copy")
+
+  const box = (await line.boundingBox())!
+  expect(box.x).toBe(20)
+  expect(box.x + box.width).toBeLessThanOrEqual(316)
+  // Whole, wrapped rather than cut.
+  expect(await line.evaluate((el) => el.scrollWidth <= el.clientWidth && el.scrollHeight <= el.clientHeight)).toBe(true)
+  await expect(line.getByRole('button', { name: 'Save a copy' })).toBeInViewport({ ratio: 1 })
+  // + New chapter stands where it stood, 12px under the line, and can be pressed.
+  const after = (await add.boundingBox())!
+  expect(after).toEqual(before)
+  expect(after.y - (box.y + box.height)).toBeGreaterThanOrEqual(12)
+  await add.click({ trial: true })
+
+  // The last chapter scrolls clear of the line.
+  const list = contents(page).locator('.contents-list')
+  await list.evaluate((el) => {
+    el.scrollTop = el.scrollHeight
+  })
+  const last = (await rows(page).last().boundingBox())!
+  expect(last.y + last.height).toBeLessThanOrEqual(box.y)
+})
+
+test('a short book keeps its chapters and + New chapter where they stood when a save fails', async ({ page }) => {
+  desktopOnly(page)
+  await importBook(page, TWO)
+  await openChapter(page, 'Two')
+  await writeHere(page)
+  const add = page.getByRole('button', { name: 'New chapter' })
+  const before = (await add.boundingBox())!
+  await page.evaluate(() => {
+    IDBDatabase.prototype.transaction = () => {
+      throw new DOMException('The disk is full.', 'QuotaExceededError')
+    }
+  })
+  await page.keyboard.type(' Not stored.')
+  await expect(page.getByRole('alert')).toBeVisible()
+  expect(await add.boundingBox()).toEqual(before)
+  await page.getByRole('button', { name: 'Contents' }).click()
+  // Folded, there is no + New chapter to clear: the line goes down to the foot, and keeps its width.
+  const box = (await page.getByRole('alert').boundingBox())!
+  expect(box.x + box.width).toBeLessThanOrEqual(316)
+  expect(box.y + box.height).toBe(900 - 20)
+})
+
 test('words typed just before a jump are there after a reload, in their own chapter', async ({ page }) => {
   await importBook(page, TWO)
   await writeHere(page)

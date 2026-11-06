@@ -554,6 +554,10 @@ export function Page({
 
   const openingAt = titlePage ? 1 : 0
   const openingPage = page === openingAt
+  // A sheet over the page: the phone's, which a tap outside closes. The focus can stay in the text under it,
+  // to keep the keyboard up, and iOS paints its caret above the sheet, so the page's fields hide it (styles.css).
+  // A sheet from the desktop head stands beside the page while the writer types, and leaves the caret alone.
+  const sheetOver = sheet === 'contents' ? phone : sheet !== null && !anchor
 
   return (
     <div
@@ -561,6 +565,7 @@ export function Page({
       className={piece.kind === 'journal' ? 'page-screen journal' : 'page-screen'}
       data-keyboard={keyboard || undefined}
       data-tools={tools || undefined}
+      data-sheet={sheetOver || undefined}
       inert={covered}
       aria-hidden={covered}
     >
