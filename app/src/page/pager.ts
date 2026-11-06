@@ -76,6 +76,18 @@ export function geometry(screenWidth: number, screenHeight: number, wide = false
   }
 }
 
+/** What the moment bar takes at the foot, from the end of the page to the screen's bottom: the gap above it, the bar, the gap under it. */
+const MOMENT_FOOT = { phone: 24 + 130 + 24, desktop: 20 + 130 + 20 }
+
+/**
+ * The Time Machine's page (DESIGN.md, The page above the bar): the same column and type, ending above the
+ * moment bar. Only the height changes, so its breaks can differ from the writing page's and its words never do.
+ */
+export function aboveMomentBar(fit: Fit, screenHeight: number): Fit {
+  const height = Math.min(fit.height, screenHeight - MOMENT_FOOT[screenOf(fit.stride)] - fit.top)
+  return { ...fit, height, bottom: screenHeight - fit.top - height }
+}
+
 /** The page holding a point, given its distance from the start of the flow. */
 export function pageAt(offset: number, g: Geometry): number {
   return Math.max(0, Math.floor((offset + (g.stride - g.measure) / 2) / g.stride))
