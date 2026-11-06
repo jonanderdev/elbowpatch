@@ -29,7 +29,7 @@ import { raiseKeyboard } from '../page/useFocusOnOpen'
 import { waiting } from '../settings/PutAway'
 import { type Area, Settings } from '../settings/Settings'
 import { readLast, writeLast } from '../stores/last'
-import { type BringBackRequest, TimeMachine } from '../timeMachine/TimeMachine'
+import { type BringBackLine, type BringBackRequest, type PartBack, TimeMachine } from '../timeMachine/TimeMachine'
 import { bringSectionBack } from './bringBack'
 import { askToPersist } from './persist'
 import { replayJournal } from './replay'
@@ -169,19 +169,30 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
   // the line. Until then the page stays covered, whatever closes the Time Machine meanwhile, and a second press waits for nothing.
   const [bringing, setBringing] = useState(false)
   const bringingNow = useRef(false)
-  const bringBackTo = async (moment: BringBackRequest, line: string): Promise<void> => {
+  const bringBackTo = async (moment: BringBackRequest, line: BringBackLine): Promise<void> => {
     if (!opened || bringingNow.current) return
     bringingNow.current = true
     setBringing(true)
     let landed = false
     try {
-      const done = await bringSectionBack({ deps, pieceId: opened.piece.id, reshape: () => reshapePage.current, writes: holds }, moment)
+      const done = await bringSectionBack(
+        { deps, pieceId: opened.piece.id, pageSectionId: opened.sectionId, reshape: () => reshapePage.current, writes: holds },
+        moment,
+      )
       if (!done) return void timeMachine.leave()
       landed = true
       timeMachine.leave(() => {
         ++chosen.current
         going.current = ''
-        setOpened({ piece: done.piece, sectionId: done.sectionId, content: done.content, updatedAt: done.updatedAt, at: 'opening', line, readAt: ++reads })
+        setOpened({
+          piece: done.piece,
+          sectionId: done.sectionId,
+          content: done.content,
+          updatedAt: done.updatedAt,
+          at: 'opening',
+          line: typeof line === 'function' ? line(done.piece) : line,
+          readAt: ++reads,
+        })
         bringingNow.current = false
         setBringing(false)
       })
@@ -212,6 +223,26 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
     const unstored = draft.kind === 'journal' ? withDay(deps, { ...draft, sections: [] }, sectionId) : { piece: neverStored(draft), sectionId }
     const there = next ?? { ...unstored, content: '', readAt: ++reads }
     setOpened({ ...there, at, writing })
+  }
+
+  // A passage brought back from the Time Machine: the Time Machine closes onto the page, and the page puts it in.
+  // The page that has the section already has it in at once; another section opens first, saved as any is.
+  const bringPart = ({ sectionId, passage, from }: PartBack): void => {
+    if (bringingNow.current || !holds()) return
+    const bringing = { passage, from }
+    timeMachine.leave(() => {
+      if (!opened) return
+      if (opened.sectionId === sectionId) {
+        setOpened((now) => now && { ...now, bringing })
+        return
+      }
+      const turn = ++chosen.current
+      void (async () => {
+        await saveFirst()
+        const next = await open(opened.piece.id, sectionId).catch(() => undefined)
+        if (next && turn === chosen.current) setOpened({ ...next, bringing })
+      })()
+    })
   }
 
   // A new chapter at the end of the book or right after a chapter, read from what is stored once the
@@ -339,9 +370,11 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
           deps={deps}
           looking={timeMachine.onScreen.looking}
           leaving={timeMachine.onScreen.leaving}
-          {...(timeMachine.onScreen.looking.piece.kind === 'essay' ? { onBringBack: bringBackTo } : {})}
+          writes={writer === 'here'}
+          onBringBack={bringBackTo}
           onKeepCopy={(moment, line) => keepCopyOf(timeMachine.onScreen!.looking.piece.id, moment, line)}
           onBack={() => timeMachine.leave()}
+          onBringPart={bringPart}
           onHome={() => timeMachine.leave(() => void toLibrary())}
         />
       )}

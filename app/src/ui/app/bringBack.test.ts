@@ -2,10 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { memoryStore } from '../../adapters/memory-store'
 import { momentsOf } from '../../domain/lookBack'
 import type { Piece } from '../../domain/model'
-import { newPiece, openPiece, rename, takeMoment, write } from '../../domain/pieces'
+import { newPiece, openPiece, rename, takeMoment, withDay, write } from '../../domain/pieces'
 import type { Store, WriterLock } from '../../domain/ports'
 import { thin } from '../../domain/thinning'
-import { keepUndo, takeUndo } from '../../page/undoMemory'
+import { closeUndo, keepUndo, takeUndo } from '../../page/undoMemory'
 import { keptFor } from '../page/fields'
 import { createSaving, type Saving } from '../page/saving'
 import { unsaved } from '../stores/unsaved'
@@ -93,7 +93,7 @@ async function setup() {
       },
       closing: () => Promise.resolve(),
     })
-    const seams: BringBackSeams = { deps, pieceId: piece.id, reshape: () => saving.reshape, writes: () => lock.writes }
+    const seams: BringBackSeams = { deps, pieceId: piece.id, pageSectionId: sectionId, reshape: () => saving.reshape, writes: () => lock.writes }
     return { page, saving, seams }
   }
   const at = async (content: string) => {
@@ -322,5 +322,122 @@ describe('words held in the unsaved journal, and what came back', () => {
 
     expect(await s.dump()).toEqual(before)
     expect(unsaved.get(s.sectionId)?.markdown).toBe('two, and words a failed save kept')
+  })
+})
+
+/** A journal of two days, each written as `one` then `two` a minute apart, with a page open on the later day. */
+async function journalSetup() {
+  vi.useFakeTimers({ now: START, toFake: ['Date', 'setTimeout', 'clearTimeout'] })
+  let n = 0
+  const deps = { store: memoryStore(), clock: { now: () => Date.now() }, ids: { next: () => `id${++n}` } }
+  let piece = newPiece(deps, 'journal', 'en')
+  const days: Record<string, string> = {}
+  for (const day of ['2026-09-29', '2026-09-30']) {
+    let sectionId: string
+    ;({ piece, sectionId } = withDay(deps, piece, day))
+    days[day] = sectionId
+    for (const text of ['one', 'two']) {
+      vi.setSystemTime(Date.now() + MIN)
+      await write(deps, piece, sectionId, text)
+      await takeMoment(deps, piece.id)
+    }
+  }
+  vi.setSystemTime(Date.now() + MIN)
+  const earlier = days['2026-09-29']!
+  const later = days['2026-09-30']!
+  const found = (await openPiece(deps, piece.id))!
+  const page = { markdown: 'two', failed: false }
+  const saving: Saving = createSaving({
+    deps,
+    piece: found.piece,
+    sectionId: later,
+    stored: { markdown: 'two', title: '', bookTitle: '', subtitle: '' },
+    read: () => ({ markdown: page.markdown, title: null, bookTitle: null, subtitle: null }),
+    readOnly: () => false,
+    place: () => undefined,
+    pages: () => null,
+    onStored: () => {},
+    onFailed: () => {},
+    closing: () => Promise.resolve(),
+  })
+  const seams: BringBackSeams = { deps, pieceId: piece.id, pageSectionId: later, reshape: () => saving.reshape, writes: () => true }
+  const at = async (sectionId: string, content: string) => {
+    const m = (await momentsOf(deps, piece.id, sectionId)).find((x) => x.content === content)!
+    return { sectionId, at: m.at, content }
+  }
+  const stored = async (sectionId: string) => (await openPiece(deps, piece.id))!.sections.find((s) => s.sectionId === sectionId)!.content
+  return { deps, piece, earlier, later, saving, page, seams, at, stored }
+}
+
+describe('bringing a day back', () => {
+  const editorState = async (text: string) => {
+    const { EditorState } = await import('prosemirror-state')
+    const { history } = await import('prosemirror-history')
+    const { toDoc } = await import('../../page/schema')
+    const { parse } = await import('../../domain/markdown')
+    return EditorState.create({ doc: toDoc(parse(text)), plugins: [history()] })
+  }
+
+  it('brings back one day and leaves the other as it was, and names that day for the page to open on', async () => {
+    const s = await journalSetup()
+    const done = await bringSectionBack(s.seams, await s.at(s.earlier, 'one'))
+    expect(done).toMatchObject({ sectionId: s.earlier, content: 'one', changed: true })
+    expect(done!.piece.sections.map((d) => d.sectionId)).toContain(s.earlier)
+    expect(await s.stored(s.earlier)).toBe('one')
+    expect(await s.stored(s.later)).toBe('two')
+  })
+
+  it('keeps the undo of the day the page sits on when another day is brought back, though the sealed page closes', async () => {
+    const s = await journalSetup()
+    const state = await editorState('two')
+    await bringSectionBack(s.seams, await s.at(s.earlier, 'one'))
+    // The page, sealed by the bring back, closes with its history: it was not the day that changed.
+    closeUndo(s.later, state, s.saving.sealed())
+    expect(takeUndo(s.later, 'two')).toBe(state)
+  })
+
+  it('still ends the undo of the day brought back, though the page sat on it', async () => {
+    const s = await journalSetup()
+    const state = await editorState('two')
+    await bringSectionBack(s.seams, await s.at(s.later, 'one'))
+    closeUndo(s.later, state, s.saving.sealed())
+    expect(takeUndo(s.later, 'one')).toBeUndefined()
+  })
+
+  it('the page’s undo survives one close only, not a later sealed one', async () => {
+    const s = await journalSetup()
+    const state = await editorState('two')
+    await bringSectionBack(s.seams, await s.at(s.earlier, 'one'))
+    closeUndo(s.later, state, true)
+    expect(takeUndo(s.later, 'two')).toBe(state)
+    // A split on a later page seals it for good reason: its history goes.
+    closeUndo(s.later, state, true)
+    expect(takeUndo(s.later, 'two')).toBeUndefined()
+  })
+
+  it('an older held entry for the day never overwrites what came back, and does not start the page', async () => {
+    const s = await journalSetup()
+    unsaved.keep({ piece: s.piece, pieceId: s.piece.id, sectionId: s.earlier, name: 'journal.md', markdown: 'two, held', title: null }, Date.now())
+    vi.setSystemTime(Date.now() + MIN)
+    await write(s.deps, s.piece, s.earlier, 'two, and more')
+    vi.setSystemTime(START - 10 * DAY)
+
+    const done = await bringSectionBack(s.seams, await s.at(s.earlier, 'one'))
+
+    expect(done?.content).toBe('one')
+    expect(keptFor({ piece: done!.piece, sectionId: s.earlier, content: 'one', updatedAt: done!.updatedAt, readAt: 1 })).toBeUndefined()
+    const lock = { hold: async () => ({ release() {} }) } as unknown as WriterLock
+    await replayJournal(s.deps, lock)
+    expect(await s.stored(s.earlier)).toBe('one')
+  })
+
+  it('newer held words for the day stop it, and stay', async () => {
+    const s = await journalSetup()
+    const request = await s.at(s.earlier, 'one')
+    vi.setSystemTime(Date.now() + MIN)
+    unsaved.keep({ piece: s.piece, pieceId: s.piece.id, sectionId: s.earlier, name: 'journal.md', markdown: 'two, and held', title: null })
+    await expect(bringSectionBack(s.seams, request)).rejects.toBeInstanceOf(NotBroughtBack)
+    expect(await s.stored(s.earlier)).toBe('two')
+    expect(unsaved.get(s.earlier)?.markdown).toBe('two, and held')
   })
 })

@@ -9,7 +9,7 @@ import { scrollToCaret, showCaret, toOpeningPage } from '../../page/caret'
 import { type Editor, selectionBox } from '../../page/editor'
 import { screenOf } from '../../page/pager'
 import { placeOf } from '../../page/place'
-import { keepUndo, takeUndo } from '../../page/undoMemory'
+import { closeUndo, takeUndo } from '../../page/undoMemory'
 import { settled } from '../app/settled'
 import { ExportSheet } from '../components/ExportSheet'
 import { Path } from '../components/Path'
@@ -27,6 +27,7 @@ import { PageFoot, StatusLine } from './PageFoot'
 import { SectionTitle, TitlePage } from './Titles'
 import { HeadTools, TextSettings } from './Tools'
 import { isTimeMachineKey } from './timeMachineKey'
+import { useBringPart } from './useBringPart'
 import { useCaretFollowing, useCaretKeys } from './useCaret'
 import { useChapterStart } from './useChapterStart'
 import { useEditor } from './useEditor'
@@ -138,6 +139,8 @@ export function Page({
   /** Where Days was opened from, which is where it stands. */
   const [daysFrom, setDaysFrom] = useState<'head' | 'tools'>('head')
   const [line, setLine] = useState<string | null>(opened.line ?? null)
+  /** The line said after a passage was brought back (Brought back from Sunday evening.): calm, as the line a page opens with is. */
+  const [brought, setBrought] = useState<string | null>(null)
   const [words, setWords] = useState(() => countWords(content))
   const [blank, setBlank] = useState(() => !content.trim())
   const today = isoDay(new Date(deps.clock.now()))
@@ -212,6 +215,7 @@ export function Page({
     kind: piece.kind,
     settings,
     keyboard,
+    rail: railed && !settings.railFolded,
     onRelayout: (p) => {
       rail.laidOut(p.g.side)
       const e = editorNow.current
@@ -281,7 +285,7 @@ export function Page({
     onUndoPast: () => undoPast(),
     onClose(state) {
       // A page split or rejoined holds text that is no longer the section's: its history goes with it.
-      if (!saving?.sealed()) keepUndo(sectionId, state)
+      closeUndo(sectionId, state, !!saving?.sealed())
     },
     onSelection(view, tr) {
       const e = editorNow.current
@@ -477,6 +481,23 @@ export function Page({
     return () => window.removeEventListener('keydown', onKey)
   }, [covered])
 
+  // Words brought back from the Time Machine go in as soon as the page shows, after the focus above has gone back.
+  useBringPart({
+    editor,
+    pager,
+    bringing: opened.bringing,
+    covered,
+    writer,
+    onBrought(from) {
+      moved.current = true
+      backFromLooking.current = null
+      const text = `Brought back from ${from}.`
+      setBrought(text)
+      setLine(text)
+      setSaid({ text, over: announcement })
+    },
+  })
+
   // A chapter chosen in Contents opens at its opening page.
   function openChapter(chosen: string): void {
     if (!editor || !pager) return
@@ -557,18 +578,28 @@ export function Page({
     })
   }
 
-  // Escape closes what is open, innermost first: a sheet, then the tools. One listener reads what
-  // is open now from a ref: re-attached on each change, an Escape pressed right after one (Done,
-  // then Escape) would reach the listener from before it.
-  const open = useRef({ tools, sheet, anchor })
-  open.current = { tools, sheet, anchor }
+  // Back to the library. Pressed, it leaves the caret where it is, so the place kept is the caret's.
+  const home = (): void => {
+    focus.leaving()
+    onLibrary()
+  }
+
+  // Escape closes what is open, innermost first: a sheet, then the tools. With nothing open, on desktop, it
+  // goes back to the library; a selection is something the writer is doing, and a held key is not a press.
+  // One listener reads what is open now from a ref: re-attached on each change, an Escape pressed right
+  // after one (Done, then Escape) would reach the listener from before it.
+  const selected = !!selection?.rect
+  const open = useRef({ tools, sheet, anchor, selected, phone, home })
+  open.current = { tools, sheet, anchor, selected, phone, home }
   useEffect(() => {
     if (covered) return
     const onKey = (e: KeyboardEvent): void => {
       if (e.key !== 'Escape') return
       if (open.current.sheet) closeSheet()
       else if (open.current.tools) closeTools()
-      else return
+      // Not by whether it was answered: the editor answers every Escape. The rail keeps its own.
+      else if (open.current.phone || open.current.selected || e.repeat || e.isComposing || (e.target as Element).closest('.rail')) return
+      else open.current.home()
       e.preventDefault()
     }
     window.addEventListener('keydown', onKey)
@@ -587,8 +618,8 @@ export function Page({
     return () => window.removeEventListener('pointerdown', onDown)
   }, [covered, closeSheet])
 
-  /** The line the page opened with is calm: secondary, with no surface, and the folio stands aside for it. */
-  const calm = line !== null && line === opened.line && writer !== 'elsewhere' && !failed
+  /** The line the page opened with, or one said after a passage was brought back, is calm: secondary, with no surface, and the folio stands aside for it. */
+  const calm = line !== null && (line === opened.line || line === brought) && writer !== 'elsewhere' && !failed
 
   // A calm line at the foot for a few seconds.
   useEffect(() => {
@@ -636,17 +667,9 @@ export function Page({
       aria-hidden={covered}
     >
       <div ref={head} className="head" data-scrolled={scrolled || undefined}>
-        {/* Pressed, § leaves the caret where it is, so the place kept is the caret's. On desktop the
-            piece's name follows it; a phone shows § alone. */}
+        {/* On desktop § and *Library*, then the piece's name; a phone shows § alone. */}
         <div className="head-path">
-          <Path
-            crumbs={[{ word: (piece.kind === 'essay' ? heading : name).trim() || 'Untitled' }]}
-            keepFocus
-            onHome={() => {
-              focus.leaving()
-              onLibrary()
-            }}
-          />
+          <Path crumbs={[{ word: (piece.kind === 'essay' ? heading : name).trim() || 'Untitled' }]} keepFocus onHome={home} />
           {railed ? <RailToggle label={journal ? 'Days' : 'Contents'} open={rail.open} onToggle={rail.toggle} buttonRef={railToggle} /> : null}
         </div>
         {/* In the head, so the toggle's next stop is what it opens, then the tools. */}

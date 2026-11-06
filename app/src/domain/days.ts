@@ -1,7 +1,7 @@
 // A journal's days as the writer reaches them (DESIGN.md, The journal). Everything here works on what
 // it is given, so the same rail and month sheet can show the days as they stand or as they were.
 
-import type { Piece } from './model'
+import type { OutlineSection, Piece } from './model'
 import { dayAndMonth, monthName, number } from './words'
 
 /** A day of a journal, by its date: "2026-10-26". A today not begun has no section yet. */
@@ -24,6 +24,11 @@ export function journalDays(piece: Piece, today: string, open?: OpenDay): Day[] 
   })
   if (!days.some((d) => d.iso === today)) days.push({ iso: today, words: 0 })
   return days.sort((a, b) => b.iso.localeCompare(a.iso))
+}
+
+/** The days a journal listed at a time, latest first, each with the words it held then. No today: none is marked in the past. */
+export function daysAsItWas(sections: readonly OutlineSection[], words: Readonly<Record<string, number>>): Day[] {
+  return sections.map(({ sectionId, title }): Day => ({ iso: title, sectionId, words: words[sectionId] ?? 0 })).sort((a, b) => b.iso.localeCompare(a.iso))
 }
 
 /** The day a turn reaches from this one, on (1) or back (-1). Days are latest first. */

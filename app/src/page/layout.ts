@@ -4,8 +4,8 @@ import { aboveMomentBar, geometry, type Pager } from './pager'
 /** The screen's height with no keyboard up, and the tallest the window has been, at this width: on a touch screen the keyboard shortens the window, never the page. */
 let tallest = { width: 0, height: 0, window: 0 }
 
-/** Lays the pages out: the page fitted to the screen, at the text settings. `short`: it ends above the moment bar. */
-export function layOut(pager: Pager, screen: HTMLElement, kind: Kind, short = false): void {
+/** Lays the pages out: the page fitted to the screen, at the text settings. `short`: it ends above the moment bar. `rail`: an open rail stands at the left. */
+export function layOut(pager: Pager, screen: HTMLElement, kind: Kind, short = false, rail = false): void {
   const width = screen.clientWidth
   let height = screen.clientHeight
   if (matchMedia('(pointer: coarse)').matches) {
@@ -27,11 +27,13 @@ export function layOut(pager: Pager, screen: HTMLElement, kind: Kind, short = fa
     // The screen keeps that height, and the page's scroller its length.
     screen.style.setProperty('--page-height', `${height}px`)
   }
-  const fit = geometry(width, height, document.documentElement.dataset.measure === 'wide', kind === 'journal')
+  const fit = geometry(width, height, document.documentElement.dataset.measure === 'wide', kind === 'journal', rail)
   const g = short ? aboveMomentBar(fit, height) : fit
   const set = (name: string, px: number): void => screen.style.setProperty(name, `${px}px`)
   screen.style.setProperty('--k', `${g.k}`)
   set('--side', g.side)
+  // The narrower margin: the running head keeps clear of the path and the tools by it.
+  set('--head-room', Math.min(g.side, g.stride - g.side - g.measure))
   set('--measure-px', g.measure)
   set('--stride', g.stride)
   set('--top', g.top)

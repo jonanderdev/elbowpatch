@@ -489,6 +489,10 @@ button {
   position: relative;
   top: -1px;
 }
+/* What § does, in a word: on desktop only, where nothing else says it (DESIGN.md, Control). */
+.path .home-word {
+  display: none;
+}
 .path .crumbs {
   /* A long path wraps rather than cutting, and never leaves the rail. */
   max-width: 224px;
@@ -615,6 +619,10 @@ button {
 }
 .running-control .icon {
   flex: none;
+}
+/* While its sheet is open the arrow points up: tapped again it closes (DESIGN.md, Control). It turns at once. */
+.running-control[aria-expanded='true'] .icon {
+  transform: scaleY(-1);
 }
 
 .pager {
@@ -2238,15 +2246,33 @@ button.count[aria-expanded='true'] {
     right: -10px;
     min-width: 0;
   }
+  .head .path .home-word,
+  .settings-head .path .home-word {
+    display: inline;
+    top: 0;
+    margin-left: 8px;
+    font-size: 15px;
+    font-weight: 400;
+    line-height: 20px;
+    color: var(--text);
+  }
+  .head .path .home:hover .home-word,
+  .settings-head .path .home:hover .home-word {
+    color: var(--title);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  /* The rail's width, less *Library* and the toggle: the path never leaves the rail. */
   .head .path .crumbs {
     display: block;
+    max-width: 162px;
     padding-top: 8px;
     font-size: 15px;
   }
   /* Still centred over the column, but clear of the path and the tools (about 330px from each edge),
      cut with "…" where a narrow window brings them close. */
   .running-head {
-    padding: 0 max(0px, calc(330px - var(--side)));
+    padding: 0 max(0px, calc(330px - var(--head-room)));
   }
   .head-tools {
     display: flex;
@@ -2521,10 +2547,6 @@ button.count[aria-expanded='true'] {
     z-index: 0;
     padding: 76px 12px 24px 20px;
   }
-  /* The journal's margin rule is its edge (DESIGN.md, Layout). */
-  .days-rail {
-    border-right: 0;
-  }
   .days-month {
     display: flex;
     flex-direction: column;
@@ -2652,6 +2674,34 @@ button.count[aria-expanded='true'] {
 }
 .time-machine .title {
   cursor: text;
+}
+/* The bar over selected old words: two words to press, in the selection menu's frame. */
+.bar.part-menu {
+  position: fixed;
+  z-index: 4;
+  gap: 0;
+  padding: 0 4px;
+}
+.part-menu .bar-separator {
+  margin: 0 6px;
+}
+.part-action {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 18px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--title);
+  white-space: nowrap;
+  transition: background-color 160ms;
+}
+.part-action:active {
+  background: var(--pressed);
+}
+@media (hover: hover) {
+  .part-action:hover {
+    background: var(--pressed);
+  }
 }
 /* Fixed to the window: in a window smaller than the page the bar stays on screen, in every state, ✕ included, and
    the page scrolls under it. The page ends above it, so scrolled to its end no text stands under the bar. */
@@ -2817,8 +2867,17 @@ button.count[aria-expanded='true'] {
     background: var(--pressed);
   }
 }
-.moment-bar[data-loading] .moment-action {
+.moment-bar[data-loading] .moment-action,
+.moment-action[aria-disabled='true'] {
   color: var(--secondary);
+}
+.moment-action[aria-disabled='true']:active {
+  background: none;
+}
+@media (hover: hover) {
+  .moment-action[aria-disabled='true']:hover {
+    background: none;
+  }
 }
 
 @media (min-width: 700px) {
@@ -2831,6 +2890,10 @@ button.count[aria-expanded='true'] {
   }
   /* The moment stands whole, and the piece's name shortens: the path stays inside the rail's width, room left for its
      toggle. An essay has no toggle, and keeps the same limit: its path ends by x316 (DESIGN.md, The Time Machine). */
+  /* It has ✕ for the way out, and the moment needs the room. */
+  .time-machine .head .path .home-word {
+    display: none;
+  }
   .time-machine .path .crumbs {
     display: flex;
     max-width: 238px;

@@ -21,13 +21,21 @@ export interface BarActions {
   busy?: boolean
   /** Keep a copy of the moment on screen. */
   onKeepCopy?(): void
+  /** Another window writes the piece: *Bring … back* stands in secondary and does nothing; *Keep a copy* leaves the piece alone. */
+  unavailable?: boolean
 }
 
 /** The bar's two actions. */
-function Actions({ kind, onBringBack, busy, onKeepCopy }: { kind: Kind } & BarActions): ReactElement {
+function Actions({ kind, onBringBack, busy, onKeepCopy, unavailable }: { kind: Kind } & BarActions): ReactElement {
   return (
     <div className="moment-actions">
-      <button type="button" className="moment-action leading" aria-busy={busy || undefined} onClick={busy ? undefined : onBringBack}>
+      <button
+        type="button"
+        className="moment-action leading"
+        aria-busy={busy || undefined}
+        aria-disabled={unavailable || undefined}
+        onClick={busy || unavailable ? undefined : onBringBack}
+      >
         {BRING_BACK[kind]}
       </button>
       <span className="bar-separator" />

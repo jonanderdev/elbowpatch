@@ -1152,7 +1152,7 @@ test('a window that does not write brings nothing back', async ({ page, context 
   await expect(oldText(second)).toHaveText('One.')
   const before = await stored(second, 'versions')
   const working = await stored(second, 'working')
-  await machine(second).getByRole('button', { name: 'Bring essay back' }).click()
+  await machine(second).getByRole('button', { name: 'Bring essay back' }).click({ force: true })
   await expect(oldText(second)).toHaveText('One.')
   expect(await stored(second, 'versions')).toEqual(before)
   expect(await stored(second, 'working')).toEqual(working)
