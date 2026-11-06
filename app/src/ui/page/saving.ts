@@ -66,6 +66,8 @@ export interface Saving {
   reshape(change: (whole: string) => Promise<Piece | undefined>): Promise<boolean>
   /** A split is running or has run: what this page holds and counts is no longer the section's. */
   sealed(): boolean
+  /** Another window writes the piece now. */
+  readOnly(): boolean
 }
 
 /** How long a split waits for the words to be stored, and earlier pages to finish, before leaving the text as it is. */
@@ -203,6 +205,7 @@ export function createSaving(o: SavingOptions): Saving {
       return last
     },
     sealed: () => sealed,
+    readOnly: () => o.readOnly(),
     async reshape(change): Promise<boolean> {
       if (closed || sealed || o.readOnly()) return false
       // Text read differently from how it is stored counts as a change too: it is stored first.

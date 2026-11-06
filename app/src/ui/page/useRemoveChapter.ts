@@ -54,7 +54,7 @@ export function useRemoveChapter(o: Options): (chosen: string) => Promise<void> 
       return back?.piece
     })
     if (done && back) {
-      forgetChapter(sectionId)
+      gone(sectionId)
       o.onRemovedHere(back, writing)
       return
     }
@@ -69,6 +69,8 @@ export function useRemoveChapter(o: Options): (chosen: string) => Promise<void> 
     const { sections } = o.outline()
     // First, so the place kept for this page is counted as it is laid out now.
     await saving.flush().catch(() => {})
+    // Past the waits: another window may have taken the piece.
+    if (saving.readOnly()) return
     const remove = (): Promise<Removed | undefined> => removeChapter(deps, pieceId, { sectionId: chosen, held: heldIn(unsaved.get(chosen)) })
     if (sections[0]?.sectionId === chosen && sections[1]?.sectionId === sectionId) await removeBeforeHere(chosen, remove)
     else {
