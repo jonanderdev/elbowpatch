@@ -2825,8 +2825,17 @@ button.count[aria-expanded='true'] {
     background: var(--pressed);
   }
 }
-.moment-bar[data-loading] .moment-action {
+.moment-bar[data-loading] .moment-action,
+.moment-action[aria-disabled='true'] {
   color: var(--secondary);
+}
+.moment-action[aria-disabled='true']:active {
+  background: none;
+}
+@media (hover: hover) {
+  .moment-action[aria-disabled='true']:hover {
+    background: none;
+  }
 }
 
 @media (min-width: 700px) {
