@@ -76,6 +76,8 @@ async function select(page: Page, words: string): Promise<void> {
 
 async function bring(page: Page, words: string): Promise<void> {
   await open(page)
+  // A book opens on its title page: the chapter's words are on the page after.
+  if (await machine(page).locator('[data-title-page]').count()) await page.keyboard.press('PageDown')
   await select(page, words)
   await menu(page).getByRole('button', { name: 'Bring part back' }).click()
   await expect(machine(page)).toHaveCount(0)
