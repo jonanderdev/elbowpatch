@@ -307,13 +307,7 @@ export function TimeMachine({ deps, looking, onBringBack, onKeepCopy, onBack, on
       },
     )
   }
-  const said = copied
-    ? 'Copied'
-    : crossedOver === announcement
-      ? heading
-      : moment && saidOver === announcement
-        ? momentName(moment.at, now)
-        : announcement
+  const said = copied ? 'Copied' : crossedOver === announcement ? heading : moment && saidOver === announcement ? momentName(moment.at, now) : announcement
 
   return (
     <div
