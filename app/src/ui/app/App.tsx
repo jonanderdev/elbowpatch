@@ -175,7 +175,10 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
     setBringing(true)
     let landed = false
     try {
-      const done = await bringSectionBack({ deps, pieceId: opened.piece.id, reshape: () => reshapePage.current, writes: holds }, moment)
+      const done = await bringSectionBack(
+        { deps, pieceId: opened.piece.id, pageSectionId: opened.sectionId, reshape: () => reshapePage.current, writes: holds },
+        moment,
+      )
       if (!done) return void timeMachine.leave()
       landed = true
       timeMachine.leave(() => {
@@ -337,7 +340,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
         <TimeMachine
           deps={deps}
           looking={timeMachine.looking}
-          {...(timeMachine.looking.piece.kind === 'essay' ? { onBringBack: bringBackTo } : {})}
+          {...(timeMachine.looking.piece.kind !== 'book' ? { onBringBack: bringBackTo } : {})}
           onKeepCopy={(moment, line) => keepCopyOf(timeMachine.looking!.piece.id, moment, line)}
           onBack={() => timeMachine.leave()}
           onHome={() => timeMachine.leave(() => void toLibrary())}

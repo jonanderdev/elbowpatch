@@ -265,8 +265,12 @@ export function TimeMachine({ deps, looking, onBringBack, onKeepCopy, onBack, on
     working.current = true
     setBusy(true)
     setBringFailed(false)
-    // An essay has no rest: the line says what is kept instead (DESIGN.md).
-    const line = `Brought back from ${momentInSentence(moment.at, now)}. Today’s text is kept as a moment.`
+    // An essay has no rest: the line says what is kept instead. A day says the rest of the journal is as it was (DESIGN.md).
+    const from = momentInSentence(moment.at, now)
+    const line =
+      piece.kind === 'journal'
+        ? `${title.trim() || 'This day'} brought back from ${from}. The rest of the journal is as it was.`
+        : `Brought back from ${from}. Today’s text is kept as a moment.`
     onBringBack({ sectionId, at: moment.at, content: moment.content }, line).then(
       () => {
         working.current = false

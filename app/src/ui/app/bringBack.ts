@@ -1,7 +1,7 @@
 import { type BringBack, type BroughtBack, bringBack } from '../../domain/lookBack'
 import type { Piece } from '../../domain/model'
 import type { Deps } from '../../domain/pieces'
-import { forgetUndo } from '../../page/undoMemory'
+import { forgetUndo, keepThroughSeal } from '../../page/undoMemory'
 import type { Saving } from '../page/saving'
 import { unsaved } from '../stores/unsaved'
 
@@ -9,6 +9,8 @@ import { unsaved } from '../stores/unsaved'
 export interface BringBackSeams {
   deps: Deps
   pieceId: string
+  /** The section the open page holds: it may not be the one brought back. */
+  pageSectionId: string
   /** The open page's reshape: it stores what the page holds, waits for any page still closing, and seals the page while the change runs. */
   reshape(): Saving['reshape'] | null
   /** Whether this window holds the piece right now, asked inside the transaction. */
@@ -54,7 +56,9 @@ export async function bringSectionBack(seams: BringBackSeams, moment: MomentOf):
   })
   if (result) {
     // The text it replaced is a moment, not an undo step (0003).
-    forgetUndo(moment.sectionId)
+    // The page sealed for it holds another section, whose text did not change: its history goes on (0003).
+    if (moment.sectionId === seams.pageSectionId) forgetUndo(moment.sectionId)
+    else keepThroughSeal(seams.pageSectionId)
     return result
   }
   if (unchanged) return null
