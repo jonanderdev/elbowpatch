@@ -161,6 +161,42 @@ test('the tape is the chapter on screen’s own, and the time it stands at goes 
   await expect(oldText(page)).toHaveText('First chapter.')
 })
 
+test('a change of moment fades the page in, and a turn into another chapter does not', async ({ page }) => {
+  test.skip(!onDesktop(page), 'the same on a phone, and the keys are quicker here')
+  await importBook(page, '# One\n\nFirst chapter.\n\n# Two\n\nSecond.\n')
+  await keepMoment(page)
+  await typeAtEnd(page, ' Then more.')
+  await open(page)
+  await expect(tape(page)).toBeVisible()
+  await expect(tape(page)).toBeFocused()
+  await page.waitForTimeout(400)
+  const fades = () =>
+    page.evaluate(() => {
+      const w = window as unknown as { __fades?: number }
+      if (w.__fades === undefined) {
+        w.__fades = 0
+        const animate = HTMLElement.prototype.animate
+        HTMLElement.prototype.animate = function (this: HTMLElement, ...args: Parameters<typeof animate>) {
+          if (this.classList.contains('pager')) w.__fades = (w.__fades ?? 0) + 1
+          return animate.apply(this, args)
+        }
+      }
+      return w.__fades
+    })
+  expect(await fades()).toBe(0)
+  await page.keyboard.press('ArrowRight')
+  await expect(oldText(page)).toHaveText('First chapter. Then more.')
+  expect(await fades()).toBe(1)
+  // Turning across the chapters, at the same time, is a turn.
+  await page.keyboard.press('PageDown')
+  await page.keyboard.press('PageDown')
+  await expect(machine(page).locator('.title')).toHaveText('Two')
+  await page.keyboard.press('PageUp')
+  await expect(machine(page).locator('.title')).toHaveText('One')
+  await page.waitForTimeout(300)
+  expect(await fades()).toBe(1)
+})
+
 /** Counts the pages the Time Machine lays out out of sight to count a chapter, and the times a number in Contents stands empty. */
 async function watchNumbers(page: Page): Promise<void> {
   await page.evaluate(() => {
@@ -210,6 +246,16 @@ test('stepping the tape lays out only the chapter whose words changed, and no nu
   expect(seen.empty).toBe(0)
   expect(seen.layouts).toBeLessThanOrEqual(3)
   expect(await Promise.all([0, 1, 2].map((i) => rowsOf(page).nth(i).locator('.contents-page').textContent()))).toEqual(before)
+
+  // The first chapter's count at an earlier moment is the one the page laid out; laid out again out of sight, it is the same.
+  await page.keyboard.press('Home')
+  await expect(oldText(page)).not.toContainText('Then more.')
+  const pageCounted = await Promise.all([0, 1, 2].map((i) => rowsOf(page).nth(i).locator('.contents-page').textContent()))
+  expect(pageCounted.every((n) => /^\d+$/.test(n ?? ''))).toBe(true)
+  await page.evaluate(() => window.dispatchEvent(new Event('resize')))
+  await expect(rowsOf(page).nth(2).locator('.contents-page')).toHaveText(/^\d+$/)
+  await page.waitForTimeout(500)
+  expect(await Promise.all([0, 1, 2].map((i) => rowsOf(page).nth(i).locator('.contents-page').textContent()))).toEqual(pageCounted)
 })
 
 // Contents as it was, and the title page (#90).

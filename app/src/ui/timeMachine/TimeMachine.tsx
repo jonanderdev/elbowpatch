@@ -166,16 +166,15 @@ export function TimeMachine({ deps, looking, onBringBack, onKeepCopy, leaving = 
     })
   }
 
-  const list =
-    useContentsAsItWas(
-      deps,
-      piece,
-      book && asItWas ? sectionList : undefined,
-      stands,
-      phone ? 'phone' : 'desktop',
-      book && asItWas && (phone ? sheet.open : rail.open),
-      asItWas ? { sectionId, content } : undefined,
-    ) ?? today.contents
+  const asItWasList = useContentsAsItWas(
+    deps,
+    piece,
+    book && asItWas ? sectionList : undefined,
+    stands,
+    phone ? 'phone' : 'desktop',
+    book && asItWas && (phone ? sheet.open : rail.open),
+  )
+  const list = asItWasList.contents ?? today.contents
 
   usePageTurns({
     screen,
@@ -198,13 +197,16 @@ export function TimeMachine({ deps, looking, onBringBack, onKeepCopy, leaving = 
     if (pager && arriving) pager.opening = true
     reader?.show(content)
     pager?.measure()
+    // What the page has just laid out is the chapter's count in Contents: no second layout for it.
+    if (pager && asItWas && book) asItWasList.counted(sectionId, pager.count)
     if (pager && arriving) {
       pager.turnTo(arriving === 'last' ? pager.count - 1 : arriving === 'opening' && titlePage ? 1 : 0)
       pager.opening = false
     }
     arrive.current = undefined
   }, [reader, pager, content, title, sectionId, titlePage])
-  useMomentFade(viewport, moment?.at)
+  // By the time it stands at, not the moment: a turn into another chapter keeps the time, and is a turn, not a change of moment.
+  useMomentFade(viewport, stands)
   useScreenFade(screen, leaving)
 
   // A bring back under way: the way out waits for it, so a page it is about to replace is never left under way.
