@@ -19,6 +19,7 @@ describe('a moment in plain words', () => {
     expect(momentName(NOW - 60_000, NOW)).toBe('1 minute ago')
     expect(momentName(NOW - 12 * 60_000, NOW)).toBe('12 minutes ago')
     expect(momentName(NOW - 59 * 60_000, NOW)).toBe('59 minutes ago')
+    expect(momentName(NOW - 60 * 60_000, NOW)).toBe('This afternoon, 14:30')
   })
 
   it('names the part of today, with a 24-hour clock', () => {
@@ -27,6 +28,8 @@ describe('a moment in plain words', () => {
     expect(momentName(at(11, 6, 11, 59), NOW)).toBe('This morning, 11:59')
     expect(momentName(at(11, 6, 9, 5), NOW)).toBe('This morning, 9:05')
     expect(momentName(at(11, 6, 5, 0), NOW)).toBe('This morning, 5:00')
+    expect(momentName(at(11, 6, 17, 59), at(11, 6, 22, 0))).toBe('This afternoon, 17:59')
+    expect(momentName(at(11, 6, 18, 0), at(11, 6, 22, 0))).toBe('This evening, 18:00')
     expect(momentName(at(11, 6, 19, 0), at(11, 6, 22, 0))).toBe('This evening, 19:00')
   })
 
@@ -40,6 +43,23 @@ describe('a moment in plain words', () => {
     expect(momentName(at(11, 5, 22, 59), NOW)).toBe('Yesterday evening, 22:59')
     expect(momentName(at(11, 5, 22, 50), at(11, 6, 0, 55))).toBe('Yesterday evening, 22:50')
     expect(momentName(at(11, 5, 8, 0), NOW)).toBe('Yesterday morning, 8:00')
+  })
+
+  it('turns the day at midnight', () => {
+    const small = at(11, 6, 2, 0)
+    expect(momentName(at(11, 6, 0, 0), small)).toBe('Last night, 0:00')
+    expect(momentName(at(11, 5, 23, 59), small)).toBe('Yesterday night, 23:59')
+    expect(momentName(at(11, 5, 0, 0), small)).toBe('Yesterday night, 0:00')
+    expect(momentName(at(11, 4, 23, 59), small)).toBe('Wednesday night')
+  })
+
+  it('counts days as the calendar does when the clocks change', () => {
+    // Where the clocks go back or forward on these Sundays, the day between is 25 or 23 hours long.
+    expect(momentName(at(10, 25, 0, 10), at(10, 26, 0, 30))).toBe('Yesterday night, 0:10')
+    expect(momentName(at(10, 25, 12, 0), at(10, 25, 23, 50))).toBe('This afternoon, 12:00')
+    expect(momentName(at(3, 29, 0, 10), at(3, 30, 0, 30))).toBe('Yesterday night, 0:10')
+    expect(momentName(at(3, 28, 23, 50), at(3, 29, 23, 30))).toBe('Yesterday night, 23:50')
+    expect(momentName(at(10, 19, 12, 0), at(10, 26, 12, 0))).toBe('19 October')
   })
 
   it('names the weekday within the week, and never one that could be today', () => {
@@ -95,6 +115,11 @@ describe('a label on the tape', () => {
     expect(tapeLabel(at(10, 31, 12), NOW)).toBe('Sat')
   })
 
+  it('changes unit at midnight', () => {
+    expect(tapeLabel(at(11, 6, 0, 0), NOW)).toBe('0:00')
+    expect(tapeLabel(at(11, 5, 23, 59), NOW)).toBe('Thu')
+  })
+
   it('is the date within the year', () => {
     expect(tapeLabel(at(10, 30, 16), NOW)).toBe('30 Oct')
     expect(tapeLabel(at(1, 9, 16), NOW)).toBe('9 Jan')
@@ -102,5 +127,14 @@ describe('a label on the tape', () => {
 
   it('is the month before that', () => {
     expect(tapeLabel(at(9, 12, 16, 0, 2025), NOW)).toBe('Sep')
+  })
+
+  it('crosses a new year as a calendar does', () => {
+    const newYear = at(1, 1, 10, 0, 2027)
+    expect(tapeLabel(at(12, 31, 21, 10), newYear)).toBe('Thu')
+    expect(tapeLabel(at(12, 26, 12, 0), newYear)).toBe('Sat')
+    expect(tapeLabel(at(12, 25, 12, 0), newYear)).toBe('Dec')
+    expect(tapeLabel(at(1, 1, 9, 0, 2027), at(1, 9, 10, 0, 2027))).toBe('1 Jan')
+    expect(tapeLabel(at(12, 31, 12, 0), at(1, 9, 10, 0, 2027))).toBe('Dec')
   })
 })
