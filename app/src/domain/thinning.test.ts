@@ -277,6 +277,24 @@ describe('thinning a book with a chapter removed', () => {
 })
 
 describe('thinning the store', () => {
+  it('stops before the next piece once it is held, and the next run finishes the work', async () => {
+    const { deps, clock } = setup()
+    const pieces = [newPiece(deps, 'essay', 'en'), newPiece(deps, 'essay', 'en')]
+    for (const piece of pieces) {
+      for (const day of [40, 39.9, 39.8, 39.7]) {
+        clock.set(NOW - day * DAY)
+        await write(deps, piece, piece.sections[0]!.sectionId, `Day ${day}`)
+        await takeMoment(deps, piece.id)
+      }
+    }
+    clock.set(NOW)
+    expect(await thin(deps, () => true)).toBe(0)
+    let asked = 0
+    const first = await thin(deps, () => ++asked > 1)
+    expect(first).toBeGreaterThan(0)
+    expect(await thin(deps)).toBe(first)
+  })
+
   it('thins a section written over a year, keeps the text, and is safe to run twice', async () => {
     const { deps, clock } = setup()
     const piece = newPiece(deps, 'essay', 'en')
