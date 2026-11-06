@@ -13,11 +13,21 @@ function BackToNow({ onBack }: { onBack(): void }): ReactElement {
   )
 }
 
-/** The bar's two actions. They show from here on; what they do comes with their own tickets. */
-function Actions({ kind, onKeepCopy }: { kind: Kind; onKeepCopy?(): void }): ReactElement {
+/** What the bar's actions do. An action left out does nothing yet (its own ticket wires it). */
+export interface BarActions {
+  /** Bring the section back. */
+  onBringBack?(): void
+  /** It is under way: a second press waits for nothing and does nothing. */
+  busy?: boolean
+  /** Keep a copy of the moment on screen. */
+  onKeepCopy?(): void
+}
+
+/** The bar's two actions. */
+function Actions({ kind, onBringBack, busy, onKeepCopy }: { kind: Kind } & BarActions): ReactElement {
   return (
     <div className="moment-actions">
-      <button type="button" className="moment-action leading">
+      <button type="button" className="moment-action leading" aria-busy={busy || undefined} onClick={busy ? undefined : onBringBack}>
         {BRING_BACK[kind]}
       </button>
       <span className="bar-separator" />
@@ -33,20 +43,19 @@ export function MomentsBar({
   kind,
   name,
   tape,
-  onKeepCopy,
   onBack,
+  ...actions
 }: {
   kind: Kind
   name: string
   tape: ReactNode
-  onKeepCopy(): void
   onBack(): void
-}): ReactElement {
+} & BarActions): ReactElement {
   return (
     <div className="moment-bar surface">
       <p className="moment-name">{name}</p>
       {tape}
-      <Actions kind={kind} onKeepCopy={onKeepCopy} />
+      <Actions kind={kind} {...actions} />
       <BackToNow onBack={onBack} />
     </div>
   )
@@ -76,7 +85,7 @@ export function NothingEarlierBar({ onBack }: { onBack(): void }): ReactElement 
   )
 }
 
-/** Something went wrong: what happened, with Try again under it. #84 and #86 use this shape with their own words. */
+/** Something went wrong: what happened, with Try again under it. Each failure has its own words. */
 export function ErrorBar({ line, onAgain, onBack }: { line: string; onAgain(): void; onBack(): void }): ReactElement {
   return (
     <div className="moment-bar surface" data-state="error">

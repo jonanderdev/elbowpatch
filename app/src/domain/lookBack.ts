@@ -1,8 +1,9 @@
 // Looking back (DESIGN.md, The Time Machine; docs/decisions/0005, 0008): the history as the writer walks
 // it. It knows the Store and the product's words, and nothing of the page.
 
-import type { Kind, Outline, OutlineSection } from './model'
-import { type Deps, history, outlineAt } from './pieces'
+import { countWords } from './markdown'
+import type { Kind, Outline, OutlineSection, Piece } from './model'
+import { current, type Deps, history, latest, momentIn, openingWords, outlineAt, withoutCounts } from './pieces'
 import { dayTitle } from './words'
 
 /** One tick on the tape: a point where the section differs from the tick before it, in its text or its title. */
@@ -76,10 +77,221 @@ function walk(kind: Kind, versions: { createdAt: number; content: string; kept?:
   return moments
 }
 
+/** What is needed to tell the sections a piece listed at any time: the piece as stored, and its outlines. */
+export interface Listing {
+  piece: Piece
+  outlines: Outline[]
+}
+
+/** The piece's listings, read once: they are small, and the sections themselves are read only as they are reached. */
+export function listingOf(deps: Pick<Deps, 'store'>, pieceId: string): Promise<Listing | undefined> {
+  return deps.store.transaction(async (tx) => {
+    const piece = await tx.piece(pieceId)
+    if (!piece) return undefined
+    return { piece, outlines: [...(await tx.outlinesOf(pieceId))].sort((a, b) => a.seq - b.seq) }
+  })
+}
+
+/** A section as a piece listed it at a time. */
+export interface Listed extends OutlineSection {
+  /** It is not in the piece now: removed since. */
+  removed: boolean
+}
+
+/** The piece's outline as it stood at a time: what a title page and Contents show of it. */
+export interface Shape {
+  title: string
+  /** A book's subtitle. */
+  subtitle?: string
+  /** In reading order. A journal's days run oldest first, whatever order they were stored in. */
+  sections: Listed[]
+}
+
+/**
+ * The piece's outline in force at a time (0005): its title, subtitle and sections then, so a chapter added
+ * since is absent and one removed since is there, marked. Before its first outline, the oldest; after its
+ * last, the piece as it stands, which a window that does not write may know better.
+ */
+export function shapeAt(listing: Listing, at: number): Shape {
+  const { piece, outlines } = listing
+  const newest = outlines.at(-1)
+  const from = !newest || at > newest.createdAt ? piece : (outlineAt(outlines, at) ?? outlines[0]!)
+  const now = new Set(piece.sections.map((s) => s.sectionId))
+  const sections = from.sections.map((s): Listed => ({ ...s, removed: !now.has(s.sectionId) }))
+  return {
+    title: from.title,
+    ...(from.subtitle !== undefined && { subtitle: from.subtitle }),
+    sections: piece.kind === 'journal' ? sections.sort((a, b) => a.title.localeCompare(b.title)) : sections,
+  }
+}
+
+/** The sections the piece listed at a time, in reading order. */
+export function sectionsAt(listing: Listing, at: number): Listed[] {
+  return shapeAt(listing, at).sections
+}
+
+/**
+ * The time the writer stands at on choosing a moment of the tape. A moment holds until the next one of
+ * its section, so it stands at its own time; the last holds until now, so choosing it is choosing now,
+ * when a chapter added after it is there. Infinity is now: later than any time the history holds.
+ */
+export function timeOf(moments: Moment[], index: number): number | undefined {
+  if (index < 0 || index >= moments.length) return undefined
+  return index === moments.length - 1 ? Number.POSITIVE_INFINITY : moments[index]!.at
+}
+
+/** The section a turn reaches from this one, on (1) or back (-1), or none past the ends or from one not listed. */
+export function sectionBeyond(sections: readonly OutlineSection[], sectionId: string, dir: 1 | -1): string | undefined {
+  const here = sections.findIndex((s) => s.sectionId === sectionId)
+  return here < 0 ? undefined : sections[here + dir]?.sectionId
+}
+
+/** What a section reads as at a time. */
+export interface Reading {
+  /** The moment under the hairline, or -1 where the section has none. */
+  index: number
+  content: string
+  title: string
+}
+
+/**
+ * A section at a time: the latest of its moments at or before it. A section the piece listed then with
+ * no moment yet reads as empty, under the title it was listed with; the tape stands on its first moment,
+ * the nearest it has. With no time to stand at, there is nothing to read.
+ */
+export function readingAt(moments: Moment[], at: number | undefined, listedTitle: string): Reading {
+  if (at === undefined) return { index: -1, content: '', title: listedTitle }
+  const found = moments.findLastIndex((m) => m.at <= at)
+  const moment = moments[found]
+  if (moment) return { index: found, content: moment.content, title: moment.title }
+  return { index: moments.length > 0 ? 0 : -1, content: '', title: listedTitle }
+}
+
+/**
+ * A section's text at a time, read alone: Contents lays each chapter out to count its pages, and a chapter
+ * is not worth its whole tape for that. As `momentsOf` reads it: a time past every version, now, is the
+ * working copy; a time before the first version is empty.
+ */
+export function textAt(deps: Pick<Deps, 'store'>, sectionId: string, at: number): Promise<string> {
+  return deps.store.transaction(async (tx) => {
+    const versions = history(await tx.versionsOf(sectionId))
+    if (at === Number.POSITIVE_INFINITY) {
+      const working = await tx.working(sectionId)
+      return working?.content ?? versions.at(-1)?.content ?? ''
+    }
+    return versions.findLast((v) => v.createdAt <= at)?.content ?? ''
+  })
+}
+
 /**
  * The moment the Time Machine opens on: the most recent that differs from now, or none, which is
  * *Nothing earlier*. Each moment differs from the one after it, so that is the one before now.
  */
 export function momentToOpen(moments: Moment[]): Moment | undefined {
   return moments.at(-2)
+}
+
+// ——— Bring back ———
+
+/** What a bring back asks for: a moment as the writer saw it, of one section. */
+export interface BringBack {
+  sectionId: string
+  /** The moment on screen: when it stands, and the words the writer saw there. */
+  at: number
+  content: string
+  /** Words held for this section outside the database (the unsaved journal), if any. */
+  kept?: { at: number; content: string }
+  /** Whether this window still writes the piece. Asked inside the transaction, before anything is written. */
+  writes(): boolean
+}
+
+/** The section as it stands once brought back, at hand for the page to open on. */
+export interface BroughtBack {
+  piece: Piece
+  sectionId: string
+  content: string
+  /** When the section's text was stored: kept words older than this never start the page. */
+  updatedAt: number
+  /** False when the section already held that text, and nothing was written. */
+  changed: boolean
+}
+
+export type Refusal = 'not-writing' | 'left' | 'gone' | 'unstored'
+
+/** A bring back that did not run, with nothing written. */
+export class BringBackRefused extends Error {
+  constructor(readonly reason: Refusal) {
+    super(`Not brought back: ${reason}`)
+  }
+}
+
+/**
+ * Makes a section's text at a moment its current text (0005, 0008), in one transaction, or not at all:
+ * - the text it replaces is written first as a version marked `beforeBringBack`, even if it matches the last
+ *   one, with the stamp of any moment (`momentIn`), so it and the outline in force then are never thinned;
+ * - then the old text as a new version, stamped later, and the working copy points at it;
+ * - the section's word count follows, its page counts are dropped, and a place in it goes to its opening.
+ * Only that section's text changes: its title and the rest of the piece stay. Running it again writes
+ * nothing, for the section then already holds that text.
+ *
+ * Refused, with nothing written: when this window no longer writes the piece, when the section is not in the
+ * piece, when the moment has gone (thinning in another window took it, so what the writer saw is not what is
+ * stored), and when words held for the section outside the database are newer than what is stored, which a
+ * brought-back text stamped later would shut out.
+ */
+export function bringBack(deps: Deps, pieceId: string, request: BringBack): Promise<BroughtBack> {
+  return deps.store.transaction(async (tx) => {
+    const { sectionId, at, content, kept } = request
+    if (!request.writes()) throw new BringBackRefused('not-writing')
+    const found = await tx.piece(pieceId)
+    if (!found?.sections.some((s) => s.sectionId === sectionId)) throw new BringBackRefused('left')
+    const now = await current(tx, sectionId)
+    // The versions as stored now, not as the writer saw them: the moment must still stand as it was seen.
+    const then = history((await tx.versionsOf(sectionId)).filter((v) => v.createdAt <= at)).at(-1)
+    if (then?.content !== content) {
+      if (now.content === content) return { piece: found, sectionId, content, updatedAt: now.updatedAt, changed: false }
+      throw new BringBackRefused('gone')
+    }
+    if (now.content === content) return { piece: found, sectionId, content, updatedAt: now.updatedAt, changed: false }
+    if (kept && kept.at > now.updatedAt && kept.content !== now.content) throw new BringBackRefused('unstored')
+
+    // A section with versions and no working copy: its text is its latest version, which the moment below needs to hold.
+    const head = latest(await tx.versionsOf(sectionId))
+    if (!(await tx.working(sectionId))) {
+      await tx.putWorking({ sectionId, pieceId, content: head?.content ?? '', baseVersionId: head?.id ?? null, updatedAt: head?.createdAt ?? 0 })
+    }
+    // The text being replaced, marked. The outline changes only in a later moment, as removing a chapter does (0005).
+    await momentIn(tx, deps, pieceId, { beforeBringBack: sectionId })
+    const piece = (await tx.piece(pieceId))!
+    const working = (await tx.working(sectionId))!
+    // Never earlier than what the working copy was stamped: a journal entry overtaken by it must stay overtaken (ruling 8).
+    const stamp = Math.max(deps.clock.now(), now.updatedAt + 1)
+    await tx.putWorking({ ...working, content, updatedAt: stamp })
+    const place: Piece['place'] =
+      piece.place?.sectionId === sectionId
+        ? {
+            sectionId,
+            paragraph: 0,
+            offset: 0,
+            snippet: openingWords(content),
+            ...(piece.sections[0]?.sectionId === sectionId ? {} : { page: 1 }),
+            caret: false,
+            at: stamp,
+          }
+        : piece.place
+    await tx.putPiece({
+      ...piece,
+      words: { ...piece.words, [sectionId]: countWords(content) },
+      pages: withoutCounts(piece.pages, [sectionId]),
+      ...(place ? { place } : {}),
+      updatedAt: stamp,
+    })
+    // The old text as a version of its own, stamped later than the marked one by the same rule.
+    await momentIn(tx, deps, pieceId)
+    // The version was stamped by the moment rule, which can be later than the clock: the working copy is never earlier than it.
+    const version = latest(await tx.versionsOf(sectionId))
+    const updatedAt = Math.max(stamp, version?.createdAt ?? 0)
+    if (updatedAt !== stamp) await tx.putWorking({ ...(await tx.working(sectionId))!, updatedAt })
+    return { piece: (await tx.piece(pieceId))!, sectionId, content, updatedAt, changed: true }
+  })
 }

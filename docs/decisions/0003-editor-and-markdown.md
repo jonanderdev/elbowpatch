@@ -49,6 +49,7 @@ The page is paged, not scrolled (DESIGN.md, Behaviour).
 - A split or a rejoin is refused, with the text as it was, unless every page closed before it has finished: a closing save landing afterwards would replace the reshaped text. So is a rejoin while words newer than the chapter it joins wait in the unsaved journal, since the joined text would be stamped newer and shut them out. They come back when that chapter opens, and undo can rejoin it once they are stored.
 - What goes back is what stood at the split only while it still does. New words on the end of the earlier chapter stand apart from what returns, and a `# ` line returns with its marks while the title still reads the same.
 - Anything older than the session is the Time Machine's job.
+- *Updated 2026-11-06:* a bring back ends the history of the section it changes, for the session. Its text is now the text of a moment, so steps taken on the text it replaced would be replayed on words they never touched; the text it replaced is a moment on the tape, which is where to go back to it, not an undo step. A chapter split off from it, or that it was split off from, stops being one that undo can rejoin, for the same reason. Other sections keep their history, and a bring part back is one step of the section's own history, as typing is (0008).
 
 ## Consequences
 - ProseMirror is the largest dependency; its size is measured when it is installed.

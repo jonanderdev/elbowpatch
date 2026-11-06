@@ -3,7 +3,7 @@ import { EditorState } from 'prosemirror-state'
 import { describe, expect, it } from 'vitest'
 import { parse, serialize } from '../domain/markdown'
 import { schema, toBlocks, toDoc } from './schema'
-import { forgetChapter, forgetSplit, keepUndo, rememberSplit, splitOf, takeUndo } from './undoMemory'
+import { forgetChapter, forgetSplit, forgetUndo, keepUndo, rememberSplit, splitOf, takeUndo } from './undoMemory'
 
 const opened = (markdown: string) => EditorState.create({ doc: toDoc(parse(markdown)), plugins: [history()] })
 const typed = (state: EditorState, text: string) => state.apply(state.tr.insertText(text, 1))
@@ -88,5 +88,24 @@ describe('a chapter that left the book', () => {
     expect(splitOf('later', 'Salt.')).toBeUndefined()
     expect(splitOf('other', 'Sea.')).toBeDefined()
     forgetSplit('other')
+  })
+})
+
+describe('a section brought back to a moment', () => {
+  it('has no history for the session, even where the text it holds is the text that history ended on', () => {
+    keepUndo('a', typed(opened('Salt.'), 'Sea '))
+    forgetUndo('a')
+    expect(takeUndo('a', 'Sea Salt.')).toBeUndefined()
+  })
+
+  it('is not rejoined by undo as a chapter split off, nor is what split off from it, and no other split goes', () => {
+    rememberSplit('b', { into: 'a', after: 'The rail.', seam: SEAM })
+    rememberSplit('c', { into: 'b', after: 'Sea.', seam: SEAM })
+    rememberSplit('d', { into: 'a', after: 'Tide.', seam: SEAM })
+    forgetUndo('b')
+    expect(splitOf('b', 'The rail.')).toBeUndefined()
+    expect(splitOf('c', 'Sea.')).toBeUndefined()
+    expect(splitOf('d', 'Tide.')).toBeDefined()
+    forgetSplit('d')
   })
 })

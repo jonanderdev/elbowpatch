@@ -20,9 +20,10 @@ export async function fontsFor(chapter: ChapterToLayOut): Promise<void> {
 /**
  * A chapter's pages on this screen's page at the text settings, laid out as the page lays it out: the same
  * elements, styles and pager, without an editor (0003). Built, read and taken away in one task, so it is
- * never painted and nothing ever finds it in the document.
+ * never painted and nothing ever finds it in the document. `short`: on the Time Machine's page, which ends
+ * above the moment bar.
  */
-export function measureChapter(chapter: ChapterToLayOut): number {
+export function measureChapter(chapter: ChapterToLayOut, short = false): number {
   const screen = element('page-screen')
   screen.style.visibility = 'hidden'
   screen.style.contain = 'strict'
@@ -40,7 +41,7 @@ export function measureChapter(chapter: ChapterToLayOut): number {
 
   document.getElementById('app')?.append(screen)
   const pager = new Pager(viewport, flow, body, () => {})
-  layOut(pager, screen, 'book')
+  layOut(pager, screen, 'book', short)
   screen.remove()
   return pager.count
 }

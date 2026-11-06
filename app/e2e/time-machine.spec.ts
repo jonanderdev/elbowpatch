@@ -231,18 +231,6 @@ test('the bar stands where the frames draw it, and names what it brings back', a
   expect(back.y - box.y).toBe(1)
 })
 
-test('bring back does nothing yet', async ({ page }) => {
-  await history(page, ['Before.', 'After.'])
-  await open(page)
-  await expect(oldText(page)).toHaveText('Before.')
-  const before = await stored(page, 'versions')
-  await machine(page).getByRole('button', { name: 'Bring essay back' }).click()
-  await expect(oldText(page)).toHaveText('Before.')
-  expect(await stored(page, 'versions')).toEqual(before)
-  await close(page)
-  await expect(page.locator('.body')).toHaveText('After.')
-})
-
 test('the path keeps the longest names of a moment whole, and ends by x316', async ({ page }) => {
   test.skip(phone(page), 'the path is desktop’s')
   await essay(page, 'Before.', 'A very long title that could never fit beside the moment in the rail')
@@ -395,7 +383,8 @@ test('a book’s and a journal’s page 1 keep the running head here, which an e
     await saved(page, 'Some words.')
     await page.keyboard.press('Control+Alt+z')
     await expect(machine(page)).toBeVisible()
-    await expect(machine(page).locator('.running-head')).toHaveCount(1)
+    // A phone's book has it as the control that opens Contents.
+    await expect(machine(page).locator('.running-head, .running-control')).toHaveCount(1)
     await page.keyboard.press('Escape')
     await expect(machine(page)).toHaveCount(0)
   }
@@ -1018,4 +1007,153 @@ test('with reduced motion nothing glides or fades, and it is gone at once', asyn
   await page.keyboard.press('Escape')
   await expect(machine(page)).toHaveCount(0)
   expect(await animated(page)).toEqual([])
+})
+
+type Version = { content: string; seq: number; sectionId: string; kept?: boolean; beforeBringBack?: boolean }
+type Working = { content: string; sectionId: string }
+
+/** The section's versions in order, as stored. */
+async function versionsOf(page: Page): Promise<Version[]> {
+  return (await stored<Version>(page, 'versions')).sort((a, b) => a.seq - b.seq)
+}
+
+test('Bring essay back closes onto the page with the old text, one calm line, and the text it replaced as a moment that stays through a reload', async ({
+  page,
+}) => {
+  await history(page, ['One.', 'Two.'])
+  await caretToEnd(page)
+  // Typed an instant ago: no save has been asked for, and the key goes straight to the Time Machine.
+  await page.keyboard.type(' Typed just before.')
+  await page.keyboard.press('Control+Alt+z')
+  await expect(oldText(page)).toHaveText('One.')
+  const before = (await versionsOf(page)).length
+
+  await machine(page).getByRole('button', { name: 'Bring essay back' }).click()
+
+  await expect(machine(page)).toHaveCount(0)
+  await expect(page.locator('.body')).toHaveText('One.')
+  await expect(page.locator('.title')).toHaveText('Salt')
+  const line = page.locator('.line.calm')
+  await expect(line).toHaveText('Brought back from just now. Today’s text is kept as a moment.')
+  // Secondary, no surface, and the folio gives way to it.
+  await expect(line).not.toHaveClass(/surface/)
+  await expect(page.locator('.folio')).toHaveCount(0)
+  expect(await line.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgba(0, 0, 0, 0)')
+
+  const after = await versionsOf(page)
+  expect(after.length).toBe(before + 2)
+  const marked = after.filter((v) => v.beforeBringBack)
+  expect(marked.map((v) => v.content)).toEqual(['Two. Typed just before.'])
+  expect(after.at(-1)!.content).toBe('One.')
+  expect(after.at(-1)!.beforeBringBack).toBeUndefined()
+  expect((await stored<Working>(page, 'working')).map((w) => w.content)).toEqual(['One.'])
+
+  // The page's own closing save, and the line's end, never write over it.
+  await expect(line).toHaveCount(0, { timeout: 8000 })
+  await page.reload()
+  await expect(page.locator('.body')).toHaveText('One.')
+  expect((await stored<Working>(page, 'working')).map((w) => w.content)).toEqual(['One.'])
+  expect((await versionsOf(page)).at(-1)!.content).toBe('One.')
+  expect((await versionsOf(page)).filter((v) => v.beforeBringBack)).toHaveLength(1)
+  // The replaced text is on the tape: Time Machine opens on it.
+  await open(page)
+  await expect(oldText(page)).toHaveText('Two. Typed just before.')
+})
+
+test('pressed twice, it writes once: a marked moment and the old text, nothing more', async ({ page }) => {
+  await history(page, ['One.', 'Two.'])
+  await open(page)
+  await expect(oldText(page)).toHaveText('One.')
+  const before = (await versionsOf(page)).length
+  const action = machine(page).getByRole('button', { name: 'Bring essay back' })
+  await action.dblclick().catch(() => {})
+  await expect(machine(page)).toHaveCount(0)
+  await expect(page.locator('.body')).toHaveText('One.')
+  expect((await versionsOf(page)).length).toBe(before + 2)
+  // And once more from the tape, which now ends on the text that came back: nothing to bring, nothing written.
+  await open(page)
+  await expect(tape(page)).toBeFocused()
+  await page.keyboard.press('Home')
+  await expect(oldText(page)).toHaveText('One.')
+  await expect(ticks(page)).toHaveCount(3)
+  const count = (await versionsOf(page)).length
+  await machine(page).getByRole('button', { name: 'Bring essay back' }).click()
+  await expect(machine(page)).toHaveCount(0)
+  await expect(page.locator('.body')).toHaveText('One.')
+  expect((await versionsOf(page)).length).toBe(count)
+})
+
+test('a failed bring back leaves everything as it was, says so with Try again, and the page saves again', async ({ page }) => {
+  await history(page, ['One.', 'Two.'])
+  await open(page)
+  await expect(oldText(page)).toHaveText('One.')
+  const versions = await stored(page, 'versions')
+  const working = await stored(page, 'working')
+  await page.evaluate(() => {
+    const w = window as unknown as { broken: boolean }
+    w.broken = true
+    const put = IDBObjectStore.prototype.put
+    IDBObjectStore.prototype.put = function (...args) {
+      if (w.broken && this.name === 'versions') throw new Error('No room')
+      return put.apply(this, args)
+    }
+  })
+
+  await machine(page).getByRole('button', { name: 'Bring essay back' }).click()
+
+  await expect(bar(page)).toContainText('Couldn’t bring that back just now. Nothing has changed.')
+  await expect(machine(page).getByRole('button', { name: 'Try again' })).toBeVisible()
+  await expect(oldText(page)).toHaveText('One.')
+  const box = (await bar(page).boundingBox())!
+  expect(box.height).toBe(98)
+  expect(await stored(page, 'versions')).toEqual(versions)
+  expect(await stored(page, 'working')).toEqual(working)
+
+  // Try again, once it can: the same moment comes back.
+  await page.evaluate(() => {
+    ;(window as unknown as { broken: boolean }).broken = false
+  })
+  await machine(page).getByRole('button', { name: 'Try again' }).click()
+  await expect(machine(page)).toHaveCount(0)
+  await expect(page.locator('.body')).toHaveText('One.')
+  expect((await versionsOf(page)).at(-1)!.content).toBe('One.')
+})
+
+test('after a failure, ✕ goes back to a page that was never sealed: what is typed there is saved and stays through a reload', async ({ page }) => {
+  await history(page, ['One.', 'Two.'])
+  await open(page)
+  await expect(oldText(page)).toHaveText('One.')
+  await page.evaluate(() => {
+    const put = IDBObjectStore.prototype.put
+    IDBObjectStore.prototype.put = function (...args) {
+      if (this.name === 'versions') throw new Error('No room')
+      return put.apply(this, args)
+    }
+  })
+  await machine(page).getByRole('button', { name: 'Bring essay back' }).click()
+  await expect(bar(page)).toContainText('Couldn’t bring that back just now.')
+  await close(page)
+  await expect(page.locator('.body')).toHaveText('Two.')
+  await expect(page.getByText('Can’t save right now')).toHaveCount(0)
+  await caretToEnd(page)
+  await page.keyboard.type(' Typed after.')
+  await saved(page, 'Typed after.')
+  await page.reload()
+  await expect(page.locator('.body')).toHaveText('Two. Typed after.')
+})
+
+test('a window that does not write brings nothing back', async ({ page, context }) => {
+  await history(page, ['One.', 'Two.'])
+  const url = page.url()
+  const second = await context.newPage()
+  await second.goto(url)
+  await expect(second.getByText('Open in another window')).toBeVisible()
+  await open(second)
+  await expect(oldText(second)).toHaveText('One.')
+  const before = await stored(second, 'versions')
+  const working = await stored(second, 'working')
+  await machine(second).getByRole('button', { name: 'Bring essay back' }).click()
+  await expect(oldText(second)).toHaveText('One.')
+  expect(await stored(second, 'versions')).toEqual(before)
+  expect(await stored(second, 'working')).toEqual(working)
 })
