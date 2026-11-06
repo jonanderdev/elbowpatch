@@ -220,7 +220,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
   // A passage brought back from the Time Machine: the Time Machine closes onto the page, and the page puts it in.
   // The page that has the section already has it in at once; another section opens first, saved as any is.
   const bringPart = ({ sectionId, passage, from }: PartBack): void => {
-    if (bringingNow.current) return
+    if (bringingNow.current || !holds()) return
     const bringing = { passage, from }
     timeMachine.leave(() => {
       if (!opened) return
@@ -360,6 +360,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
         <TimeMachine
           deps={deps}
           looking={timeMachine.looking}
+          writes={writer === 'here'}
           {...(timeMachine.looking.piece.kind !== 'book' ? { onBringBack: bringBackTo } : {})}
           onKeepCopy={(moment, line) => keepCopyOf(timeMachine.looking!.piece.id, moment, line)}
           onBack={() => timeMachine.leave()}
