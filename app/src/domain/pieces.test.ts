@@ -1243,6 +1243,15 @@ describe('removing an empty chapter', () => {
       expect([...removableChapters(chapters, await storedChapters(s.deps, draft.id), { sectionId, blank: true }, new Set())]).toEqual([])
     })
 
+    it('a chapter that has just gone is not one that stays: what is stored may not have caught up with the outline', () => {
+      const stored = new Map([
+        ['here', true],
+        ['gone', true],
+      ])
+      const listed = [{ sectionId: 'here', title: '' }]
+      expect([...removableChapters(listed, stored, { sectionId: 'here', blank: true }, new Set())]).toEqual([])
+    })
+
     it('a book never stored offers nothing: there is nothing yet to take it out of', async () => {
       const s = setup()
       const { piece, sectionId } = withChapter(s, newPiece(s, 'book', 'en'))

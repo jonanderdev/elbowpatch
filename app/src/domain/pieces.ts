@@ -544,7 +544,8 @@ export function removableChapters(
   held: ReadonlySet<string>,
 ): ReadonlySet<string> {
   const empty = (id: string): boolean => (id === open.sectionId ? stored.has(id) && open.blank : stored.get(id) === true)
-  const otherStays = (id: string): boolean => [...stored.keys()].some((other) => other !== id)
+  // What is stored is read after the outline, so it can still hold a chapter that has just gone.
+  const otherStays = (id: string): boolean => chapters.some((c) => c.sectionId !== id && stored.has(c.sectionId))
   return new Set(chapters.filter((c) => blank(c.title) && empty(c.sectionId) && !held.has(c.sectionId) && otherStays(c.sectionId)).map((c) => c.sectionId))
 }
 
