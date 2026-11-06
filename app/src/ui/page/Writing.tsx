@@ -1,6 +1,7 @@
-import { type ReactElement, type ReactNode, type RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { type ReactElement, type ReactNode, type RefObject, useEffect, useState } from 'react'
 import type { Editor } from '../../page/editor'
 import { Icon, IconButton } from '../components/Icon'
+import { useFloatingAt } from '../components/useFloatingAt'
 import { stepField } from './fields'
 
 type Command = Parameters<Editor['run']>[0]
@@ -52,27 +53,9 @@ export function SelectionMenu({
   /** In a book: § starts a chapter where the selection starts. */
   onChapter?: () => void
 }): ReactElement {
-  const ref = useRef<HTMLDivElement>(null)
-  const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
-  useLayoutEffect(() => {
-    const bar = ref.current
-    if (!bar) return
-    const w = bar.offsetWidth
-    const h = bar.offsetHeight
-    const edge = 16
-    const left = Math.max(edge, Math.min(window.innerWidth - w - edge, rect.left + rect.width / 2 - w / 2))
-    // Above the words if there is room, else below them.
-    const top = rect.top - h - 10 > edge ? rect.top - h - 10 : rect.bottom + 10
-    setPos({ left, top })
-  }, [rect.left, rect.top, rect.width, rect.bottom])
+  const { ref, style } = useFloatingAt(rect)
   return (
-    <div
-      ref={ref}
-      className="bar surface selection-menu"
-      role="toolbar"
-      aria-label="Formatting"
-      style={pos ? { left: pos.left, top: pos.top } : { visibility: 'hidden' }}
-    >
+    <div ref={ref} className="bar surface selection-menu" role="toolbar" aria-label="Formatting" style={style}>
       <Formatting editor={editor} active={active} />
       {onChapter ? <IconButton icon="section" label="Start chapter here" onClick={onChapter} keepFocus /> : null}
       <span className="bar-separator" />

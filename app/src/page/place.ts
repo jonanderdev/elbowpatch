@@ -2,6 +2,7 @@
 // the caret if they were writing, otherwise the first line on screen, kept as a paragraph, an
 // offset and its opening words, so it survives edits made elsewhere.
 
+import type { Node } from 'prosemirror-model'
 import { TextSelection } from 'prosemirror-state'
 import type { EditorView } from 'prosemirror-view'
 import type { Place, Screen } from '../domain/model'
@@ -29,17 +30,30 @@ export function placeOf(view: EditorView, sectionId: string, page: number, scree
   }
 }
 
+/** How much of a paragraph's opening finds it again. */
+const KEY = 40
+
+/**
+ * The paragraph a place or a passage means, found again after edits made elsewhere: the one at its old index if
+ * it still opens with the same words, else the first that does, else none. A paragraph that is gone is
+ * undefined, which restorePlace answers by taking the nearest and a passage by going to the end.
+ */
+export function paragraphOf(doc: Node, paragraph: number, snippet: string): number | undefined {
+  const key = snippet.slice(0, KEY)
+  if (!key) return undefined
+  if (doc.maybeChild(paragraph)?.textContent.startsWith(key)) return paragraph
+  let found: number | undefined
+  doc.forEach((node, _, i) => {
+    if (found === undefined && node.textContent.startsWith(key)) found = i
+  })
+  return found
+}
+
 /** Finds the place again after edits made elsewhere: by its words, else the nearest paragraph. */
 export function restorePlace(view: EditorView, place: Place | undefined, sectionId: string): void {
   if (!place || place.sectionId !== sectionId) return
   const doc = view.state.doc
-  const key = place.snippet.slice(0, 40)
-  let index = -1
-  if (doc.maybeChild(place.paragraph)?.textContent.startsWith(key)) index = place.paragraph
-  else
-    doc.forEach((node, _, i) => {
-      if (index < 0 && key && node.textContent.startsWith(key)) index = i
-    })
+  let index = paragraphOf(doc, place.paragraph, place.snippet) ?? -1
   if (index < 0 && place.paragraph >= doc.childCount) {
     // Past the end (an empty last paragraph is not stored): the end of the text.
     view.dispatch(view.state.tr.setSelection(TextSelection.atEnd(doc)))
