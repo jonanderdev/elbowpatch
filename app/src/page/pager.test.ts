@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { aboveMomentBar, geometry, linesOf, MAX_SCALE, pageAt } from './pager'
+import { aboveMomentBar, geometry, linesOf, MAX_SCALE, pageAt, RAIL_WIDTH } from './pager'
+
+describe('the page beside the rail', () => {
+  it('centres in the width right of an open rail, at the same scale, so its breaks stay', () => {
+    const alone = geometry(1440, 900)
+    const beside = geometry(1440, 900, false, false, true)
+    expect(beside.side).toBe(alone.side + RAIL_WIDTH / 2)
+    expect({ ...beside, side: 0 }).toEqual({ ...alone, side: 0 })
+  })
+
+  it('stays centred on the window where the rail has no room beside it', () => {
+    expect(geometry(1000, 900, false, false, true)).toEqual(geometry(1000, 900))
+  })
+})
 
 describe('the page above the moment bar', () => {
   it('ends 24px above the bar on a phone: 86px shorter than the writing page', () => {

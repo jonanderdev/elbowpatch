@@ -487,7 +487,8 @@ test('words typed just before a jump are there after a reload, in their own chap
   await expect(page.locator('.title')).toHaveText(/^(One|Two)$/)
   await openChapter(page, 'One')
   await expect(page.locator('.body')).toHaveText('First chapter. Typed at the last moment.')
-  await page.keyboard.press('Escape')
+  // A phone's Contents closes; on desktop it is the rail, and Escape would leave the page.
+  if (!onDesktop(page)) await page.keyboard.press('Escape')
   await openChapter(page, 'Two')
   await expect(page.locator('.body')).toHaveText('Second.')
 })
@@ -604,17 +605,20 @@ test('the rail says the size of the book, and lists what the sheet lists', async
   await expect(rows(page).nth(0).locator('.contents-page')).toHaveText('1')
 })
 
-test('the rail folds and opens, is remembered on this device, and never moves the text', async ({ page }) => {
+test('the rail folds and opens, is remembered on this device, and the text centres in what it leaves', async ({ page }) => {
   desktopOnly(page)
   await importBook(page, THREE)
   const column = async () => (await page.locator('.pager').boundingBox())!
   const open = await column()
   await expect(toggle(page)).toHaveAttribute('aria-expanded', 'true')
+  // Right of the rail, centred in the width it leaves: 336px, then the window's other 1104.
+  expect(open.x + open.width / 2).toBeCloseTo(336 + (1440 - 336) / 2, 0)
 
   await toggle(page).click()
   await expect(contents(page)).toBeHidden()
   await expect(toggle(page)).toHaveAttribute('aria-expanded', 'false')
-  expect(await column()).toEqual(open)
+  await expect.poll(async () => (await column()).x).toBeCloseTo(open.x - 168, 0)
+  expect((await column()).width).toBeCloseTo(open.width, 1)
 
   await page.reload()
   await expect(page.locator('.title')).toHaveText('One')
@@ -626,7 +630,86 @@ test('the rail folds and opens, is remembered on this device, and never moves th
   await chapter(page, 'Two').click()
   await expect(page.locator('.title')).toHaveText('Two')
   await expect(contents(page)).toBeVisible()
-  expect(await column()).toEqual(open)
+  await expect.poll(async () => (await column()).x).toBeCloseTo(open.x, 1)
+})
+
+test('folding the rail keeps the book on the same page, with the same words on it', async ({ page }) => {
+  desktopOnly(page)
+  await importBook(page, THREE)
+  const count = page.locator('.head-tools .count')
+  await expect(count).toContainText(' of ')
+  const before = await count.textContent()
+  await toggle(page).click()
+  await expect(contents(page)).toBeHidden()
+  await expect(count).toHaveText(before!)
+})
+
+test('in a window with no room beside the text the rail opens over it and the text stays', async ({ page }) => {
+  desktopOnly(page)
+  await page.setViewportSize({ width: 1000, height: 900 })
+  await importBook(page, THREE)
+  const column = async () => (await page.locator('.pager').boundingBox())!
+  await expect(toggle(page)).toHaveAttribute('aria-expanded', 'false')
+  const folded = await column()
+  await toggle(page).click()
+  await expect(contents(page)).toBeVisible()
+  expect(await column()).toEqual(folded)
+})
+
+test('the Time Machine opens with the page where it stood, beside the rail', async ({ page }) => {
+  desktopOnly(page)
+  await importBook(page, THREE)
+  const before = (await page.locator('.pager').boundingBox())!
+  await page.getByRole('button', { name: 'Time Machine' }).click()
+  const pager = page.locator('.time-machine .pager')
+  await expect(pager).toBeVisible()
+  await expect.poll(async () => (await pager.boundingBox())!.x).toBeCloseTo(before.x, 1)
+})
+
+test('the path says where § goes, and Escape goes there, keeping the words and the place', async ({ page }) => {
+  desktopOnly(page)
+  await importBook(page, THREE)
+  await expect(page.locator('.head .path .home-word')).toBeVisible()
+  await writeHere(page)
+  await page.keyboard.type(' still warm')
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('navigation', { name: 'Library' })).toBeVisible()
+  await page
+    .getByRole('button', { name: /harbour/ })
+    .first()
+    .click()
+  await expect(page.locator('.body')).toContainText('still warm')
+})
+
+test('Escape closes a sheet first, and only the next one leaves the page', async ({ page }) => {
+  desktopOnly(page)
+  await importBook(page, THREE)
+  await page.getByRole('button', { name: 'Text settings' }).click()
+  await expect(page.locator('.sheet')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.locator('.sheet')).toBeHidden()
+  await expect(page.locator('.page-screen')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('navigation', { name: 'Library' })).toBeVisible()
+})
+
+test('Escape with words selected stays on the page', async ({ page }) => {
+  desktopOnly(page)
+  await importBook(page, THREE)
+  await writeHere(page)
+  await page.keyboard.press('Shift+ArrowLeft')
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(100)
+  await expect(page.locator('.page-screen')).toBeVisible()
+})
+
+test('Escape in the rail gives the focus back to the toggle and stays on the page', async ({ page }) => {
+  desktopOnly(page)
+  await importBook(page, THREE)
+  await rows(page).first().focus()
+  await page.keyboard.press('Escape')
+  await expect(toggle(page)).toBeFocused()
+  await expect(page.locator('.page-screen')).toBeVisible()
 })
 
 test('a rail opened again shows the current chapter, however far the list was scrolled while it was folded away', async ({ page }) => {
