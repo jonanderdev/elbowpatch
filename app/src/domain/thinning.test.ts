@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { memoryStore } from '../adapters/memory-store'
-import { exportAll } from './archive'
+import { exportAll, importArchive } from './archive'
 import type { Piece } from './model'
 import { history, latest, newPiece, openPiece, outlineAt, putAway, removeChapter, renameSection, restore, takeMoment, withChapter, write } from './pieces'
 import { forgetPutAway, type Thinnable, thin, toThin } from './thinning'
@@ -159,6 +159,26 @@ describe("thinning a kept moment's outline", () => {
     clock.set(NOW)
     await thin(deps)
     expect(await titlesAtKept(deps, book.id, chapter)).toEqual(['The harbour'])
+  })
+
+  it("a book exported and imported elsewhere still keeps its kept moment's outline", async () => {
+    const { deps, clock } = setup()
+    const t = clock.now()
+    const book = newPiece(deps, 'book', 'en')
+    const chapter = book.sections[0]!.sectionId
+    await write(deps, book, chapter, 'The boats came in.')
+    await renameSection(deps, book, chapter, 'Untitled yet')
+    await takeMoment(deps, book.id)
+    clock.set(t + HOUR)
+    await renameSection(deps, book, chapter, 'The harbour')
+    await takeMoment(deps, book.id, { kept: true })
+    await renamesLater(deps, clock, book, chapter, t + 2 * HOUR)
+
+    const elsewhere = { ...deps, store: memoryStore() }
+    expect(await importArchive(elsewhere, await exportAll(deps))).toMatchObject({ ok: true, added: 1 })
+    clock.set(NOW)
+    expect(await thin(elsewhere)).toBeGreaterThan(0)
+    expect(await titlesAtKept(elsewhere, book.id, chapter)).toEqual(['The harbour'])
   })
 
   it('the outline in place just before a bring back stays, like the text it replaced', async () => {
