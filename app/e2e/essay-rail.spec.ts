@@ -118,7 +118,6 @@ test('the first words follow the writing, on a later page too', async ({ page })
   const before = await row(page, 1).locator('.contents-title').textContent()
   const second = await row(page, 2).locator('.contents-title').textContent()
   await page.locator('.body p').first().click()
-  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+ArrowUp' : 'Control+Home')
   await page.evaluate(() => {
     const p = document.querySelector('.body p')!
     getSelection()!.collapse(p, 0)
@@ -143,7 +142,10 @@ test('a page added by writing gets its row', async ({ page }) => {
   await page.keyboard.insertText(PARAGRAPH.repeat(12))
   await expect(rows(page)).toHaveCount(count + 1)
   await expect.poll(() => pageInView(page)).toBe(count + 1)
-  const label = (await row(page, count + 1).locator('.contents-title').textContent()) ?? ''
+  const label =
+    (await row(page, count + 1)
+      .locator('.contents-title')
+      .textContent()) ?? ''
   expect(await topLine(page)).toContain(label)
 })
 
