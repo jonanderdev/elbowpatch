@@ -4,11 +4,23 @@ import { Icon, IconButton } from '../components/Icon'
 import { ThemeButton } from '../components/ThemeButton'
 import { type Settings, theme, update, useSettings } from '../stores/settings'
 
+/** A journal's count goes by the day ("26 Oct"), not by pages. */
+function shownCount(props: { page?: number; count?: number; day?: string }, wordsShown: string): string {
+  return props.day ? `${props.day}  ·  ${wordsShown}` : countLine(props.page, props.count, wordsShown)
+}
+
+/** What a screen reader hears of the count. */
+function saidCount(props: { page?: number; count?: number; words: number; day?: string }): string {
+  return props.day ? `${props.day}, ${number(props.words)} words` : countSaid(props.page, props.count, props.words)
+}
+
 export function ToolsBar(props: {
   page?: number
   count?: number
   words: number
-  /** A book's count opens Contents, from a page with no running head. */
+  /** The day on the page, in a journal. */
+  day?: string
+  /** A book's count opens Contents and a journal's Days, from a page with no running head. */
   onContents?(from: HTMLElement): void
   /** Contents is open. */
   contentsOpen?: boolean
@@ -20,7 +32,7 @@ export function ToolsBar(props: {
   const settings = useSettings()
   const night = theme(settings) === 'night'
   const ref = useRef<HTMLDivElement>(null)
-  const full = countLine(props.page, props.count, `${number(props.words)} words`)
+  const full = shownCount(props, `${number(props.words)} words`)
 
   // Opened from the page button: focus moves into the bar, and Escape folds it back.
   useEffect(() => {
@@ -30,8 +42,8 @@ export function ToolsBar(props: {
   // On a narrow phone a long count drops its last word; the label still says it in full. The buttons
   // and the bar's edges take about 256px with the screen's margins, and a character about 5.2px.
   const short = typeof window !== 'undefined' && window.innerWidth < 400 && full.length > Math.min(22, (window.innerWidth - 256) / 5.2)
-  const said = countSaid(props.page, props.count, props.words)
-  const shown = short ? countLine(props.page, props.count, number(props.words)) : full
+  const said = saidCount(props)
+  const shown = short ? shownCount(props, number(props.words)) : full
   const { onContents } = props
   return (
     <div ref={ref} className="bar surface tools" role="toolbar" aria-label="Tools">
@@ -39,7 +51,7 @@ export function ToolsBar(props: {
         <button
           type="button"
           className="count"
-          aria-label={`${said}. Open Contents`}
+          aria-label={`${said}. Open ${props.day ? 'Days' : 'Contents'}`}
           aria-haspopup="dialog"
           aria-expanded={!!props.contentsOpen}
           onClick={(e) => onContents(e.currentTarget)}
@@ -75,6 +87,8 @@ export function HeadTools(props: {
   page?: number
   count?: number
   words: number
+  /** The day on the page, in a journal. */
+  day?: string
   sheet: 'text' | 'export' | null
   onTextSettings(from: HTMLElement): void
   onExport(from: HTMLElement): void
@@ -83,8 +97,8 @@ export function HeadTools(props: {
   return (
     <div className="head-tools" role="toolbar" aria-label="Tools">
       <span className="count">
-        <span aria-hidden="true">{countLine(props.page, props.count, `${number(props.words)} words`)}</span>
-        <span className="visually-hidden">{countSaid(props.page, props.count, props.words)}</span>
+        <span aria-hidden="true">{shownCount(props, `${number(props.words)} words`)}</span>
+        <span className="visually-hidden">{saidCount(props)}</span>
       </span>
       <span className="bar-separator" />
       <button

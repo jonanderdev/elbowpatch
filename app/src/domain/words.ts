@@ -56,6 +56,32 @@ export function dayTitle(isoDay: string, withYear = false): string {
   return `${DAYS[date.getDay()]} ${d} ${MONTHS[m - 1]}${withYear ? ` ${y}` : ''}`
 }
 
+/** "Monday 26": a day under its month, in the rail. */
+export function dayInMonth(isoDay: string): string {
+  return dayTitle(isoDay).split(' ').slice(0, 2).join(' ')
+}
+
+/** "26 October": a day in the month sheet. */
+export function dayAndMonth(isoDay: string): string {
+  return dayTitle(isoDay).split(' ').slice(1).join(' ')
+}
+
+/** "October", of a month like "2026-10". */
+export function monthName(month: string): string {
+  return MONTHS[Number(month.slice(5, 7)) - 1]!
+}
+
+/** "October 2026": the month sheet's title. */
+export function monthTitle(month: string): string {
+  return `${monthName(month)} ${month.slice(0, 4)}`
+}
+
+/** "26 Oct": a journal's count goes by the day, not by pages. */
+export function dayShort(isoDay: string, now: number): string {
+  const [y, m, d] = isoDay.split('-').map(Number) as [number, number, number]
+  return shortDate(new Date(y, m - 1, d).getTime(), now)
+}
+
 /** "27th": the journal's mark. */
 export function ordinal(day: number): string {
   const tens = day % 100

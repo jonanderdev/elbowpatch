@@ -172,21 +172,23 @@ export function RailToggle({ label = 'Contents', open, onToggle, buttonRef }: Ra
 
 interface RunningHeadControlProps {
   title: string
+  /** What it drops. */
+  label: 'Contents' | 'Days'
   open: boolean
   onOpen(from: HTMLElement): void
 }
 
-/** A book's running head on a phone: a control with ⌄ that drops Contents (DESIGN.md, Control). */
-export function RunningHeadControl({ title, open, onOpen }: RunningHeadControlProps): ReactElement {
+/** The running head on a phone: a control with ⌄ that drops a book's Contents or a journal's Days (DESIGN.md, Control). */
+export function RunningHeadControl({ title, label, open, onOpen }: RunningHeadControlProps): ReactElement {
   const name = title.trim() || 'Untitled'
   return (
     <button
       type="button"
       className="running-control"
-      aria-label={`${name}. Contents`}
+      aria-label={`${name}. ${label}`}
       aria-haspopup="dialog"
       aria-expanded={open}
-      // Pressed, it leaves the focus in the text: Contents opens with the keyboard up.
+      // Pressed, it leaves the focus in the text: the sheet opens with the keyboard up.
       onMouseDown={(e) => e.preventDefault()}
       onClick={(e) => onOpen(e.currentTarget)}
     >

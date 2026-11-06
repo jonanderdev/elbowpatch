@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-import { caretToEnd, saved, write } from './helpers'
+import { caretToEnd, saved } from './helpers'
 
 // Contents: a sheet on a phone (#55), the rail on desktop (#57).
 const onDesktop = (page: Page) => page.viewportSize()!.width >= 700
@@ -555,7 +555,7 @@ test('a window that is not writing can still open chapters, and stays there on W
   await expect(second.locator('.title')).toHaveText('Two')
 })
 
-test('journals and essays are unchanged: no control on the running head, and the count opens nothing', async ({ page }) => {
+test('an essay is unchanged: no control on the running head, and the count opens nothing', async ({ page }) => {
   phoneOnly(page)
   await page.goto('./')
   await page.locator('.start.essay').click()
@@ -568,12 +568,6 @@ test('journals and essays are unchanged: no control on the running head, and the
   await expect(runningHead(page)).toHaveCount(0)
   await page.locator('.page-button').click()
   await expect(page.locator('.tools span.count')).toBeVisible()
-  await expect(page.locator('.tools button.count')).toHaveCount(0)
-
-  await page.goto('./#/')
-  await write(page, 'Journal')
-  await expect(page.locator('.book-title')).toBeFocused()
-  await page.locator('.page-button').click()
   await expect(page.locator('.tools button.count')).toHaveCount(0)
 })
 
@@ -732,13 +726,4 @@ test('just wide enough for the rail, a chapter opens with the rail standing stil
   await chapter(page, 'One').click()
   await expect(page.locator('.title')).toHaveText('One')
   await expect(page.locator('body')).not.toHaveAttribute('data-rail-slid')
-})
-
-test('a journal has no rail and no toggle', async ({ page }) => {
-  desktopOnly(page)
-  await page.goto('./#/')
-  await write(page, 'Journal')
-  await expect(page.locator('.book-title')).toBeFocused()
-  await expect(contents(page)).toHaveCount(0)
-  await expect(toggle(page)).toHaveCount(0)
 })
