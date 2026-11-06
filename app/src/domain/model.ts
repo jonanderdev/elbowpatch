@@ -61,7 +61,7 @@ export interface Version {
   createdAt: number
   content: string
   kept?: boolean
-  /** The text a "bring back" replaced: never thinned (0005). */
+  /** The text a "bring back" replaced, written as its own moment before it: never thinned, nor the outline in force then (0005). */
   beforeBringBack?: boolean
 }
 

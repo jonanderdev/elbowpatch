@@ -278,7 +278,7 @@ export function savePlace(deps: Pick<Deps, 'store'>, pieceId: string, place: Pla
  * A moment: every section whose text changed since its last version gets a new
  * version, and a changed title or section list a new outline version, all with
  * one timestamp. Nothing changed, nothing written — so running it twice is safe.
- * `kept` ("keep this moment") always writes, and is never thinned.
+ * `kept` ("keep this moment") always writes, and neither it nor the outline in force is thinned.
  */
 export function takeMoment(deps: Deps, pieceId: string, opts: { kept?: boolean } = {}): Promise<number> {
   return deps.store.transaction((tx) => momentIn(tx, deps, pieceId, opts))
