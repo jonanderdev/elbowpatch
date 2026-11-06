@@ -4,7 +4,7 @@ Date: 2026-11-06 · Status: accepted
 
 ## Decision
 
-On desktop, an open rail with room beside it takes its place: the page centres in the width right of it. Folded, or on an essay, which has no rail, the page centres on the window. The Time Machine follows the same rule, so nothing moves between a page and its past. Its path keeps § alone: ✕ is its way out, and the moment needs the room. Below the same width as before, the rail still opens over the text.
+On desktop, an open rail with room beside it takes its place: the page centres in the width right of it. Folded, on a journal, or on an essay, which has no rail, the page centres on the window. The Time Machine follows the same rule, so nothing moves between a page and its past. Its path keeps § alone: ✕ is its way out, and the moment needs the room. Below the same width as before, the rail still opens over the text.
 
 The path reads "§ Library / name" on desktop, § and the word being one button. Escape, once nothing is open, goes back one place: a page to the library, a settings area to Settings, Settings to the library. It does nothing while words are selected, while a key is held or mid-composition, and only on desktop.
 
@@ -17,6 +17,6 @@ The rail was chosen on 2026-10-30 never to push the text, so that opening it mov
 ## Consequences
 
 - Folding the rail moves the text by 168px. The scale stays, so the page breaks and page numbers stay.
-- The journal's margin rule no longer stands near the rail, so the rail keeps its own edge there, and the journal shows two hairlines.
+- A journal is the exception. *Updated 2026-11-06:* its page centres on the window with the rail open or folded, and the rail beside it draws no edge. Centring it beside the rail left two hairlines far apart on a wide screen, around an empty strip that read as a third panel.
 - The running head keeps clear of the head's controls by the narrower of the two margins, since the page is no longer centred.
 - A second Escape after closing a sheet leaves the page. Nothing is lost by it: the words are saved and the place is kept.
