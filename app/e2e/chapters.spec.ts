@@ -637,6 +637,16 @@ test('in a window with no room beside the text the rail opens over it and the te
   expect(await column()).toEqual(folded)
 })
 
+test('the Time Machine opens with the page where it stood, beside the rail', async ({ page }) => {
+  desktopOnly(page)
+  await importBook(page, THREE)
+  const before = (await page.locator('.pager').boundingBox())!
+  await page.getByRole('button', { name: 'Time Machine' }).click()
+  const pager = page.locator('.time-machine .pager')
+  await expect(pager).toBeVisible()
+  await expect.poll(async () => (await pager.boundingBox())!.x).toBeCloseTo(before.x, 1)
+})
+
 test('the path says where § goes, and Escape goes there, keeping the words and the place', async ({ page }) => {
   desktopOnly(page)
   await importBook(page, THREE)
@@ -645,7 +655,10 @@ test('the path says where § goes, and Escape goes there, keeping the words and 
   await page.keyboard.type(' still warm')
   await page.keyboard.press('Escape')
   await expect(page.getByRole('navigation', { name: 'Library' })).toBeVisible()
-  await page.getByRole('button', { name: /harbour/ }).first().click()
+  await page
+    .getByRole('button', { name: /harbour/ })
+    .first()
+    .click()
   await expect(page.locator('.body')).toContainText('still warm')
 })
 
