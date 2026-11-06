@@ -1,5 +1,5 @@
 import { type ReactElement, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { Day } from '../../domain/days'
+import { type Day, daysAsItWas } from '../../domain/days'
 import { type Moment, momentToOpen, readingAt, timeOf } from '../../domain/lookBack'
 import type { Piece } from '../../domain/model'
 import { momentInSentence } from '../../domain/momentInSentence'
@@ -183,7 +183,9 @@ export function TimeMachine({ deps, looking, onBringBack, onKeepCopy, onBack, on
       book && asItWas && (phone ? sheet.open : rail.open),
     ) ?? today.contents
   /** A journal's days as that moment listed them, once their words are read: nothing is marked as today. */
-  const days = useDaysAsItWas(deps, journal && asItWas ? sectionList : undefined, stands, journal && asItWas && (phone ? sheet.open : rail.open))
+  const daysRead = useDaysAsItWas(deps, journal && asItWas ? sectionList : undefined, stands, journal && asItWas && (phone ? sheet.open : rail.open))
+  // Before a moment stands (while moments load, or with none earlier) Days is the journal's own, as a book's Contents is.
+  const days = asItWas ? daysRead : journal ? daysAsItWas(piece.sections, piece.words ?? {}) : undefined
   const dayOpen = days?.find((d) => d.sectionId === sectionId)?.iso ?? ''
   /** The last day that can be reached: the moment's own, so every later day recedes. */
   const lastDay = isoDay(new Date(Math.min(stands ?? now, now)))
@@ -334,9 +336,10 @@ export function TimeMachine({ deps, looking, onBringBack, onKeepCopy, onBack, on
               railToggle.current?.focus()
             }}
           />
-        ) : journal && !phone && days ? (
+        ) : journal && !phone ? (
+          // Always there, as a book's rail is: its words are read as a moment stands, and the list is empty for that instant.
           <DaysRail
-            days={days}
+            days={days ?? []}
             current={dayOpen}
             open={rail.open}
             onOpen={openDay}
@@ -347,7 +350,7 @@ export function TimeMachine({ deps, looking, onBringBack, onKeepCopy, onBack, on
           />
         ) : null}
         {/* As on the writing page, an essay's first page has none: its title stands there, and it is no control. A book's
-            and a journal's keep theirs on every page. On a phone a book's opens Contents as it was; the book's name stands
+            and a journal's keep theirs on every page. On a phone a book's opens Contents as it was, and a journal's Days; the book's name stands
             there while the title page and the chapter's opening page carry the chapter's own. */}
         {book && phone ? (
           <RunningHeadControl title={page <= (titlePage ? 1 : 0) ? bookName : heading} label="Contents" open={sheet.open} onOpen={sheet.toggle} />
