@@ -39,8 +39,8 @@ async function close(page: Page): Promise<void> {
 }
 
 /** An essay with a moment for each text, the last of them now. */
-async function history(page: Page, texts: string[]): Promise<void> {
-  await essay(page, texts[0]!)
+async function history(page: Page, texts: string[], title = 'Salt'): Promise<void> {
+  await essay(page, texts[0]!, title)
   for (const text of texts.slice(1)) {
     await open(page)
     await expect(machine(page).locator('.moment-name, .moment-note').first()).not.toHaveText('Finding your moments…')
@@ -1252,4 +1252,44 @@ test('a window that does not write brings nothing back', async ({ page, context 
   await expect(oldText(second)).toHaveText('One.')
   expect(await stored(second, 'versions')).toEqual(before)
   expect(await stored(second, 'working')).toEqual(working)
+})
+
+/** The title's box and the first line of the old text, as the Time Machine's page shows them. */
+async function titleAndFirstLine(page: Page) {
+  return machine(page).evaluate((screen) => {
+    const title = screen.querySelector('.title')!.getBoundingClientRect()
+    const body = screen.querySelector('.body')!
+    const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT)
+    const range = document.createRange()
+    range.selectNodeContents(walker.nextNode()!)
+    const line = range.getClientRects()[0]!
+    const lineHeight = Number.parseFloat(getComputedStyle(screen.querySelector('.title')!).lineHeight)
+    return { titleTop: title.top, titleBottom: title.bottom, lineTop: line.top, lineHeight }
+  })
+}
+
+test('an untitled chapter keeps the room of a title, and its placeholder stays clear of the text', async ({ page }) => {
+  await history(page, ['One.', 'Two.'], '')
+  await open(page)
+  await expect(machine(page).locator('.title')).toHaveAttribute('data-empty', 'true')
+  await expect(oldText(page)).toHaveText('One.')
+  const { titleTop, titleBottom, lineTop, lineHeight } = await titleAndFirstLine(page)
+  // The empty title is as tall as one line of it (and its padding), as on the writing page, so the text starts below it.
+  expect(titleBottom - titleTop).toBeGreaterThanOrEqual(lineHeight)
+  expect(lineTop).toBeGreaterThanOrEqual(titleBottom - 1)
+})
+
+test('the tape shows it can be dragged, and a pressed action stays clear of its labels', async ({ page }) => {
+  test.skip(phone(page), 'a pointer’s')
+  await history(page, ['One.', 'Two.', 'Three.'])
+  await open(page)
+  await expect(tape(page)).toHaveCSS('cursor', 'grab')
+  const box = (await tape(page).boundingBox())!
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down()
+  await expect(tape(page)).toHaveCSS('cursor', 'grabbing')
+  await page.mouse.up()
+  const action = bar(page).locator('.moment-action').first()
+  const tint = await action.evaluate((el) => getComputedStyle(el, '::before').height)
+  expect(tint).toBe('36px')
 })

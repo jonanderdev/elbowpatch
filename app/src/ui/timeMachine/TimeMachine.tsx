@@ -446,7 +446,8 @@ export function TimeMachine({ deps, looking, writes, onBringBack, onKeepCopy, le
         <div ref={flow} className="flow" lang={piece.lang} data-title-page={titlePage || undefined}>
           {titlePage ? <OldTitlePage name={bookName} subtitle={subtitle} /> : null}
           <h1 className={titlePage ? 'title chapter-opening' : 'title'} data-placeholder="Untitled" data-empty={title === '' || undefined}>
-            {title}
+            {/* As on the writing page, an empty title holds a <br>: it keeps the height of a line, which the text below leaves room for. */}
+            {title === '' ? <br /> : title}
           </h1>
           <div ref={mount} />
         </div>
