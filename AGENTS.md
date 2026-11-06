@@ -43,6 +43,12 @@ Read docs/brief.md and MANIFESTO.md before changing anything. When in doubt, cho
 - Record decisions in `docs/decisions/`.
 - Keep commits small and the app runnable at every step.
 
+# Tests while building a spec
+
+- A ticket: typecheck, lint, unit tests, and only the e2e specs it wrote or changed, in Chromium. A ticket touching saving, moments or bring back also runs `page` and `windows`.
+- A merge to the integration branch: typecheck, lint and unit tests.
+- The whole e2e suite, in every browser, runs once: on the integration branch, when every ticket is in, with nothing else running.
+
 # Public repository
 
 This repo is public and open source (MIT). Everything committed is published.
