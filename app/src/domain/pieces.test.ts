@@ -1232,7 +1232,7 @@ describe('removing an empty chapter', () => {
       expect([...removableChapters(chapters, await storedChapters(s.deps, draft.id), { sectionId: only, blank: true }, new Set())]).toEqual([])
     })
 
-    it('an unstored chapter is offered, but the one stored chapter beside it is not: it must stay', async () => {
+    it('neither a chapter not stored yet, which goes by being left, nor the one stored chapter beside it, which must stay', async () => {
       const s = setup()
       const draft = newPiece(s, 'book', 'en')
       const only = draft.sections[0]!.sectionId
@@ -1240,7 +1240,7 @@ describe('removing an empty chapter', () => {
       const { piece, sectionId } = withChapter(s, (await storedPiece(s.deps, draft.id))!)
       const chapters = contents(withOpenSection((await storedPiece(s.deps, draft.id))!, piece, sectionId), 'phone').chapters
       expect(chapters).toHaveLength(2)
-      expect([...removableChapters(chapters, await storedChapters(s.deps, draft.id), { sectionId, blank: true }, new Set())]).toEqual([sectionId])
+      expect([...removableChapters(chapters, await storedChapters(s.deps, draft.id), { sectionId, blank: true }, new Set())]).toEqual([])
     })
 
     it('a book never stored offers nothing: there is nothing yet to take it out of', async () => {

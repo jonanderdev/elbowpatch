@@ -534,8 +534,8 @@ export function storedChapters(deps: Pick<Deps, 'store'>, pieceId: string): Prom
 
 /**
  * The chapters Contents offers to remove, by the rule `removeChapter` holds to, so an offer is not refused:
- * no title, no text, nothing `held` in the unsaved journal, and another stored chapter to stay. The open
- * chapter goes by what its page holds, and may not be stored yet: leaving it is then what removes it.
+ * stored, with no title, no text, nothing `held` in the unsaved journal, and another stored chapter to stay.
+ * The open chapter goes by what its page holds. One not stored yet is not offered: leaving it already removes it.
  */
 export function removableChapters(
   chapters: ContentsChapter[],
@@ -543,7 +543,7 @@ export function removableChapters(
   open: { sectionId: string; blank: boolean },
   held: ReadonlySet<string>,
 ): ReadonlySet<string> {
-  const empty = (id: string): boolean => (id === open.sectionId ? open.blank : stored.get(id) === true)
+  const empty = (id: string): boolean => (id === open.sectionId ? stored.has(id) && open.blank : stored.get(id) === true)
   const otherStays = (id: string): boolean => [...stored.keys()].some((other) => other !== id)
   return new Set(chapters.filter((c) => blank(c.title) && empty(c.sectionId) && !held.has(c.sectionId) && otherStays(c.sectionId)).map((c) => c.sectionId))
 }
