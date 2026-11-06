@@ -325,6 +325,24 @@ test('the title page is that moment’s title and subtitle, and the running head
   await expect(machine(page).locator('.subtitle')).toHaveText('A second subtitle')
 })
 
+test('in the Time Machine the running head’s arrow points down when Contents is closed, up while it is open, and tapped again it closes', async ({ page }) => {
+  test.skip(onDesktop(page), 'the sheet is a phone’s')
+  await importBook(page, THREE)
+  await keepMoment(page)
+  await typeAtEnd(page, ' Then more.')
+  await open(page)
+  await expect(tape(page)).toBeVisible()
+  const head = machine(page).locator('.running-control')
+  const arrow = () => head.locator('.icon').evaluate((el) => (getComputedStyle(el).transform === 'none' ? 'down' : 'up'))
+  expect(await arrow()).toBe('down')
+  await head.click()
+  await expect(contents(page)).toBeVisible()
+  expect(await arrow()).toBe('up')
+  await head.click()
+  await expect(contents(page)).toHaveCount(0)
+  expect(await arrow()).toBe('down')
+})
+
 test('Escape closes Contents before it leaves the Time Machine, and a tap outside closes it', async ({ page }) => {
   test.skip(onDesktop(page), 'the sheet is a phone’s')
   await importBook(page, THREE)
