@@ -2637,12 +2637,13 @@ button.count[aria-expanded='true'] {
 .time-machine .title {
   cursor: text;
 }
-/* In the page, not fixed: in a window smaller than the page, a fixed bar would stand over the text. */
+/* Fixed to the window: in a window smaller than the page the bar stays on screen, in every state, ✕ included, and
+   the page scrolls under it. The page ends above it, so scrolled to its end no text stands under the bar. */
 .moment-bar {
-  position: absolute;
+  position: fixed;
   left: 16px;
   right: 16px;
-  bottom: 24px;
+  bottom: calc(var(--rise) + 24px);
   height: 130px;
   padding: 12px 0 4px;
   border-radius: 22px;
@@ -2653,7 +2654,7 @@ button.count[aria-expanded='true'] {
   padding: 14px 0 2px;
 }
 .moment-bar[data-state='nothing'] {
-  bottom: 15px;
+  bottom: calc(var(--rise) + 15px);
   height: 62px;
   padding: 14px 0 10px;
 }
@@ -2793,7 +2794,7 @@ button.count[aria-expanded='true'] {
   .moment-bar[data-state='nothing'] {
     right: auto;
     left: calc(var(--side) + var(--measure-px) / 2 - 179px);
-    bottom: 20px;
+    bottom: calc(var(--rise) + 20px);
     width: 358px;
   }
   /* The moment stands whole, and the piece's name shortens: the path ends by x316, inside the rail's width, as it does

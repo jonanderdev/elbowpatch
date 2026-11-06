@@ -460,6 +460,76 @@ test('when moments cannot be read, today’s text stays and Try again reads them
   await expect(oldText(page)).toHaveText('Before.')
 })
 
+/** A window shorter than the page: the page keeps its size, and the window scrolls. */
+const shortWindow = (page: Page) => (phone(page) ? { width: 390, height: 560 } : { width: 1440, height: 640 })
+
+for (const state of ['moments', 'loading', 'error', 'nothing'] as const) {
+  test(`in a short window the bar stays on screen, ✕ included, and the page scrolls under it (${state})`, async ({ page }) => {
+    if (state === 'nothing') await essay(page, 'Nobody remembers the first draft.')
+    else await history(page, ['Before.', 'After.'])
+    if (state === 'loading') {
+      // A transaction held open: everything the app reads waits behind it.
+      await page.evaluate(
+        () =>
+          new Promise<void>((done) => {
+            const open = indexedDB.open('elbowpatch')
+            open.onsuccess = () => {
+              const tx = open.result.transaction('versions', 'readwrite')
+              const w = window as unknown as { held: boolean }
+              w.held = true
+              const spin = (): void => {
+                if (w.held) tx.objectStore('versions').count().onsuccess = spin
+              }
+              spin()
+              done()
+            }
+          }),
+      )
+    }
+    if (state === 'error') {
+      await page.evaluate(() => {
+        const getAll = IDBIndex.prototype.getAll
+        IDBIndex.prototype.getAll = function (...args) {
+          if (this.objectStore.name === 'versions') throw new Error('No reading')
+          return getAll.apply(this, args)
+        }
+      })
+    }
+    const size = shortWindow(page)
+    await page.setViewportSize(size)
+    await open(page)
+    await expect(bar(page)).toContainText(
+      { moments: 'Just now', loading: 'Finding your moments…', error: 'Can’t read your moments', nothing: 'Nothing earlier yet.' }[state],
+    )
+    const scroller = () => page.evaluate(() => ({ top: document.scrollingElement!.scrollTop, room: document.scrollingElement!.scrollHeight - innerHeight }))
+    const barBox = async () => (await bar(page).boundingBox())!
+    const onScreen = async (): Promise<void> => {
+      const box = await barBox()
+      expect(box.y).toBeGreaterThanOrEqual(0)
+      expect(box.y + box.height).toBeLessThanOrEqual(size.height)
+      await expect(machine(page).getByRole('button', { name: 'Back to now' })).toBeInViewport({ ratio: 1 })
+    }
+    // The window is shorter than the page, so it scrolls; the bar is on screen at the top of it.
+    expect((await scroller()).room).toBeGreaterThan(0)
+    await page.evaluate(() => scrollTo(0, 0))
+    await onScreen()
+    const standing = await barBox()
+    // Scrolled to the end it stands where it did, and no text stands under it.
+    await page.evaluate(() => scrollTo(0, document.scrollingElement!.scrollHeight))
+    expect((await scroller()).top).toBeGreaterThan(0)
+    await onScreen()
+    expect(await barBox()).toEqual(standing)
+    const text = (await machine(page).locator('.pager').boundingBox())!
+    expect(text.y + text.height).toBeLessThanOrEqual(standing.y)
+    await expect(oldText(page)).toBeVisible()
+    if (state === 'loading') {
+      await page.evaluate(() => {
+        ;(window as unknown as { held: boolean }).held = false
+      })
+    }
+  })
+}
+
 test('thinning waits while the Time Machine is open, and runs once it closes', async ({ page }) => {
   // The app's idle moments, in the test's hands.
   await page.addInitScript(() => {
