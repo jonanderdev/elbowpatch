@@ -14,6 +14,8 @@ A journal is one piece with a page per day, and a book is one piece made of chap
 - The piece at any moment = the outline at that moment + each section's latest version at or before it.
 - *Updated 2026-10-27:* a section's newest version is found by following `parentId` from its first version, not by time. `createdAt` is never earlier than the previous version's (now, or the previous plus 1 ms, whichever is later). Device clocks jump; timestamps label moments, they do not order them.
 - *Updated 2026-10-28:* each version and outline also carries `seq`, its parent's plus one. Thinning removes versions from the middle of a chain, which leaves a `parentId` pointing at nothing; `seq` keeps the order without asking the clock.
+- *Added 2026-11-06:* a writer can remove a chapter by hand only while it has no words and no title (DESIGN.md, Books and chapters). A moment comes before and after, so the outline before it stays in history; its versions stay, and earlier outlines still list it, as after a rejoin (0003). Its working copy stays too, stamped at the removal, so words kept for it earlier never replay it into the book. Removing a chapter with words, joining one into the chapter before it, and an emptied chapter going by itself all wait for the Time Machine: until a writer can bring a chapter back, a chapter removed by mistake could not be, even though its versions are stored. "Removed since" reads what this leaves behind, a section in an earlier outline and not in the current one.
+- *Added 2026-11-06:* with the first chapter gone, the next is chapter 1 and the title page is part of it, so its page counts and the page of a place in it are forgotten until it is laid out again (0003).
 
 ### Titles
 *Updated 2026-10-27.*

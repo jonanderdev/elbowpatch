@@ -37,6 +37,8 @@ async function closeContents(page: Page) {
   if (onDesktop(page) || !(await contents(page).isVisible())) return
   await contents(page).getByRole('button', { name: 'Done' }).click()
   await expect(contents(page)).toBeHidden()
+  // Closing gives the focus back a frame later: keys pressed before that would land on the count.
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))
 }
 
 async function goTo(page: Page, name: string) {
