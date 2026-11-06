@@ -2,7 +2,7 @@ import { TextSelection } from 'prosemirror-state'
 import { type CSSProperties, type ReactElement, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { countWords } from '../../domain/markdown'
 import type { Piece } from '../../domain/model'
-import { type BookCount, bookCount, contents, type Deps, type Removed, removableChapters, savePages } from '../../domain/pieces'
+import { type BookCount, bookCount, contents, type Deps, type Removed, removableChapters, savePages, withOpenSection } from '../../domain/pieces'
 import { pageLine } from '../../domain/words'
 import { scrollToCaret, showCaret, toOpeningPage } from '../../page/caret'
 import { type Editor, selectionBox } from '../../page/editor'
@@ -479,7 +479,8 @@ export function Page({
       reported(stored)
       setSaid({ text: 'Chapter removed', over: announcement })
     },
-    onReopen: (stored, text) => onReopen(stored, text),
+    // With the page's chapter listed, even if not stored yet: a draft that lacks it would never join it to the book.
+    onReopen: (stored, text) => onReopen(withOpenSection(stored, piece, sectionId), text),
   })
   // The chapters Contents offers to take out, and the rest of what it lists, on a screen's page.
   function listed(on: 'phone' | 'desktop'): ReturnType<typeof contents> & { removable: ReadonlySet<string> } {
