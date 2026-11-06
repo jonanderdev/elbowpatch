@@ -199,6 +199,11 @@ export interface BringBack {
   /** The moment on screen: when it stands, and the words the writer saw there. */
   at: number
   content: string
+  /**
+   * The time the writer's Contents stood at, when the section is a chapter removed since: where it returns is where it stood in the
+   * book then. Left out, or where the book then did not list it, the time of the moment decides.
+   */
+  listedAt?: number
   /** Words held for this section outside the database (the unsaved journal), if any. */
   kept?: { at: number; content: string }
   /** Whether this window still writes the piece. Asked inside the transaction, before anything is written. */
@@ -225,6 +230,38 @@ export class BringBackRefused extends Error {
   }
 }
 
+/** A chapter removed since, as the book listed it: its title, and the chapter that stood before it. */
+interface OldPlace {
+  title: string
+  /** The chapter before it then, or none when it was the first. */
+  before: string | undefined
+}
+
+/**
+ * Where a chapter that is not in the book now stood: in the outline in force at `listedAt`, or else at the moment; if that
+ * outline did not list it (a time before it, or the moment's own was thinned), the newest that did. Undefined where none did.
+ * Its title is the one the writer saw at the moment, the outline's at that time.
+ */
+function oldPlaceOf(outlines: Outline[], sectionId: string, at: number, listedAt: number): OldPlace | undefined {
+  const sorted = [...outlines].sort((a, b) => a.seq - b.seq)
+  const lists = (o: Outline | undefined): o is Outline => !!o?.sections.some((s) => s.sectionId === sectionId)
+  const newest = sorted.findLast(lists)
+  const stood = outlineAt(sorted, listedAt)
+  const where = lists(stood) ? stood : newest
+  if (!where) return undefined
+  const seen = outlineAt(sorted, at)
+  const title = (lists(seen) ? seen : where).sections.find((s) => s.sectionId === sectionId)!.title
+  const index = where.sections.findIndex((s) => s.sectionId === sectionId)
+  return { title, before: where.sections[index - 1]?.sectionId }
+}
+
+/** The chapter back in the book: after the one that stood before it, at the start if it was the first, at the end if that one is gone too. */
+function withChapterBack(sections: OutlineSection[], back: OutlineSection, before: string | undefined): OutlineSection[] {
+  if (before === undefined) return [back, ...sections]
+  const at = sections.findIndex((s) => s.sectionId === before)
+  return at < 0 ? [...sections, back] : [...sections.slice(0, at + 1), back, ...sections.slice(at + 1)]
+}
+
 /**
  * Makes a section's text at a moment its current text (0005, 0008), in one transaction, or not at all:
  * - the text it replaces is written first as a version marked `beforeBringBack`, even if it matches the last
@@ -234,26 +271,34 @@ export class BringBackRefused extends Error {
  * Only that section's text changes: its title and the rest of the piece stay. Running it again writes
  * nothing, for the section then already holds that text.
  *
+ * A chapter removed since comes back too: with the title it had then, after the chapter that stood before it
+ * then, at the start if it was the first, and at the end if that chapter is gone too. The book's outline changes
+ * in the second moment, stamped later than the marked version and than every outline before it, as removing a
+ * chapter does (0005), so the outline in force at any earlier moment is still the one that was.
+ *
  * Refused, with nothing written: when this window no longer writes the piece, when the section is not in the
- * piece, when the moment has gone (thinning in another window took it, so what the writer saw is not what is
- * stored), and when words held for the section outside the database are newer than what is stored, which a
- * brought-back text stamped later would shut out.
+ * piece (and is no chapter of a book removed since), when the moment has gone (thinning in another window took
+ * it, so what the writer saw is not what is stored), and when words held for the section outside the database are
+ * newer than what is stored, which a brought-back text stamped later would shut out.
  */
 export function bringBack(deps: Deps, pieceId: string, request: BringBack): Promise<BroughtBack> {
   return deps.store.transaction(async (tx) => {
     const { sectionId, at, content, kept } = request
     if (!request.writes()) throw new BringBackRefused('not-writing')
     const found = await tx.piece(pieceId)
-    if (!found?.sections.some((s) => s.sectionId === sectionId)) throw new BringBackRefused('left')
+    if (!found) throw new BringBackRefused('left')
+    const inBook = found.sections.some((s) => s.sectionId === sectionId)
+    // A chapter removed since is brought back into the book as well, so it is never "already" as it was.
+    const old = inBook || found.kind !== 'book' ? undefined : oldPlaceOf(await tx.outlinesOf(pieceId), sectionId, at, request.listedAt ?? at)
+    if (!inBook && !old) throw new BringBackRefused('left')
     const now = await current(tx, sectionId)
     // The versions as stored now, not as the writer saw them: the moment must still stand as it was seen.
     const then = history((await tx.versionsOf(sectionId)).filter((v) => v.createdAt <= at)).at(-1)
-    if (then?.content !== content) {
-      if (now.content === content) return { piece: found, sectionId, content, updatedAt: now.updatedAt, changed: false }
-      throw new BringBackRefused('gone')
-    }
-    if (now.content === content) return { piece: found, sectionId, content, updatedAt: now.updatedAt, changed: false }
-    if (kept && kept.at > now.updatedAt && kept.content !== now.content) throw new BringBackRefused('unstored')
+    const textChanged = now.content !== content
+    // A section that already holds the text has nothing to bring back; so does a chapter removed since, but for its place in the book.
+    if (!textChanged && inBook) return { piece: found, sectionId, content, updatedAt: now.updatedAt, changed: false }
+    if (textChanged && then?.content !== content) throw new BringBackRefused('gone')
+    if (textChanged && kept && kept.at > now.updatedAt && kept.content !== now.content) throw new BringBackRefused('unstored')
 
     // A section with versions and no working copy: its text is its latest version, which the moment below needs to hold.
     const head = latest(await tx.versionsOf(sectionId))
@@ -261,37 +306,44 @@ export function bringBack(deps: Deps, pieceId: string, request: BringBack): Prom
       await tx.putWorking({ sectionId, pieceId, content: head?.content ?? '', baseVersionId: head?.id ?? null, updatedAt: head?.createdAt ?? 0 })
     }
     // The text being replaced, marked. The outline changes only in a later moment, as removing a chapter does (0005).
-    await momentIn(tx, deps, pieceId, { beforeBringBack: sectionId })
+    await momentIn(tx, deps, pieceId, textChanged ? { beforeBringBack: sectionId } : {})
     const piece = (await tx.piece(pieceId))!
     const working = (await tx.working(sectionId))!
     // Never earlier than what the working copy was stamped: a journal entry overtaken by it must stay overtaken (ruling 8).
     const stamp = Math.max(deps.clock.now(), now.updatedAt + 1)
-    await tx.putWorking({ ...working, content, updatedAt: stamp })
+    if (textChanged) await tx.putWorking({ ...working, content, updatedAt: stamp })
+    const sections = old ? withChapterBack(piece.sections, { sectionId, title: old.title }, old.before) : piece.sections
     const place: Piece['place'] =
-      piece.place?.sectionId === sectionId
+      old || piece.place?.sectionId === sectionId
         ? {
             sectionId,
             paragraph: 0,
             offset: 0,
             snippet: openingWords(content),
-            ...(piece.sections[0]?.sectionId === sectionId ? {} : { page: 1 }),
+            ...(sections[0]?.sectionId === sectionId ? {} : { page: 1 }),
             caret: false,
             at: stamp,
           }
         : piece.place
+    // Chapter 1 has the title page: with a chapter back at the start, the one that had it has it no more, and its pages are laid out anew.
+    const lost = old && sections[0]?.sectionId === sectionId ? piece.sections[0]?.sectionId : undefined
     await tx.putPiece({
       ...piece,
+      sections,
       words: { ...piece.words, [sectionId]: countWords(content) },
-      pages: withoutCounts(piece.pages, [sectionId]),
+      pages: withoutCounts(piece.pages, lost ? [sectionId, lost] : [sectionId]),
       ...(place ? { place } : {}),
       updatedAt: stamp,
     })
-    // The old text as a version of its own, stamped later than the marked one by the same rule.
+    // The old text as a version of its own, and a chapter back in the outline, stamped later than the marked one by the same rule.
     await momentIn(tx, deps, pieceId)
     // The version was stamped by the moment rule, which can be later than the clock: the working copy is never earlier than it.
-    const version = latest(await tx.versionsOf(sectionId))
-    const updatedAt = Math.max(stamp, version?.createdAt ?? 0)
-    if (updatedAt !== stamp) await tx.putWorking({ ...(await tx.working(sectionId))!, updatedAt })
+    let updatedAt = textChanged ? stamp : now.updatedAt
+    if (textChanged) {
+      const version = latest(await tx.versionsOf(sectionId))
+      updatedAt = Math.max(stamp, version?.createdAt ?? 0)
+      if (updatedAt !== stamp) await tx.putWorking({ ...(await tx.working(sectionId))!, updatedAt })
+    }
     return { piece: (await tx.piece(pieceId))!, sectionId, content, updatedAt, changed: true }
   })
 }
