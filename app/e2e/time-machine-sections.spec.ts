@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-import { openTools, saved, write } from './helpers'
+import { caretToEnd, openTools, saved, write } from './helpers'
 
 // The Time Machine across a book's chapters (#90): turning past an end reaches the next chapter at the same time.
 const onDesktop = (page: Page) => page.viewportSize()!.width >= 700
@@ -42,8 +42,7 @@ async function goTo(page: Page, name: string): Promise<void> {
 
 /** Words at the end of the open chapter. */
 async function typeAtEnd(page: Page, words: string): Promise<void> {
-  await page.locator('.body').click()
-  await page.keyboard.press('ControlOrMeta+End')
+  await caretToEnd(page)
   await page.keyboard.type(words)
   await saved(page, words.trim())
 }
@@ -303,8 +302,7 @@ test('the title page is that moment’s title and subtitle, and the running head
   await page.keyboard.press('Enter')
   await page.keyboard.press('ControlOrMeta+a')
   await page.keyboard.type('A second subtitle')
-  await page.locator('.body').click()
-  await page.keyboard.press('ControlOrMeta+End')
+  await caretToEnd(page)
   await page.keyboard.type(' And more.')
   await saved(page, 'And more.')
   await open(page)
