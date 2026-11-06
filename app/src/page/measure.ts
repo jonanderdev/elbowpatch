@@ -35,6 +35,7 @@ export function measureChapter(chapter: ChapterToLayOut, short = false): number 
   title.className = 'title'
   title.contentEditable = 'plaintext-only'
   title.textContent = chapter.title
+  if (chapter.title === '') title.append(document.createElement('br'))
   title.dataset.placeholder = 'Chapter title'
   title.toggleAttribute('data-empty', chapter.title === '')
   const body = flow.appendChild(textOf(chapter))
