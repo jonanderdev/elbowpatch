@@ -140,7 +140,7 @@ export function DaysRail({ days, current, today, open, onOpen, onLeave }: DaysRa
     <nav
       ref={ref}
       id={RAIL_ID}
-      className="rail contents-rail"
+      className="rail contents-rail days-rail"
       aria-label="Days"
       data-folded={open ? undefined : ''}
       // A press in the rail leaves the focus where it is: a day chosen while writing keeps the caret going.

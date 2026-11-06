@@ -365,10 +365,15 @@ test('the rail folds as a book’s does, and gives way to the keyboard', async (
   await expect(rail(page)).toBeHidden()
 })
 
-test('the rail keeps its own edge beside the journal, whose margin rule now stands with the text', async ({ page }) => {
+test('beside a journal the rail draws no edge and moves nothing: the margin rule is the one line', async ({ page }) => {
   desktopOnly(page)
   await openJournal(page)
-  await expect(rail(page)).toHaveCSS('border-right-width', '1px')
+  await expect(rail(page)).toHaveCSS('border-right-width', '0px')
+  const pager = page.locator('.pager')
+  const open = (await pager.boundingBox())!.x
+  await page.getByRole('button', { name: 'Days', exact: true }).click()
+  await expect(rail(page)).toBeHidden()
+  expect((await pager.boundingBox())!.x).toBeCloseTo(open, 0)
 })
 
 test('turning past a day’s last page goes to the next day, and back to the day’s last page', async ({ page }) => {
@@ -473,7 +478,7 @@ test('left on an earlier day, the journal still opens on today, from the library
   await expect(page.locator('.title')).toHaveText('Friday 30 October')
 })
 
-test('the Time Machine opens a day with its page where it stood, beside the rail', async ({ page }) => {
+test('the Time Machine opens a day with its page where it stood', async ({ page }) => {
   desktopOnly(page)
   await openJournal(page)
   const before = (await page.locator('.pager').boundingBox())!

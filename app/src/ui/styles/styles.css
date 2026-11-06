@@ -2470,6 +2470,10 @@ button.count[aria-expanded='true'] {
     /* A hairline, the journal's line: the surface line (DESIGN.md, Layout). Decorative only. */
     border-right: 1px solid var(--surface-line);
   }
+  /* A journal's own margin rule is its line: the rail beside it draws none (DESIGN.md, The journal). */
+  .days-rail {
+    border-right: 0;
+  }
   /* The head's line: under it the places start 76px from the top, as the right column does. */
   .rail-top {
     display: flex;

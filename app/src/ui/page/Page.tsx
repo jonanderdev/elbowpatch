@@ -217,7 +217,7 @@ export function Page({
     kind: piece.kind,
     settings,
     keyboard,
-    rail: railed && !settings.railFolded,
+    rail: book && !phone && !settings.railFolded,
     onRelayout: (p) => {
       rail.laidOut(p.g.side)
       const e = editorNow.current
