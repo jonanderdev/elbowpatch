@@ -78,10 +78,10 @@ describe('how long a glide takes', () => {
     expect(glideTime(0)).toBe(0)
   })
 
-  it('is short for a tick and longer for a throw, and never past 320ms', () => {
+  it('is short for a tick and longer for a throw, and never past 300ms', () => {
     expect(glideTime(11)).toBeLessThan(200)
     expect(glideTime(300)).toBeGreaterThan(glideTime(11))
-    expect(glideTime(100_000)).toBe(320)
+    expect(glideTime(100_000)).toBe(300)
   })
 })
 

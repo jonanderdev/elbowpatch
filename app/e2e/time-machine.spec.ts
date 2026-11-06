@@ -840,9 +840,11 @@ test('labels go by age, none meet, now is the last, and a kept moment stands in 
   const labels = machine(page).locator('.tick-label')
   const texts = await labels.allTextContents()
   expect(texts.at(-1)).toBe('Now')
-  expect(texts.some((t) => /^\d{1,2}:\d\d$/.test(t))).toBe(true)
+  // Hours have no leading zero; and what is older than the week is a date, or a month once it is a year back.
+  expect(texts.some((t) => /^(0|[1-9]\d?):00$/.test(t))).toBe(true)
   expect(texts.some((t) => /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)$/.test(t))).toBe(true)
-  expect(texts.some((t) => /^\d{1,2} [A-Z][a-z]{2}$/.test(t))).toBe(true)
+  expect(texts.some((t) => /^(\d{1,2} )?(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)$/.test(t))).toBe(true)
+  expect(texts.filter((t) => /^0\d:/.test(t))).toEqual([])
   const boxes = await labels.evaluateAll((els) => els.map((el) => el.getBoundingClientRect()).map((r) => ({ left: r.left, right: r.right })))
   boxes.sort((a, b) => a.left - b.left)
   for (let i = 1; i < boxes.length; i++) expect(boxes[i]!.left).toBeGreaterThanOrEqual(boxes[i - 1]!.right)
@@ -888,7 +890,46 @@ test('the tape fades at its edges over the ticks, not over the labels', async ({
   expect(edge.events).toBe('none')
 })
 
-test('a swipe on the tape moves the tape and turns no page, and a swipe on the page turns', async ({ page }) => {
+/** A finger across the screen, by the browser's own touch input: `from` to `to`, in steps about 16ms apart. */
+async function finger(page: Page, from: { x: number; y: number }, dx: number, steps = 8): Promise<void> {
+  const cdp = await page.context().newCDPSession(page)
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [from] })
+  for (let i = 1; i <= steps; i++) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: from.x + (dx * i) / steps, y: from.y }] })
+    await page.waitForTimeout(16)
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+  await cdp.detach()
+}
+
+test('a finger on the tape moves the tape and turns no page, and a finger on the page turns', async ({ page, browserName }) => {
+  test.skip(!phone(page) || browserName !== 'chromium', 'a finger is a phone’s, and is sent through Chromium’s own touch input')
+  const long = Array.from({ length: 40 }, (_, i) => `Paragraph ${i + 1} goes on for a while, so that the text fills more than one page.`).join(' ')
+  // Both of the last moments are more than a page, so a page turned by mistake would show.
+  await history(page, ['One.', long, `${long} And more.`, 'Now.'])
+  await open(page)
+  await expect(oldText(page)).toContainText('And more.')
+  await expect(tape(page)).toBeFocused()
+  const left = () =>
+    machine(page)
+      .locator('.pager')
+      .evaluate((el) => el.scrollLeft)
+  const box = (await tape(page).boundingBox())!
+  // Dragged right by a tick (44px with so few), the tape goes to the moment before.
+  await finger(page, { x: box.x + box.width / 2, y: box.y + 14 }, 44)
+  await expect(tape(page)).toHaveAttribute('aria-valuenow', '1')
+  await expect(oldText(page)).not.toContainText('And more.')
+  await expect(oldText(page)).toContainText('Paragraph 40')
+  await page.waitForTimeout(500)
+  expect(await left()).toBe(0)
+  // Swiped left across the page, the page turns and the tape stays.
+  const page1 = (await machine(page).locator('.pager').boundingBox())!
+  await finger(page, { x: page1.x + page1.width * 0.8, y: page1.y + 200 }, -160)
+  await expect.poll(left).toBeGreaterThan(0)
+  await expect(tape(page)).toHaveAttribute('aria-valuenow', '1')
+})
+
+test('a swipe sent as plain touch events on the tape does not reach the page', async ({ page }) => {
   test.skip(!phone(page), 'a swipe is a phone’s turn')
   const long = Array.from({ length: 40 }, (_, i) => `Paragraph ${i + 1} goes on for a while, so that the text fills more than one page.`)
   await history(page, [long.join(' '), 'Short.'])

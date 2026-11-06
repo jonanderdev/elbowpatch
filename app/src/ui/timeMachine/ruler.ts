@@ -62,9 +62,9 @@ export function settleOn(x: number, velocity: number, spacing: number, count: nu
   return Math.max(0, Math.min(count - 1, from + thrown))
 }
 
-/** How long a glide over `distance` px takes: a tick's step is quick, a throw longer, none past 320ms. */
+/** How long a glide over `distance` px takes: a tick's step is quick, a throw longer, none past 300ms. */
 export function glideTime(distance: number): number {
-  return distance === 0 ? 0 : Math.min(320, 160 + Math.abs(distance) * 0.5)
+  return distance === 0 ? 0 : Math.min(300, 160 + Math.abs(distance) * 0.5)
 }
 
 /** The ticks drawn while the one at `center` stands under the hairline. */
