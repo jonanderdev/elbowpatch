@@ -2,6 +2,8 @@
 
 Date: 2026-10-27 · Status: accepted
 
+*Updated 2026-11-06:* DESIGN.md and the Ready frames now hold how it looks, and win where this record differs. There is no *Contents* or *Days* at the top right: the running head opens them, and ✕ in the moment bar goes back to now. The scrubber below is the tape.
+
 ## Decision
 - Opens from the Time Machine button in the tools bar, or a keyboard shortcut. Nothing new on the writing page.
 - Full screen, in place of the page: the text as it was at the chosen moment, laid out as the same pages, with a scrubber at the foot labelled in plain words ("Tuesday evening", "14 October").

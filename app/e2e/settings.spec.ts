@@ -228,7 +228,7 @@ test('About & privacy says what it promises, and only what is true here', async 
   // Neither is true yet: nothing can be connected, and nothing counts visits.
   await expect(page.getByText('a place you connect')).toHaveCount(0)
   await expect(page.getByText('Visits to this site are counted')).toHaveCount(0)
-  await expect(page.getByText('Elbowpatch is provided as-is, with no warranty. Keep a copy of what matters:')).toBeVisible()
+  await expect(page.getByText('Elbowpatch is provided as-is, with no warranty. Export what matters:')).toBeVisible()
   await page.getByRole('link', { name: 'Export & import' }).click()
   await expect(page.getByRole('heading', { name: 'Export & import', level: 1 })).toBeVisible()
 })
