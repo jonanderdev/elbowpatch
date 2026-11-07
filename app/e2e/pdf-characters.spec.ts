@@ -60,20 +60,18 @@ test('Cyrillic, Greek and Vietnamese are set in the book font, with no image', a
   expect(asked.some((name) => name.startsWith('literata-360-greek'))).toBe(true)
 })
 
-test('a piece in Latin fetches no Cyrillic or Greek, and a Cyrillic one no Greek', async ({ page }) => {
+test('a piece in Latin fetches no Cyrillic or Greek file', async ({ page }) => {
   const asked = fontRequests(page)
   await essay(page, 'Plain', 'Just plain English, with a café and a Łódź.')
   const pdf = await makePdf(page)
   expect(flat(pdf.pages[0]?.text ?? '')).toContain('JustplainEnglish,withacaféandaŁódź.')
   expect(asked.length).toBeGreaterThan(0)
   expect(asked.filter((name) => /-(cyrillic|greek)-/.test(name))).toEqual([])
+})
 
-  asked.length = 0
-  await page.goto('./#/')
-  await page.locator('.continue').click()
-  await page.keyboard.press('Control+End')
-  await page.keyboard.insertText(' Привет.')
-  await saved(page, 'Привет.')
+test('a piece with Cyrillic fetches the Cyrillic file and no Greek one', async ({ page }) => {
+  const asked = fontRequests(page)
+  await essay(page, 'Plain', 'Just English, and Привет.')
   await makePdf(page)
   expect(asked.some((name) => /-cyrillic-/.test(name))).toBe(true)
   expect(asked.filter((name) => /-greek-/.test(name))).toEqual([])
