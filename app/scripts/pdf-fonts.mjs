@@ -26,7 +26,9 @@ const SOURCES = {
 
 // The characters of the three Latin files the page loads, so the PDF holds what the page shows.
 const css = readFileSync(here('../src/ui/styles/fonts.css'), 'utf8')
-const ranges = [...css.matchAll(/url\(\.\/fonts\/literata-(?:latin|latin-ext|vietnamese)-standard-normal\.woff2\)[^}]*?unicode-range:([^;]+);/gs)].map((m) => m[1])
+const ranges = [...css.matchAll(/url\(\.\/fonts\/literata-(?:latin|latin-ext|vietnamese)-standard-normal\.woff2\)[^}]*?unicode-range:([^;]+);/gs)].map(
+  (m) => m[1],
+)
 if (ranges.length !== 3) throw new Error('Expected the latin, latin-ext and vietnamese unicode ranges in fonts.css')
 const codes = new Set()
 for (const part of ranges.join(',').split(',')) {
@@ -48,4 +50,6 @@ execFileSync('python3', ['-m', 'venv', join(work, 'venv')], { stdio: 'inherit' }
 execFileSync(join(work, 'venv/bin/pip'), ['install', '--quiet', 'fonttools==4.60.2'], { stdio: 'inherit' })
 const out = here('../src/pdf/fonts')
 mkdirSync(out, { recursive: true })
-execFileSync(join(work, 'venv/bin/python'), [here('pdf-fonts.py'), paths.literata, paths.literataItalic, paths.ebGaramond, join(work, 'unicodes.txt'), out], { stdio: 'inherit' })
+execFileSync(join(work, 'venv/bin/python'), [here('pdf-fonts.py'), paths.literata, paths.literataItalic, paths.ebGaramond, join(work, 'unicodes.txt'), out], {
+  stdio: 'inherit',
+})

@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { paperFor } from './paper'
 
 describe('the paper a region prints on', () => {
-  it.each(['en-US', 'en-CA', 'fr-CA', 'es-MX', 'es-CL', 'es-CO', 'en-PH', 'es-VE', 'es-PA', 'es-CR', 'es-GT', 'es-SV', 'es-NI', 'en-BZ', 'es-PR'])('%s is Letter', (tag) => {
-    expect(paperFor([tag])).toBe('letter')
-  })
+  it.each(['en-US', 'en-CA', 'fr-CA', 'es-MX', 'es-CL', 'es-CO', 'en-PH', 'es-VE', 'es-PA', 'es-CR', 'es-GT', 'es-SV', 'es-NI', 'en-BZ', 'es-PR'])(
+    '%s is Letter',
+    (tag) => {
+      expect(paperFor([tag])).toBe('letter')
+    },
+  )
 
   it.each(['en-GB', 'de-DE', 'fr-FR', 'es-ES', 'pt-BR', 'ja-JP', 'en-AU', 'en-IN', 'es-AR', 'es-PE'])('%s is A4', (tag) => {
     expect(paperFor([tag])).toBe('a4')
