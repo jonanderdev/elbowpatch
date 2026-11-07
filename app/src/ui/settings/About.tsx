@@ -41,7 +41,9 @@ export function About(): ReactElement {
         </div>
       </dl>
       <p className="settings-note">Set in Literata by TypeTogether and EB Garamond by Georg Duffner, both under the SIL Open Font License.</p>
-      <p className="settings-note">PDFs are made with pdf-lib and fontkit, both under the MIT License; their notices are in the source.</p>
+      <p className="settings-note">
+        PDFs are made with pdf-lib, fontkit and the small parts they carry, under the MIT, Apache 2.0 and Zlib licences; notices are in the source.
+      </p>
     </>
   )
 }

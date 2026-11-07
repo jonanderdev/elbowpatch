@@ -103,6 +103,19 @@ test.describe('with no worker to fetch for the page', () => {
     expect((await download).suggestedFilename()).toBe('On a train.pdf')
     await expect(page.getByRole('status').filter({ hasText: 'Saved as On a train.pdf.' })).toBeVisible()
   })
+
+  test('a failure that is not the code or a font failing to load says it failed, even when the browser reports it is offline', async ({ page, context }) => {
+    await page.addInitScript(() => Object.defineProperty(navigator, 'onLine', { get: () => false }))
+    await essay(page, false)
+    const before = await kept(page)
+    // The font file arrives, but it is not a font: the file cannot be made, though nothing failed to load.
+    await context.route(/\.ttf$/, (route) => route.fulfill({ status: 200, contentType: 'font/ttf', body: 'not a font' }))
+    await openExport(page)
+    await page.getByRole('button', { name: /PDF/ }).click()
+    await expect(page.getByRole('status').filter({ hasText: FAILED })).toBeVisible()
+    await expect(page.getByRole('status').filter({ hasText: OFFLINE })).toHaveCount(0)
+    expect(await kept(page)).toBe(before)
+  })
 })
 
 test('a first PDF fetches its code and fonts, and later PDFs work offline', async ({ page, context }) => {

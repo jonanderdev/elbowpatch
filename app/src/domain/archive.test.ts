@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { memoryStore } from '../adapters/memory-store'
-import { exportAll, FORMAT_VERSION, guessKind, importArchive, importMarkdown, readDay } from './archive'
+import { exportAll, FORMAT_VERSION, guessKind, guessKindFrom, importArchive, importMarkdown, readDay, readTitled } from './archive'
 import { pieceAsMarkdown } from './export'
 import {
   newPiece,
@@ -356,6 +356,16 @@ describe('loose .md files', () => {
     expect(guessKind('# A title\n\nText.')).toBe('essay')
     expect(guessKind('# One\n\nA.\n\n# Two\n\nB.')).toBe('book')
     expect(guessKind('# Monday 26 October 2026\n\nA.\n\n# Tuesday 27 October 2026\n\nB.')).toBe('journal')
+  })
+
+  it('guesses the same from a file already read', () => {
+    for (const text of [
+      'Just text.',
+      '# One\n\nA.\n\n# Two\n\nB.',
+      '# Winter\n\n*A subtitle*\n\n## One\n\nA.\n\n## Two\n\nB.',
+      '# Log\n\n## Monday 26 October 2026\n\nA.',
+    ])
+      expect(guessKindFrom(text, readTitled(text))).toBe(guessKind(text))
   })
 
   it('reads a day heading', () => {

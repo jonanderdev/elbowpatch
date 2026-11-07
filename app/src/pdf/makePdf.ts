@@ -8,7 +8,7 @@ import type { Paper } from '../domain/paper'
 import type { OpenSection } from '../domain/pieces'
 import { printOrder } from '../domain/printOrder'
 import { type Look, layOut } from './layout'
-import { type Sheet, write } from './write'
+import { type PrintedPage, write } from './write'
 
 export type { Look }
 
@@ -17,7 +17,7 @@ export type { Look }
  * page is fixed, so a piece makes the same pages on every screen.
  */
 export async function makePdf(piece: Piece, sections: OpenSection[], paper: Paper, look: Look): Promise<Uint8Array> {
-  const sheets: Sheet[] = []
+  const sheets: PrintedPage[] = []
   let number = 0
   // A book's contents lists the same rows the pages are laid out from, and is written with them once every
   // page is laid out: the number beside a chapter is the one its first page is printed with, so they cannot disagree.

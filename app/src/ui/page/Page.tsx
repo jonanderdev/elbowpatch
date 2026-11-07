@@ -11,13 +11,14 @@ import { screenOf } from '../../page/pager'
 import { placeOf } from '../../page/place'
 import { closeUndo, takeUndo } from '../../page/undoMemory'
 import { settled } from '../app/settled'
-import { ExportSheet, pdfNote } from '../components/ExportSheet'
+import { ExportSheet } from '../components/ExportSheet'
 import { Path } from '../components/Path'
 import { usePhone } from '../components/usePhone'
 import { useScrolled } from '../components/useScrolled'
-import { download, downloadBytes } from '../files/download'
+import { download } from '../files/download'
+import { pdfNote, savedAs } from '../files/exportCopy'
 import { markdownFile, pieceAsPageHolds } from '../files/markdownFile'
-import { pdfFile } from '../files/pdfFile'
+import { savePdf } from '../files/pdfFile'
 import { useSettings } from '../stores/settings'
 import { useUnsaved } from '../stores/unsaved'
 import type { Today } from '../timeMachine/TimeMachine'
@@ -658,9 +659,7 @@ export function Page({
   async function exportPdf(): Promise<string | undefined> {
     if (!editor) return undefined
     const held = await pieceAsPageHolds(deps, piece, sectionId, editor.markdown(), titles.title.current?.textContent ?? '')
-    const file = await pdfFile(held.piece, held.sections)
-    downloadBytes(file.name, file.bytes, 'application/pdf')
-    return file.name
+    return savePdf(held.piece, held.sections)
   }
 
   async function keepMoment(): Promise<void> {
@@ -866,13 +865,13 @@ export function Page({
             make: async () => {
               const name = await exportPdf()
               closeSheet()
-              if (name) setLine(`Saved as ${name}.`)
+              if (name) setLine(savedAs(name))
             },
           }}
           onMarkdown={async () => {
             const name = await exportMarkdown()
             closeSheet()
-            if (name) setLine(`Saved as ${name}.`)
+            if (name) setLine(savedAs(name))
           }}
           onDone={closeSheet}
         />
