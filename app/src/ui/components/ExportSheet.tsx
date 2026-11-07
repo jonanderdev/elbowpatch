@@ -8,11 +8,13 @@ export interface PdfRow {
 }
 
 const WORKING = 'Setting your pages…'
+// A first PDF needs its code and fonts from the network; once they are kept it needs nothing.
+const OFFLINE = 'PDF needs a connection the first time. Nothing has changed.'
 const FAILED = 'Couldn’t make the PDF just now. Nothing has changed; try again.'
 
 export function ExportSheet(props: { title: string; pdf?: PdfRow; onMarkdown(): void; onDone(): void; style?: CSSProperties }): ReactElement {
   const first = useRef<HTMLButtonElement>(null)
-  const [state, setState] = useState<'ready' | 'working' | 'failed'>('ready')
+  const [state, setState] = useState<'ready' | 'working' | 'offline' | 'failed'>('ready')
   useEffect(() => first.current?.focus(), [])
 
   // While the file is made, a second tap does nothing.
@@ -22,7 +24,7 @@ export function ExportSheet(props: { title: string; pdf?: PdfRow; onMarkdown(): 
     try {
       await props.pdf.make()
     } catch {
-      setState('failed')
+      setState(navigator.onLine === false ? 'offline' : 'failed')
     }
   }
 
@@ -41,7 +43,7 @@ export function ExportSheet(props: { title: string; pdf?: PdfRow; onMarkdown(): 
           <button type="button" className="sheet-row" aria-busy={state === 'working'} onClick={() => void makePdf()}>
             <span className="sheet-row-name">PDF</span>
             <span className="sheet-row-note" role="status">
-              {state === 'working' ? WORKING : state === 'failed' ? FAILED : props.pdf.note}
+              {state === 'working' ? WORKING : state === 'offline' ? OFFLINE : state === 'failed' ? FAILED : props.pdf.note}
             </span>
           </button>
         )}

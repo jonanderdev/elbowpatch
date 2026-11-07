@@ -86,8 +86,8 @@ test('an emoji, Arabic and Japanese appear in the file, in place in their line',
   expect(line?.replace(/\s+/g, ' ')).toBe('We lit the lamp, then and too.')
   // Three drawn runs: the emoji, the Arabic word and the Japanese word.
   expect(first.images).toHaveLength(3)
-  const baseline = first.items.find((i) => i.str.startsWith('We lit'))?.y as number
-  const words = first.items.filter((i) => Math.abs(i.y - baseline) < 1).sort((a, b) => a.x - b.x)
+  const baseline = first.runs.find((i) => i.str.startsWith('We lit'))?.y as number
+  const words = first.runs.filter((i) => Math.abs(i.y - baseline) < 1).sort((a, b) => a.x - b.x)
   const images = [...first.images].sort((a, b) => a.x - b.x)
   for (const image of images) {
     // On the line: the baseline runs through the image.
@@ -100,7 +100,7 @@ test('an emoji, Arabic and Japanese appear in the file, in place in their line',
     }
   }
   // Each stands between the words that were beside it: after the end of the one before, before the start of the one after.
-  const word = (text: string) => words.find((w) => w.str.includes(text)) as ReadPage['items'][number]
+  const word = (text: string) => words.find((w) => w.str.includes(text)) as ReadPage['runs'][number]
   const between = (image: ReadPage['images'][number] | undefined, before: string, after: string) => {
     expect(image?.x).toBeGreaterThan(word(before).x + word(before).width - 1)
     expect(image?.x).toBeLessThan(word(after).x + 1)
@@ -117,7 +117,7 @@ test('the running head keeps an emoji, Arabic and Cyrillic in the title', async 
   expect(pdf.count).toBeGreaterThan(1)
   const second = pdf.pages[1] as ReadPage
   // Above the text: the head stands in the top margin, centred.
-  const head = second.items.filter((i) => i.y > second.height - 60)
+  const head = second.runs.filter((i) => i.y > second.height - 60)
   expect(head.map((i) => i.str).join('')).toContain('Лампа')
   const drawn = second.images.filter((i) => i.y > second.height - 60)
   expect(drawn.length).toBeGreaterThanOrEqual(2)
