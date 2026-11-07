@@ -32,6 +32,7 @@ import { useCaretFollowing, useCaretKeys } from './useCaret'
 import { useChapterStart } from './useChapterStart'
 import { useEditor } from './useEditor'
 import { raiseKeyboard, useFocusOnOpen } from './useFocusOnOpen'
+import { useLongPath } from './useLongPath'
 import { useOpenAtPlace } from './useOpenAtPlace'
 import { useOutline } from './useOutline'
 import { usePager } from './usePager'
@@ -170,6 +171,7 @@ export function Page({
   const pageButton = useRef<HTMLButtonElement>(null)
   const railToggle = useRef<HTMLButtonElement>(null)
   const head = useRef<HTMLDivElement>(null)
+  const longPath = useLongPath(head)
   const writingBar = useRef<HTMLDivElement>(null)
   // A window smaller than the page scrolls, and the page in its scroller with the keyboard up: either
   // way the head then stands on its strip (DESIGN.md, One head). With the keyboard down the scroller no
@@ -682,7 +684,7 @@ export function Page({
       inert={covered}
       aria-hidden={covered}
     >
-      <div ref={head} className="head" data-scrolled={scrolled || undefined}>
+      <div ref={head} className="head" data-scrolled={scrolled || undefined} data-long-path={longPath || undefined}>
         {/* On desktop § and *Library*, then the piece's name; a phone shows § alone. */}
         <div className="head-path">
           <Path crumbs={[{ word: (piece.kind === 'essay' ? heading : name).trim() || 'Untitled' }]} keepFocus onHome={home} />

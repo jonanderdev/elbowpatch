@@ -2233,8 +2233,10 @@ button.count[aria-expanded='true'] {
   :root {
     --strip: 56px;
   }
+  /* One line tall, whatever the name: a long one runs on downwards, and § and the toggle stay on the head's line. */
   .head .path {
     align-items: flex-start;
+    height: 36px;
   }
   .head .path .home {
     height: 36px;
@@ -2264,10 +2266,16 @@ button.count[aria-expanded='true'] {
   }
   /* The rail's width, less *Library* and the toggle: the path never leaves the rail. */
   .head .path .crumbs {
-    display: block;
     max-width: 162px;
     padding-top: 8px;
     font-size: 15px;
+    overflow-wrap: anywhere;
+    /* Three lines, then "…": the whole name stands on its own page. */
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    overflow: hidden;
   }
   /* Still centred over the column, but clear of the path and the tools (about 330px from each edge),
      cut with "…" where a narrow window brings them close. */
@@ -2488,6 +2496,8 @@ button.count[aria-expanded='true'] {
     gap: 8px;
     margin: 0;
     font-size: 15px;
+    /* The path's measures, so § and the word stand as they do on a page. */
+    line-height: 20px;
     color: var(--text);
   }
   .rail-mark .home {
@@ -2495,6 +2505,7 @@ button.count[aria-expanded='true'] {
     top: -1px;
     font-size: 20px;
     font-weight: 300;
+    line-height: 1;
     color: var(--title);
   }
   /* 4px between rows, so two tints (the open place and one hovered) never touch. */
@@ -2543,8 +2554,10 @@ button.count[aria-expanded='true'] {
     align-items: flex-start;
     gap: 10px;
   }
+  /* Moved, not spaced: a margin would make the row taller, and lift § and the name from where they stand on every other screen. */
   .rail-toggle {
-    margin-top: 1.5px;
+    position: relative;
+    top: 0.75px;
   }
   /* Contents on a book's page. It stands in the head, under the path, and starts under the head's line. */
   .contents-rail {
@@ -2573,6 +2586,10 @@ button.count[aria-expanded='true'] {
     margin: 0;
     padding: 0;
     list-style: none;
+  }
+  /* A name on its third line ends at 84px: the rail starts one line lower, the same room under it. */
+  .head[data-long-path] .contents-rail {
+    padding-top: 96px;
   }
   .contents-rail[data-folded] {
     visibility: hidden;
@@ -2915,6 +2932,7 @@ button.count[aria-expanded='true'] {
   }
   .time-machine .path .crumbs {
     display: flex;
+    overflow: visible;
     max-width: 238px;
   }
   .time-machine[data-kind='essay'] .path .crumbs {

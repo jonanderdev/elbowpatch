@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-import { caretToEnd, saved } from './helpers'
+import { caretToEnd, saved, write } from './helpers'
 
 // Contents: a sheet on a phone (#55), the rail on desktop (#57).
 const onDesktop = (page: Page) => page.viewportSize()!.width >= 700
@@ -413,6 +413,61 @@ test('a long title wraps in the rail, whole, with the page number on its first l
     expect(number.y - box.y).toBe((await rows(page).first().locator('.contents-page').boundingBox())!.y - short.y)
     expect(number.y).toBeLessThan(line.y + 23)
   }
+})
+
+test('a long name runs downwards in the path to three lines, then cuts, and the rail makes room', async ({ page }) => {
+  desktopOnly(page)
+  await importBook(page, TWO)
+  const home = page.locator('.head .home')
+  const toggle = page.locator('.rail-toggle')
+  const crumbs = page.locator('.head .crumbs')
+  const line = page.locator('.rail-line')
+  const onTheLine = (await home.boundingBox())!.y
+  const toggleOnTheLine = (await toggle.boundingBox())!.y
+  await expect.poll(async () => (await line.boundingBox())!.y).toBe(76)
+
+  const named = async (name: string) => {
+    await page.locator('.book-title').evaluate((el, text) => {
+      el.textContent = text
+      el.dispatchEvent(new InputEvent('input', { bubbles: true }))
+    }, name)
+    await expect(crumbs).toContainText(name)
+  }
+
+  // Two lines fit above the rail, which stays where it is on every other piece.
+  await named('The windows of the shop')
+  expect((await crumbs.boundingBox())!.height).toBe(48)
+  await expect.poll(async () => (await line.boundingBox())!.y).toBe(76)
+
+  for (const name of ['The windows of the shop had been salted white by the first storm of November', 'Unbroken'.repeat(12)]) {
+    await named(name)
+    const box = (await crumbs.boundingBox())!
+    expect(box.height).toBe(68)
+    expect((await home.boundingBox())!.y).toBe(onTheLine)
+    expect((await toggle.boundingBox())!.y).toBe(toggleOnTheLine)
+    await expect.poll(async () => (await line.boundingBox())!.y).toBe(96)
+    expect(box.y + box.height).toBeLessThan(96)
+    // Nothing runs past the block, under the toggle or out of the rail.
+    expect(await crumbs.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true)
+  }
+
+  // Shortened again, the rail goes back.
+  await named('Harbour')
+  await expect.poll(async () => (await line.boundingBox())!.y).toBe(76)
+})
+
+test('§ and the word beside it stand in the same place in the library, on a book and on an essay', async ({ page }) => {
+  desktopOnly(page)
+  await importBook(page, TWO)
+  const on = async (home: string) => (await page.locator(home).boundingBox())!.y
+  const book = { mark: await on('.head .home span:first-child'), word: await on('.head .home-word') }
+  await page.locator('.head .home').click()
+  await expect(page.locator('.rail-mark')).toBeVisible()
+  expect(await on('.rail-mark .home')).toBe(book.mark)
+  await write(page, 'Essay')
+  await expect(page.locator('.title')).toBeFocused()
+  expect(await on('.head .home span:first-child')).toBe(book.mark)
+  expect(await on('.head .home-word')).toBe(book.word)
 })
 
 test('a failed save stands in the rail, above + New chapter, with every word and every chapter in reach', async ({ page }) => {
