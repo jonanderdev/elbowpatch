@@ -104,6 +104,31 @@ test.describe('with no worker to fetch for the page', () => {
     await expect(page.getByRole('status').filter({ hasText: 'Saved as On a train.pdf.' })).toBeVisible()
   })
 
+  test('a font that fails to load, and the code failing again, still let a later try work', async ({ page, context }) => {
+    test.setTimeout(120_000)
+    await essay(page, false)
+    const says = (text: string) => expect(page.getByRole('status').filter({ hasText: text })).toBeVisible()
+    await openExport(page)
+
+    // Each try at the code fails the same way; each is a new try, not the first one remembered.
+    await context.route(PDF_CODE, (route) => route.abort())
+    for (let i = 0; i < 2; i++) {
+      await page.getByRole('button', { name: /PDF/ }).click()
+      await says(FAILED)
+    }
+    await context.unroute(PDF_CODE)
+
+    // The code arrives but a font does not.
+    await context.route(/\.ttf$/, (route) => route.abort())
+    await page.getByRole('button', { name: /PDF/ }).click()
+    await says(FAILED)
+    await context.unroute(/\.ttf$/)
+
+    const download = page.waitForEvent('download', { timeout: 60_000 })
+    await page.getByRole('button', { name: /PDF/ }).click()
+    expect((await download).suggestedFilename()).toBe('On a train.pdf')
+  })
+
   test('a failure that is not the code or a font failing to load says it failed, even when the browser reports it is offline', async ({ page, context }) => {
     await page.addInitScript(() => Object.defineProperty(navigator, 'onLine', { get: () => false }))
     await essay(page, false)
@@ -162,6 +187,43 @@ test('a first PDF fetches its code and fonts, and later PDFs work offline', asyn
       return held.some((path) => PDF_CODE.test(path)) && held.some((path) => path.endsWith('.ttf'))
     })
     .toBe(true)
+  await context.setOffline(true)
+  await page.reload()
+  await expect(page.locator('.body')).toContainText(WORDS)
+  await openExport(page)
+  const again = page.waitForEvent('download', { timeout: 60_000 })
+  await page.getByRole('button', { name: /PDF/ }).click()
+  expect((await again).suggestedFilename()).toBe('On a train.pdf')
+})
+
+test('code that was fetched again after a failure is kept too, and later PDFs work offline', async ({ page, context, browserName }) => {
+  // Offline reaches the worker's own fetches in Chromium only (not Firefox), so only there does it prove the kept copy answers.
+  test.skip(browserName !== 'chromium', 'checked in Chromium')
+  test.setTimeout(120_000)
+  await essay(page)
+  await page.reload()
+  await page.evaluate(() => navigator.serviceWorker.ready)
+  await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true)
+  await expect(page.locator('.body')).toContainText(WORDS)
+
+  await context.route(PDF_CODE, (route) => route.abort())
+  await openExport(page)
+  await page.getByRole('button', { name: /PDF/ }).click()
+  await expect(page.getByRole('status').filter({ hasText: FAILED })).toBeVisible()
+  await context.unroute(PDF_CODE)
+
+  // The second try asks for the code under another address, and it is kept all the same.
+  const download = page.waitForEvent('download', { timeout: 60_000 })
+  await page.getByRole('button', { name: /PDF/ }).click()
+  expect((await download).suggestedFilename()).toBe('On a train.pdf')
+  await expect
+    .poll(async () => {
+      const held = Object.values(await cached(page)).flat()
+      return held.some((path) => PDF_CODE.test(path)) && held.some((path) => path.endsWith('.ttf'))
+    })
+    .toBe(true)
+
+  // A new session asks for the plain address: the kept copy answers.
   await context.setOffline(true)
   await page.reload()
   await expect(page.locator('.body')).toContainText(WORDS)
