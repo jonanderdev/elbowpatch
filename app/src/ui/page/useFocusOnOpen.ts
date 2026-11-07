@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react'
+import { type RefObject, useEffect, useRef } from 'react'
+import type { TitleField } from '../../domain/model'
 import type { Editor } from '../../page/editor'
-import { caretToFieldEnd, type Opened, type TitleRefs } from './fields'
+import { caretToFieldEnd, fieldOf, type Opened, type TitleRefs } from './fields'
 import type { Saving } from './saving'
 
 /**
@@ -37,22 +38,41 @@ interface Options {
   noCaret(): HTMLElement | null
 }
 
+/** Where the writer is writing: the text, or a title field. */
+export type Writing = 'text' | TitleField
+
 /**
  * Where the caret goes when the page shows (DESIGN.md, Behaviour):
  * - a new piece: its title (its name on a title page; the text, in a journal);
- * - a piece left while writing, reopened or back from the library: the caret where it was;
+ * - a piece left while writing, reopened or back from the library: the caret where it was, or at the end of the title it was in;
+ * - a journal opened on a new day, its page still empty: the text;
  * - a piece left while reading: nowhere, the page opens on their place;
  * - a chapter chosen in Contents or turned to: the text, as a turn does; on a phone only if they were writing.
  * On a phone the caret waits for a tap, so the keyboard does not cover the page unasked.
  *
  * Going to the library keeps a moment. Returns `leaving()`, for the Library button to call first:
- * it remembers whether the writer was writing, since the library takes the focus away.
+ * it remembers whether the writer was writing, since the library takes the focus away. And `writingBehind`,
+ * for the page to set when the library takes it however it was reached (the Back button): they were writing.
  */
-export function useFocusOnOpen({ opened, editor, saving, titles, covered, readOnly, titlePage, titleEditable, noCaret }: Options): { leaving(): void } {
+export function useFocusOnOpen({ opened, editor, saving, titles, covered, readOnly, titlePage, titleEditable, noCaret }: Options): {
+  leaving(): void
+  writing(): Writing | null
+  writingBehind: RefObject<Writing | null>
+} {
   const firstCover = useRef(true)
-  const writingWhenCovered = useRef(false)
+  const writingBehind = useRef<Writing | null>(null)
   // The caret was placed for this opening (the page is remounted per section, so once per mount).
   const placed = useRef(false)
+
+  const writingNow = (): Writing | null => (editor?.view.hasFocus() ? 'text' : (fieldOf(document.activeElement, titles) ?? null))
+  const caretTo = (where: Writing): void => {
+    // A journal opened again lands on today, never on its title page (useOpenAtPlace).
+    const field = where === 'text' || opened.piece.kind === 'journal' ? null : titles[where].current
+    if (field) {
+      field.focus()
+      caretToFieldEnd(field)
+    } else editor?.focus()
+  }
 
   // On covering and uncovering, and once the editor and saving exist.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the rest is this page's, fixed while it is open.
@@ -74,9 +94,10 @@ export function useFocusOnOpen({ opened, editor, saving, titles, covered, readOn
       return
     }
     if (readOnly) return
-    if (writingWhenCovered.current) {
-      writingWhenCovered.current = false
-      if (desktop) editor.focus()
+    if (writingBehind.current) {
+      const where = writingBehind.current
+      writingBehind.current = null
+      if (desktop) caretTo(where)
       return
     }
     if (placed.current) return
@@ -96,12 +117,17 @@ export function useFocusOnOpen({ opened, editor, saving, titles, covered, readOn
       return
     }
     const place = opened.piece.place
-    if (place?.caret && place.sectionId === opened.sectionId && desktop) editor.focus()
+    if (!desktop) return
+    if (place?.sectionId === opened.sectionId) {
+      if (place.caret) caretTo(place.field ?? 'text')
+    } else if (opened.piece.kind === 'journal' && !editor.view.state.doc.textContent) editor.focus()
   }, [covered, readOnly, editor, saving])
 
   return {
     leaving() {
-      writingWhenCovered.current = !!editor?.view.hasFocus()
+      writingBehind.current = writingNow()
     },
+    writing: () => writingNow() ?? writingBehind.current,
+    writingBehind,
   }
 }

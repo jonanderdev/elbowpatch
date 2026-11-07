@@ -35,6 +35,9 @@ export interface Piece {
 }
 
 /** Where the writer was: a paragraph, an offset and a few words, so it survives edits made elsewhere. */
+/** A page's title fields: a section's title, and on a title page its name and subtitle. */
+export type TitleField = 'title' | 'bookTitle' | 'subtitle'
+
 export interface Place {
   sectionId: string
   paragraph: number
@@ -47,6 +50,8 @@ export interface Place {
   screen?: Screen
   /** True when the caret was there; otherwise it is the first line on screen. */
   caret: boolean
+  /** The title field the caret was in, for a caret not in the text; the position above is then the first line on screen. */
+  field?: TitleField
   at: number
 }
 
