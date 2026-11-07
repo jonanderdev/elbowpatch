@@ -11,6 +11,6 @@ import { settingsNow } from '../stores/settings'
 export async function pdfFile(piece: Piece, sections: OpenSection[]): Promise<{ name: string; bytes: Uint8Array<ArrayBuffer> }> {
   const { makePdf } = await import('../../pdf/makePdf')
   const paper = paperFor(navigator.languages?.length ? navigator.languages : [navigator.language])
-  const made = await makePdf(piece, sections, paper, { indent: settingsNow().indent })
+  const made = await makePdf(piece, sections, paper, { indent: settingsNow().indent, dropcap: settingsNow().dropcap })
   return { name: fileName(piece.title, 'pdf'), bytes: new Uint8Array(made) }
 }

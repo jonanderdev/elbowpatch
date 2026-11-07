@@ -11,7 +11,14 @@ const K = 8
 const U = (K * 96) / 72
 
 /** The faces of the printed page (the fixed font files). */
-export type FaceName = 'literata-360' | 'literata-300-title' | 'literata-600' | 'literata-italic-400' | 'eb-garamond-italic-400' | 'eb-garamond-italic-600'
+export type FaceName =
+  | 'literata-360'
+  | 'literata-300-title'
+  | 'literata-600'
+  | 'literata-600-initial'
+  | 'literata-italic-400'
+  | 'eb-garamond-italic-400'
+  | 'eb-garamond-italic-600'
 
 export interface Fragment {
   text: string
@@ -30,6 +37,8 @@ export interface Fragment {
   continues: boolean
   /** The browser listed a box for a hyphen it set after this fragment. A hyphen is not in the text: it may be here, or in the fragment's own width. */
   hyphenBox: boolean
+  /** How far below its line's baseline it is drawn, in points: a drop cap belongs to the first line, and stands on the fourth. */
+  drop: number
 }
 
 export interface Line {
@@ -41,6 +50,7 @@ export interface Line {
 /** What the writer's text settings add to the page; the rest of the page is fixed. */
 export interface Look {
   indent: boolean
+  dropcap: boolean
 }
 
 const GAP = 40 * U
@@ -81,7 +91,7 @@ export async function layOut(title: string, blocks: Block[], paper: Paper, lang:
     `color:${INK}`,
   ].join(';')
   if (title !== '') root.append(heading(title))
-  for (const [i, block] of blocks.entries()) root.append(element(block, blocks[i - 1], i === blocks.length - 1, look))
+  for (const [i, block] of blocks.entries()) root.append(element(block, blocks[i - 1], i === 0, i === blocks.length - 1, look))
   document.body.append(root)
   try {
     return read(root)
@@ -121,7 +131,39 @@ function heading(title: string): HTMLElement {
   return h1
 }
 
-function element(block: Block, before: Block | undefined, last: boolean, look: Look): HTMLElement {
+/** Literata's cap height, in ems, at the body's weight and at the drop cap's. */
+const CAP_BODY = 0.701
+const CAP_INITIAL = 0.73
+const ASCENT = 1.177
+const DESCENT = 0.308
+const LINE = BODY * LEADING
+/** How far below its own line the drop cap is drawn: on the fourth line's baseline, three lines down. */
+const DROP: number = 3 * LINE
+
+/**
+ * The first letter, floated, sized so its capital stands from the top of the first line's capitals to the
+ * fourth line's baseline. The same in every browser, which do not all have `initial-letter`.
+ */
+function dropCap(letter: string): HTMLElement {
+  const size = (DROP + CAP_BODY * BODY) / CAP_INITIAL
+  const baseline = (LINE - (ASCENT + DESCENT) * BODY) / 2 + ASCENT * BODY + DROP
+  const lineHeight = 2 * baseline - (ASCENT - DESCENT) * size
+  const el = document.createElement('span')
+  el.textContent = letter
+  el.style.cssText = [
+    'float:left',
+    `height:${(4 * LINE - 0.5) * U}px`,
+    `margin-right:${0.08 * size * U}px`,
+    `font-size:${size * U}px`,
+    `line-height:${lineHeight * U}px`,
+    'font-weight:600',
+    "font-variation-settings:'opsz' 72",
+    'letter-spacing:0',
+  ].join(';')
+  return el
+}
+
+function element(block: Block, before: Block | undefined, first: boolean, last: boolean, look: Look): HTMLElement {
   const quote = block.type === 'quote'
   const el = document.createElement(quote ? 'blockquote' : 'p')
   const style = [
@@ -147,10 +189,19 @@ function element(block: Block, before: Block | undefined, last: boolean, look: L
     el.textContent = block.text
     return el
   }
+  // The drop cap: the first letter of the text, four lines deep.
+  let initial = look.dropcap && first && block.type === 'paragraph' ? /^[\p{P}\p{S}]*[\p{L}\p{N}]/u.exec(block.spans[0]?.text ?? '')?.[0] : undefined
+  if (block.spans[0]?.marks.length) initial = undefined
   for (const span of block.spans) {
     span.text.split(BREAK).forEach((part, i) => {
       if (i > 0) el.append(document.createElement('br'))
       if (part === '') return
+      if (initial && part.startsWith(initial)) {
+        el.append(dropCap(initial))
+        part = part.slice(initial.length)
+        initial = undefined
+        if (part === '') return
+      }
       let node: Node = document.createTextNode(part)
       if (span.marks.includes('strong')) node = wrap('strong', 'font-weight:600', node)
       if (span.marks.includes('em'))
@@ -178,7 +229,8 @@ function faceOf(style: CSSStyleDeclaration): FaceName {
   const weight = Number.parseFloat(style.fontWeight)
   if (style.fontFamily.includes('EB Garamond')) return weight >= 500 ? 'eb-garamond-italic-600' : 'eb-garamond-italic-400'
   if (weight <= 330) return 'literata-300-title'
-  return weight >= 500 ? 'literata-600' : 'literata-360'
+  if (weight >= 500) return style.fontVariationSettings.includes('72') ? 'literata-600-initial' : 'literata-600'
+  return 'literata-360'
 }
 
 interface Box {
@@ -225,7 +277,9 @@ function read(root: HTMLElement): Line[][] {
     const style = getComputedStyle(el)
     const fontPx = Number.parseFloat(style.fontSize)
     const page = Math.max(0, Math.floor((box.left - origin.left + GAP / 2) / STRIDE))
-    const baseline = (top - origin.top + baselines.of(el)) / U
+    const face = faceOf(style)
+    const drop = face === 'literata-600-initial' ? DROP : 0
+    const baseline = (top - origin.top + baselines.of(el)) / U - drop
     while (pages.length <= page) pages.push([])
     const lineList = pages[page] as Line[]
     let line = lineList.find((l) => Math.abs(l.baseline - baseline) < 4)
@@ -235,7 +289,8 @@ function read(root: HTMLElement): Line[][] {
     }
     line.fragments.push({
       text,
-      face: faceOf(style),
+      face,
+      drop,
       size: fontPx / U,
       tracking: style.letterSpacing === 'normal' ? 0 : Number.parseFloat(style.letterSpacing) / fontPx,
       x: (box.left - origin.left - page * STRIDE) / U,

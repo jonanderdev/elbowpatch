@@ -110,7 +110,7 @@ export async function write({ pages, head, paper, title, lang }: Printed): Promi
         const letters = width(f, fragment.text, fragment.size) + fragment.tracking * fragment.size * [...fragment.text].length
         const hyphen = fragment.continues && (fragment.hyphenBox || fragment.width - letters > 0.15 * fragment.size)
         const text = fragment.text + (hyphen ? '-' : next?.spaced ? ' ' : '')
-        await draw(fragment.face, text, fragment.size, left + fragment.x, MARGIN_TOP + line.baseline, INK, fragment.tracking)
+        await draw(fragment.face, text, fragment.size, left + fragment.x, MARGIN_TOP + line.baseline + fragment.drop, INK, fragment.tracking)
       }
     }
     if (index > 0 && head !== '') {
