@@ -346,7 +346,8 @@ test('a sheet from the desktop head leaves the caret alone, for the writer typin
   const shown = await carets(page)
   await page.locator('.head-tools').getByRole('button', { name: 'Text settings' }).click()
   await expect(page.getByRole('dialog', { name: 'Text settings' })).toBeVisible()
-  await page.locator('.body').click()
+  // The words, as a writer would: the box's middle, in a row of pages, can lie off the page in view.
+  await page.locator('.body p').last().click()
   await expect(page.locator('.body')).toBeFocused()
   await expect(page.getByRole('dialog', { name: 'Text settings' })).toBeVisible()
   expect(await carets(page)).toEqual(shown)
