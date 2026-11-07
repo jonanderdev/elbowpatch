@@ -2233,8 +2233,10 @@ button.count[aria-expanded='true'] {
   :root {
     --strip: 56px;
   }
+  /* One line tall, whatever the name: a long one runs on downwards, and § and the toggle stay on the head's line. */
   .head .path {
     align-items: flex-start;
+    height: 36px;
   }
   .head .path .home {
     height: 36px;
@@ -2264,10 +2266,16 @@ button.count[aria-expanded='true'] {
   }
   /* The rail's width, less *Library* and the toggle: the path never leaves the rail. */
   .head .path .crumbs {
-    display: block;
     max-width: 162px;
     padding-top: 8px;
     font-size: 15px;
+    overflow-wrap: anywhere;
+    /* Three lines, then "…": the whole name stands on its own page. */
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    overflow: hidden;
   }
   /* Still centred over the column, but clear of the path and the tools (about 330px from each edge),
      cut with "…" where a narrow window brings them close. */
@@ -2573,6 +2581,10 @@ button.count[aria-expanded='true'] {
     margin: 0;
     padding: 0;
     list-style: none;
+  }
+  /* A name on its third line ends at 84px: the rail starts one line lower, the same room under it. */
+  .head[data-long-path] .contents-rail {
+    padding-top: 96px;
   }
   .contents-rail[data-folded] {
     visibility: hidden;
@@ -2915,6 +2927,7 @@ button.count[aria-expanded='true'] {
   }
   .time-machine .path .crumbs {
     display: flex;
+    overflow: visible;
     max-width: 238px;
   }
   .time-machine[data-kind='essay'] .path .crumbs {

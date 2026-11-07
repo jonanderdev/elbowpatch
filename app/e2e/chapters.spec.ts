@@ -415,6 +415,47 @@ test('a long title wraps in the rail, whole, with the page number on its first l
   }
 })
 
+test('a long name runs downwards in the path to three lines, then cuts, and the rail makes room', async ({ page }) => {
+  desktopOnly(page)
+  await importBook(page, TWO)
+  const home = page.locator('.head .home')
+  const toggle = page.locator('.rail-toggle')
+  const crumbs = page.locator('.head .crumbs')
+  const line = page.locator('.rail-line')
+  const onTheLine = (await home.boundingBox())!.y
+  const toggleOnTheLine = (await toggle.boundingBox())!.y
+  await expect.poll(async () => (await line.boundingBox())!.y).toBe(76)
+
+  const named = async (name: string) => {
+    await page.locator('.book-title').evaluate((el, text) => {
+      el.textContent = text
+      el.dispatchEvent(new InputEvent('input', { bubbles: true }))
+    }, name)
+    await expect(crumbs).toContainText(name)
+  }
+
+  // Two lines fit above the rail, which stays where it is on every other piece.
+  await named('The windows of the shop')
+  expect((await crumbs.boundingBox())!.height).toBe(48)
+  await expect.poll(async () => (await line.boundingBox())!.y).toBe(76)
+
+  for (const name of ['The windows of the shop had been salted white by the first storm of November', 'Unbroken'.repeat(12)]) {
+    await named(name)
+    const box = (await crumbs.boundingBox())!
+    expect(box.height).toBe(68)
+    expect((await home.boundingBox())!.y).toBe(onTheLine)
+    expect((await toggle.boundingBox())!.y).toBe(toggleOnTheLine)
+    await expect.poll(async () => (await line.boundingBox())!.y).toBe(96)
+    expect(box.y + box.height).toBeLessThan(96)
+    // Nothing runs past the block, under the toggle or out of the rail.
+    expect(await crumbs.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true)
+  }
+
+  // Shortened again, the rail goes back.
+  await named('Harbour')
+  await expect.poll(async () => (await line.boundingBox())!.y).toBe(76)
+})
+
 test('a failed save stands in the rail, above + New chapter, with every word and every chapter in reach', async ({ page }) => {
   desktopOnly(page)
   await importBook(page, MANY)
