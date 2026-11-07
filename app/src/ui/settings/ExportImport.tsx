@@ -1,6 +1,6 @@
 import { type ReactElement, useEffect, useRef, useState } from 'react'
 import { unzip } from '../../adapters/zip'
-import { guessKind, importArchive, importMarkdown } from '../../domain/archive'
+import { guessKind, importArchive, importMarkdown, readTitled } from '../../domain/archive'
 import type { Kind } from '../../domain/model'
 import type { Deps } from '../../domain/pieces'
 import { longDate, number, size } from '../../domain/words'
@@ -213,15 +213,19 @@ function result(added: number, here: number): string {
 }
 
 function titleOf(f: { name: string; text: string }): string {
+  const titled = readTitled(f.text)
+  if (titled?.title) return titled.title
   const first = f.text.split('\n').find((l) => l.trim())
   if (first?.startsWith('# ') && guessKind(f.text) === 'essay') return first.slice(2).trim()
   return f.name.replace(/\.(md|markdown|txt)$/i, '')
 }
 
 function headingsNote(text: string): string {
-  const n = text.split('\n').filter((l) => l.startsWith('# ')).length
-  if (n < 2) return ''
-  return guessKind(text) === 'journal' ? ` · ${number(n)} dated headings` : ` · ${number(n)} headings`
+  const titled = readTitled(text)
+  const n = titled ? titled.headings.length : text.split('\n').filter((l) => l.startsWith('# ')).length
+  if (n < (titled ? 1 : 2)) return ''
+  const word = n === 1 ? 'heading' : 'headings'
+  return guessKind(text) === 'journal' ? ` · ${number(n)} dated ${word}` : ` · ${number(n)} ${word}`
 }
 
 function isZip(bytes: ArrayBuffer): boolean {
