@@ -5,6 +5,8 @@
 import fontkit from '@pdf-lib/fontkit'
 import {
   beginText,
+  concatTransformationMatrix,
+  drawObject,
   endText,
   PDFArray,
   PDFDocument,
@@ -14,6 +16,8 @@ import {
   PDFNumber,
   PDFOperator,
   PDFOperatorNames,
+  popGraphicsState,
+  pushGraphicsState,
   rgb,
   setCharacterSpacing,
   setFillingColor,
@@ -22,6 +26,7 @@ import {
 } from 'pdf-lib'
 import type { Paper } from '../domain/paper'
 import { faceBytes } from './fonts'
+import { advance, draw as drawn } from './images'
 import type { FaceName, Line } from './layout'
 import {
   COLUMN,
@@ -45,6 +50,10 @@ import {
   TITLE_PAGE_TOP,
 } from './page'
 
+import { fileOf, type Script, splitRuns } from './runs'
+
+const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+
 /** One sheet of paper. */
 export type Sheet =
   /** A title page: no running head and no number. */
@@ -62,10 +71,18 @@ export interface Printed {
 }
 
 interface Face {
+  /** The font file's name: a face in one group of scripts. */
+  file: string
   pdf: PDFFont
   metrics: fontkit.Font
   features: { liga: boolean } | undefined
 }
+
+/**
+ * A stretch of a fragment set in one font file, or drawn as an image. Each has the width it takes, in
+ * points, so the next starts where it ends.
+ */
+type Part = { kind: 'font'; face: Face; text: string; width: number } | { kind: 'image'; text: string; width: number }
 
 /**
  * Text with letter-spacing has no ligatures in a browser, and the title has some: the browser measured
@@ -92,16 +109,40 @@ export async function write({ sheets, ruled, paper, title, lang }: Printed): Pro
   doc.setCreationDate(now)
   doc.setModificationDate(now)
 
-  const faces = new Map<FaceName, Face>()
-  const face = async (name: FaceName): Promise<Face> => {
-    let known = faces.get(name)
+  const faces = new Map<string, Face>()
+  const face = async (name: FaceName, script: Script): Promise<Face> => {
+    const file = fileOf(name, script)
+    let known = faces.get(file)
     if (!known) {
-      const bytes = await faceBytes(name)
+      const bytes = await faceBytes(file)
       const features = NO_LIGATURES.includes(name) ? { liga: false } : undefined
-      known = { pdf: await doc.embedFont(bytes, { subset: true, features }), metrics: fontkit.create(bytes), features }
-      faces.set(name, known)
+      known = { file, pdf: await doc.embedFont(bytes, { subset: true, features }), metrics: fontkit.create(bytes), features }
+      faces.set(file, known)
     }
     return known
+  }
+
+  /** The text in the face as its parts: in each file that holds its characters, or an image where none does. */
+  const shape = async (name: FaceName, text: string, pt: number, tracking = 0): Promise<Part[]> => {
+    const parts: Part[] = []
+    for (const run of splitRuns(name, text)) {
+      if (run.script === 'image') {
+        parts.push({ kind: 'image', text: run.text, width: await advance(name, run.text, pt) })
+        continue
+      }
+      const f = await face(name, run.script)
+      parts.push({ kind: 'font', face: f, text: run.text, width: width(f, run.text, pt) + tracking * pt * [...run.text].length })
+    }
+    return parts
+  }
+  const total = (parts: Part[]): number => parts.reduce((sum, part) => sum + part.width, 0)
+
+  /** A running head too long for the column is shortened, a letter at a time, with an ellipsis. */
+  const fitted = async (name: FaceName, text: string, pt: number, room: number): Promise<Part[]> => {
+    const letters = [...graphemes.segment(text)].map((g) => g.segment)
+    let parts = await shape(name, text, pt)
+    for (let keep = letters.length - 1; total(parts) > room && keep > 0; keep--) parts = await shape(name, `${letters.slice(0, keep).join('').trimEnd()}…`, pt)
+    return parts
   }
 
   const size = PAPER[paper]
@@ -109,102 +150,119 @@ export async function write({ sheets, ruled, paper, title, lang }: Printed): Pro
   for (const sheet of sheets) {
     const page = doc.addPage([size.width, size.height])
     if (ruled) page.drawRectangle({ x: left - RULE_FROM_TEXT, y: 0, width: RULE_WIDTH, height: size.height, color: color(RULE) })
-    const keys = new Map<FaceName, PDFName>()
-    const draw = async (name: FaceName, text: string, pt: number, x: number, baselineFromTop: number, ink: string, tracking = 0): Promise<void> => {
-      const f = await face(name)
-      let key = keys.get(name)
-      if (!key) {
-        key = page.node.newFontDictionary(f.pdf.name, f.pdf.ref)
-        keys.set(name, key)
+    const keys = new Map<string, PDFName>()
+    const key = (id: string, make: () => PDFName): PDFName => {
+      const known = keys.get(id) ?? make()
+      keys.set(id, known)
+      return known
+    }
+    const draw = async (name: FaceName, parts: Part[], pt: number, x: number, baselineFromTop: number, ink: string, tracking = 0): Promise<void> => {
+      let pen = x
+      for (const part of parts) {
+        if (part.kind === 'font') {
+          const f = part.face
+          page.pushOperators(
+            beginText(),
+            setFillingColor(color(ink)),
+            setFontAndSize(
+              key(f.file, () => page.node.newFontDictionary(f.pdf.name, f.pdf.ref)),
+              pt,
+            ),
+            // Part of the graphics state, so set for every word: the title's letter-spacing must not carry on.
+            setCharacterSpacing(tracking * pt),
+            setTextMatrix(1, 0, 0, 1, pen, size.height - baselineFromTop),
+            glyphs(doc, f, part.text),
+            endText(),
+          )
+        } else {
+          const image = await drawn(doc, name, part.text, pt, ink)
+          page.pushOperators(
+            pushGraphicsState(),
+            concatTransformationMatrix(image.width, 0, 0, image.height, pen - image.left, size.height - baselineFromTop - image.below),
+            drawObject(key(`image ${image.ref.tag}`, () => page.node.newXObject('Char', image.ref))),
+            popGraphicsState(),
+          )
+        }
+        pen += part.width
       }
-      page.pushOperators(
-        beginText(),
-        setFillingColor(color(ink)),
-        setFontAndSize(key, pt),
-        // Part of the graphics state, so set for every word: the title's letter-spacing must not carry on.
-        setCharacterSpacing(tracking * pt),
-        setTextMatrix(1, 0, 0, 1, x, size.height - baselineFromTop),
-        glyphs(doc, f, text),
-        endText(),
-      )
     }
     if (sheet.kind === 'title') {
-      await titlePage(sheet, size, left, face, draw)
+      await titlePage(sheet, left, size.height, { face, shape, total, draw })
       continue
     }
     for (const line of sheet.lines) {
       for (const [i, fragment] of line.fragments.entries()) {
         const next = line.fragments[i + 1]
-        const f = await face(fragment.face)
-        // The browser sets a hyphen at a break it chose, but a hyphen is not in the text: the box it gave
-        // the word holds it, or is wider than the letters by about its width.
-        const letters = width(f, fragment.text, fragment.size) + fragment.tracking * fragment.size * [...fragment.text].length
-        const hyphen = fragment.continues && (fragment.hyphenBox || fragment.width - letters > 0.15 * fragment.size)
-        const text = fragment.text + (hyphen ? '-' : next?.spaced ? ' ' : '')
-        await draw(fragment.face, text, fragment.size, left + fragment.x, MARGIN_TOP + line.baseline + fragment.drop, INK, fragment.tracking)
+        let tail = next?.spaced ? ' ' : ''
+        if (fragment.continues) {
+          // The browser sets a hyphen at a break it chose, but a hyphen is not in the text: the box it gave
+          // the word holds it, or is wider than the letters by about its width. After a drawn character
+          // there is none (a word of Arabic or Japanese is not hyphenated).
+          const letters = await shape(fragment.face, fragment.text, fragment.size, fragment.tracking)
+          if (letters.at(-1)?.kind === 'font' && (fragment.hyphenBox || fragment.width - total(letters) > 0.15 * fragment.size)) tail = '-'
+        }
+        const parts = await shape(fragment.face, fragment.text + tail, fragment.size, fragment.tracking)
+        await draw(fragment.face, parts, fragment.size, left + fragment.x, MARGIN_TOP + line.baseline + fragment.drop, INK, fragment.tracking)
       }
     }
     if (sheet.head !== '') {
-      const f = await face('literata-italic-400')
-      const text = fitted(f, sheet.head, RUNNING_HEAD, COLUMN)
-      const y = RUNNING_HEAD_TOP + ascent(f, RUNNING_HEAD)
-      await draw('literata-italic-400', text, RUNNING_HEAD, (size.width - width(f, text, RUNNING_HEAD)) / 2, y, SECONDARY)
+      const parts = await fitted('literata-italic-400', sheet.head, RUNNING_HEAD, COLUMN)
+      const y = RUNNING_HEAD_TOP + ascent(await face('literata-italic-400', 'latin'), RUNNING_HEAD)
+      await draw('literata-italic-400', parts, RUNNING_HEAD, (size.width - total(parts)) / 2, y, SECONDARY)
     }
-    const f = await face('literata-360')
-    const number = String(sheet.number)
-    const y = size.height - PAGE_NUMBER_FROM_BOTTOM + ascent(f, PAGE_NUMBER)
-    const across = width(f, number, PAGE_NUMBER)
+    const y = size.height - PAGE_NUMBER_FROM_BOTTOM + ascent(await face('literata-360', 'latin'), PAGE_NUMBER)
+    const parts = await shape('literata-360', String(sheet.number), PAGE_NUMBER)
     // The rule holds the left of a journal's page and the number its right; elsewhere the number is centred.
-    await draw('literata-360', number, PAGE_NUMBER, ruled ? left + COLUMN - across : (size.width - across) / 2, y, SECONDARY)
+    await draw('literata-360', parts, PAGE_NUMBER, ruled ? left + COLUMN - total(parts) : (size.width - total(parts)) / 2, y, SECONDARY)
   }
   return doc.save()
 }
 
-type Draw = (name: FaceName, text: string, pt: number, x: number, baselineFromTop: number, ink: string, tracking?: number) => Promise<void>
+/** What a title page needs of the file being written: the faces, the parts a text is drawn in, and drawing them. */
+interface Tools {
+  face(name: FaceName, script: Script): Promise<Face>
+  shape(name: FaceName, text: string, pt: number, tracking?: number): Promise<Part[]>
+  total(parts: Part[]): number
+  draw(name: FaceName, parts: Part[], pt: number, x: number, baselineFromTop: number, ink: string, tracking?: number): Promise<void>
+}
 
 /** The title, and the subtitle in italic under it, each line centred on the column, in the upper third. */
-async function titlePage(
-  sheet: { title: string; subtitle: string },
-  size: { width: number; height: number },
-  left: number,
-  face: (name: FaceName) => Promise<Face>,
-  draw: Draw,
-): Promise<void> {
-  const tracking = -0.012
-  let top = size.height * TITLE_PAGE_TOP
-  const set = async (name: FaceName, text: string, pt: number, leading: number, spacing: number): Promise<void> => {
+async function titlePage(sheet: { title: string; subtitle: string }, left: number, height: number, tools: Tools): Promise<void> {
+  let top = height * TITLE_PAGE_TOP
+  const set = async (name: FaceName, text: string, pt: number, leading: number, tracking: number): Promise<void> => {
     if (text === '') return
-    const f = await face(name)
-    const across = (line: string): number => width(f, line, pt) + spacing * pt * [...line].length
+    const metrics = (await tools.face(name, 'latin')).metrics
+    const across = async (line: string): Promise<number> => tools.total(await tools.shape(name, line, pt, tracking))
     // The line box is `leading` tall and the text sits in its middle, as a browser sets it.
-    const above = (leading - ((f.metrics.ascent - f.metrics.descent) / f.metrics.unitsPerEm) * pt) / 2 + ascent(f, pt)
-    for (const line of wrapped(text, across, COLUMN)) {
-      await draw(name, line, pt, left + (COLUMN - across(line)) / 2, top + above, INK, spacing)
+    const above = (leading - ((metrics.ascent - metrics.descent) / metrics.unitsPerEm) * pt) / 2 + (metrics.ascent / metrics.unitsPerEm) * pt
+    for (const line of await wrapped(text, across, COLUMN)) {
+      const parts = await tools.shape(name, line, pt, tracking)
+      await tools.draw(name, parts, pt, left + (COLUMN - tools.total(parts)) / 2, top + above, INK, tracking)
       top += leading
     }
     top += TITLE_PAGE_GAP
   }
-  await set('literata-300-title', sheet.title, TITLE_PAGE_TITLE, TITLE_PAGE_TITLE * TITLE_PAGE_TITLE_LEADING, tracking)
+  await set('literata-300-title', sheet.title, TITLE_PAGE_TITLE, TITLE_PAGE_TITLE * TITLE_PAGE_TITLE_LEADING, -0.012)
   await set('literata-italic-400', sheet.subtitle, TITLE_PAGE_SUBTITLE, TITLE_PAGE_SUBTITLE * TITLE_PAGE_SUBTITLE_LEADING, 0)
 }
 
-/** Text broken into lines that fit a room, at its spaces; a word wider than the room is broken where it must be. */
-function wrapped(text: string, across: (line: string) => number, room: number): string[] {
+/** Text broken into lines that fit a room, at its spaces; a word wider than the room is broken between its letters. */
+async function wrapped(text: string, across: (line: string) => Promise<number>, room: number): Promise<string[]> {
   const lines: string[] = []
   let line = ''
   for (const word of text.split(/\s+/).filter(Boolean)) {
-    if (line !== '' && across(`${line} ${word}`) <= room) {
+    if (line !== '' && (await across(`${line} ${word}`)) <= room) {
       line = `${line} ${word}`
       continue
     }
     if (line !== '') lines.push(line)
     line = ''
-    for (const letter of word) {
-      if (line !== '' && across(line + letter) > room) {
+    for (const { segment } of graphemes.segment(word)) {
+      if (line !== '' && (await across(line + segment)) > room) {
         lines.push(line)
         line = ''
       }
-      line += letter
+      line += segment
     }
   }
   if (line !== '') lines.push(line)
@@ -222,13 +280,6 @@ function normal(text: string): string {
 function width(f: Face, text: string, pt: number): number {
   const run = f.metrics.layout(normal(text), f.features)
   return (run.positions.reduce((sum, p) => sum + p.xAdvance, 0) / f.metrics.unitsPerEm) * pt
-}
-
-/** A running head too long for the column is shortened, with an ellipsis. */
-function fitted(f: Face, text: string, pt: number, room: number): string {
-  let shown = text
-  while (shown.length > 1 && width(f, shown, pt) > room) shown = `${shown.slice(0, -2).trimEnd()}…`
-  return shown
 }
 
 /**

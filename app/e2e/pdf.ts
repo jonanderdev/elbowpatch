@@ -1,6 +1,7 @@
 // Reads a downloaded PDF back, for tests. pdf.js is a development dependency only: nothing of it is in the app.
 
 import type { Download } from '@playwright/test'
+import { PDFDict, PDFDocument, PDFName } from 'pdf-lib'
 import { getDocument, OPS } from 'pdfjs-dist/legacy/build/pdf.mjs'
 
 /** A piece of text as the file draws it: one word, with the font it is set in (the same id for the same font in the file). */
@@ -76,10 +77,36 @@ export interface ReadPage {
   runs: Run[]
   /** What was drawn, as pdf.js reports it: the same for the same pages. */
   operators: string
+  /** Each image the page draws, as the box it fills: the characters no font holds are images. */
+  images: { x: number; y: number; width: number; height: number }[]
+}
+
+/** The boxes the images fill: the matrix in force when each is painted, applied to the unit square. */
+function imagesOf(list: { fnArray: number[]; argsArray: unknown[] }): ReadPage['images'] {
+  type Matrix = [number, number, number, number, number, number]
+  const times = (m: Matrix, n: Matrix): Matrix => [
+    n[0] * m[0] + n[1] * m[2],
+    n[0] * m[1] + n[1] * m[3],
+    n[2] * m[0] + n[3] * m[2],
+    n[2] * m[1] + n[3] * m[3],
+    n[4] * m[0] + n[5] * m[2] + m[4],
+    n[4] * m[1] + n[5] * m[3] + m[5],
+  ]
+  let current: Matrix = [1, 0, 0, 1, 0, 0]
+  const stack: Matrix[] = []
+  const found: ReadPage['images'] = []
+  list.fnArray.forEach((fn, i) => {
+    if (fn === OPS.save) stack.push(current)
+    else if (fn === OPS.restore) current = stack.pop() ?? current
+    else if (fn === OPS.transform) current = times(current, list.argsArray[i] as Matrix)
+    else if (fn === OPS.paintImageXObject || fn === OPS.paintInlineImageXObject || fn === OPS.paintImageMaskXObject)
+      found.push({ x: current[4], y: current[5], width: current[0], height: current[3] })
+  })
+  return found
 }
 
 /** The text of a PDF, one string per visual line and per page, and the size of its pages. */
-export async function readPdf(file: Download): Promise<{ count: number; pages: ReadPage[] }> {
+export async function readPdf(file: Download): Promise<{ count: number; pages: ReadPage[]; fonts: string[] }> {
   const chunks: Uint8Array[] = []
   const stream = (await file.createReadStream()) as unknown as AsyncIterable<Uint8Array>
   for await (const chunk of stream) chunks.push(chunk)
@@ -89,6 +116,7 @@ export async function readPdf(file: Download): Promise<{ count: number; pages: R
     data.set(chunk, at)
     at += chunk.length
   }
+  const fonts = await fontsOf(data)
   const task = getDocument({ data, useSystemFonts: false })
   const doc = await task.promise
   const pages: ReadPage[] = []
@@ -133,8 +161,21 @@ export async function readPdf(file: Download): Promise<{ count: number; pages: R
       text,
       runs,
       operators: JSON.stringify([drawn, items]).replace(/g_d\d+_/g, 'g_'),
+      images: imagesOf(list),
     })
   }
   await task.destroy()
-  return { count: pages.length, pages }
+  return { count: pages.length, pages, fonts }
+}
+
+/** The names of the fonts embedded in the file, read from the file itself. */
+async function fontsOf(data: Uint8Array): Promise<string[]> {
+  const doc = await PDFDocument.load(data.slice())
+  const names: string[] = []
+  for (const [, object] of doc.context.enumerateIndirectObjects()) {
+    if (!(object instanceof PDFDict)) continue
+    const name = object.get(PDFName.of('BaseFont'))
+    if (name instanceof PDFName && object.get(PDFName.of('Subtype'))?.toString() === '/Type0') names.push(name.decodeText())
+  }
+  return names
 }
