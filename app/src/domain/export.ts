@@ -1,6 +1,6 @@
 import type { Piece } from './model'
 import type { OpenSection } from './pieces'
-import { dayTitle } from './words'
+import { dayTitle, oneLine } from './words'
 
 /**
  * One piece as one `.md` file, with no history (docs/decisions/0007): an
@@ -31,6 +31,6 @@ export function fileName(title: string, extension: 'md' | 'pdf'): string {
 
 /** The subtitle as one italic line, with what would end it early escaped; nothing when there is none. */
 function subtitleLine(subtitle: string | undefined): string {
-  const text = (subtitle ?? '').replace(/\s+/g, ' ').trim()
+  const text = oneLine(subtitle)
   return text === '' ? '' : `*${text.replace(/[\\*_]/g, '\\$&')}*`
 }

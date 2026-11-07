@@ -1,6 +1,6 @@
 import type { Piece } from './model'
 import type { OpenSection } from './pieces'
-import { dayTitle } from './words'
+import { dayTitle, oneLine } from './words'
 
 /** What goes on the printed pages, in order, before any of it is laid out (DESIGN.md, Export). */
 export type PrintItem =
@@ -38,9 +38,4 @@ export function printOrder(piece: Piece, sections: OpenSection[]): PrintItem[] {
         ...sections.map((s): PrintItem => ({ kind: 'section', heading: s.title.trim() || 'Untitled', content: s.content })),
       ]
   }
-}
-
-/** A subtitle is one line, whatever the writer typed into it. */
-function oneLine(text: string | undefined): string {
-  return (text ?? '').replace(/\s+/g, ' ').trim()
 }
