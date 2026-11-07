@@ -1,7 +1,7 @@
 import { expect, type Page, test } from '@playwright/test'
 import { PDFDocument } from 'pdf-lib'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
-import { openTools } from './helpers'
+import { openTools, saved } from './helpers'
 
 // A very long journal (docs/decisions/0019): about 1,000 printed pages must finish, the app must keep answering
 // while it works, and the writer's place and text must be as they were. It takes minutes, so it is tagged @long and
@@ -89,7 +89,7 @@ async function openJournal(page: Page, title: string, all: Record<string, string
 const stored = (page: Page) =>
   page.evaluate(
     () =>
-      new Promise<string>((done) => {
+      new Promise<Record<string, string>>((done) => {
         const open = indexedDB.open('elbowpatch')
         open.onsuccess = () => {
           const db = open.result
@@ -102,13 +102,17 @@ const stored = (page: Page) =>
               out[name] = JSON.stringify(all.result)
               if (--left === 0) {
                 db.close()
-                done(JSON.stringify(out))
+                done(out)
               }
             }
           }
         }
       }),
   )
+
+/** The stores that differ between two looks at what is kept (their contents are too long to show). */
+const changed = (before: Record<string, string>, after: Record<string, string>): string[] =>
+  [...new Set([...Object.keys(before), ...Object.keys(after)])].filter((name) => before[name] !== after[name])
 
 /** Where the writer is and what is open: the address, the text, the caret and the scroll. */
 const place = (page: Page) =>
@@ -124,14 +128,31 @@ const place = (page: Page) =>
     }
   })
 
+interface Beat {
+  longest: number
+  worked: boolean
+  dropped: number
+  frames: number
+  gaps: number[]
+  /** The longest task the browser itself reports, where it reports them (Chromium). */
+  task: number
+}
+
 /**
  * Starts a heartbeat that notes when the page last drew a frame and what the PDF row said each time: the
  * longest wait between frames, and whether the row ever stopped saying it was working before the sheet closed.
  */
 async function beat(page: Page): Promise<void> {
   await page.evaluate(() => {
-    const w = window as unknown as { __beat: { longest: number; worked: boolean; dropped: number; frames: number; gaps: number[] } }
-    const state = { longest: 0, worked: false, dropped: 0, frames: 0, gaps: [] as number[] }
+    const w = window as unknown as { __beat: Beat }
+    const state: Beat = { longest: 0, worked: false, dropped: 0, frames: 0, gaps: [], task: 0 }
+    try {
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) state.task = Math.max(state.task, entry.duration)
+      }).observe({ type: 'longtask', buffered: false })
+    } catch {
+      // Not every browser reports long tasks: the frames say the same.
+    }
     w.__beat = state
     let last = performance.now()
     const tick = (): void => {
@@ -169,13 +190,18 @@ async function textOf(bytes: Uint8Array, n: number): Promise<string> {
   return text
 }
 
-/** Makes the PDF from the open sheet and reports how long it took and how the page behaved meanwhile. */
-async function make(page: Page, browserName: string, label: string) {
+/** Opens the export sheet. Leaving the page for the sheet may let the page tidy up after itself: that is not the PDF's doing, so it is given time to. */
+async function openSheet(page: Page): Promise<void> {
   const exportButton = page.getByRole('button', { name: 'Export' }).filter({ visible: true })
   await expect(exportButton.or(page.locator('.page-button')).first()).toBeVisible()
   await openTools(page)
   await exportButton.first().click()
   await expect(page.getByRole('dialog', { name: 'Export' })).toBeVisible()
+  await page.waitForTimeout(1500)
+}
+
+/** Makes the PDF from the open sheet and reports how long it took and how the page behaved meanwhile. */
+async function make(page: Page, browserName: string, label: string) {
   await beat(page)
   const download = page.waitForEvent('download', { timeout: 540_000 })
   const failed = page.getByRole('dialog', { name: 'Export' }).getByText('Couldn’t make the PDF just now. Nothing has changed; try again.')
@@ -191,11 +217,9 @@ async function make(page: Page, browserName: string, label: string) {
       .catch(never),
   ])
   const seconds = (Date.now() - started) / 1000
-  const heart = await page.evaluate(
-    () => (window as unknown as { __beat: { longest: number; worked: boolean; dropped: number; frames: number; gaps: number[] } }).__beat,
-  )
+  const heart = await page.evaluate(() => (window as unknown as { __beat: Beat }).__beat)
   console.log(
-    `[long] ${browserName} ${label}: ${outcome.file ? 'finished' : 'failed with the plain line'} in ${seconds.toFixed(1)} s; longest wait between frames ${Math.round(heart.longest)} ms over ${heart.frames} frames; waits over 100 ms: ${heart.gaps.length}`,
+    `[long] ${browserName} ${label}: ${outcome.file ? 'finished' : 'failed with the plain line'} in ${seconds.toFixed(1)} s; longest wait between frames ${Math.round(heart.longest)} ms, longest task reported ${Math.round(heart.task)} ms, over ${heart.frames} frames; waits over 100 ms: ${heart.gaps.length}`,
   )
   return { file: outcome.file, seconds, heart }
 }
@@ -220,6 +244,8 @@ test.describe('a journal of about a thousand printed pages @long', () => {
     // Words on today's page too, so there is open text and a caret in it.
     await page.locator('.body').click()
     await page.keyboard.insertText('Typed a moment ago, not yet saved.')
+    await saved(page, 'Typed a moment ago')
+    await openSheet(page)
     const before = await place(page)
     const kept = await stored(page)
 
@@ -243,7 +269,7 @@ test.describe('a journal of about a thousand printed pages @long', () => {
     await expect(page.getByRole('dialog', { name: 'Export' })).toBeHidden()
     // As it was: the place, the text and the caret, and nothing written.
     expect(await place(page)).toEqual(before)
-    expect(await stored(page)).toBe(kept)
+    expect(changed(kept, await stored(page)), 'stores that changed').toEqual([])
   })
 })
 
@@ -255,6 +281,7 @@ test.describe('the same piece on a phone @long', () => {
     // A phone is slower than this laptop: Chromium is told so.
     if (browserName === 'chromium') await (await page.context().newCDPSession(page)).send('Emulation.setCPUThrottlingRate', { rate: 4 })
     await openJournal(page, 'Dream journal', days())
+    await openSheet(page)
     const before = await place(page)
     const kept = await stored(page)
 
@@ -268,6 +295,6 @@ test.describe('the same piece on a phone @long', () => {
     }
     expect(heart.dropped).toBe(0)
     expect(await place(page)).toEqual(before)
-    expect(await stored(page)).toBe(kept)
+    expect(changed(kept, await stored(page)), 'stores that changed').toEqual([])
   })
 })
