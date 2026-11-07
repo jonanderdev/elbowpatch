@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-import { saved } from './helpers'
+import { saved, write } from './helpers'
 
 // Turning from one chapter to the next (#58): the book reads straight through.
 
@@ -362,4 +362,27 @@ test('turning back from a new chapter left empty leaves nothing behind; turned o
   await expect(title(page)).toHaveText('Two')
   await page.keyboard.press('PageDown')
   await expect(title(page)).toHaveText('Three')
+})
+
+// A browser scrolls to show what takes the focus, and can land a pixel short of the page (WebKit, on an
+// iPhone's 402px screen): the words would stand a pixel off until the next save settled them.
+test.describe('the page settles when a title takes the focus', () => {
+  test.use({ viewport: { width: 402, height: 874 }, deviceScaleFactor: 3 })
+
+  test('the first chapter stands exactly on its page', async ({ page }) => {
+    await page.goto('./#/')
+    await write(page, 'Book')
+    await page.locator('.book-title').click()
+    await page.keyboard.press('Enter')
+    await page.keyboard.press('Enter')
+    await expect(page.locator('.title')).toBeFocused()
+    const scrolled = () => page.locator('.pager').evaluate((el) => el.scrollLeft)
+    await expect.poll(scrolled).toBe(402)
+
+    // However far short the browser lands, with the caret in the title.
+    await page.locator('.pager').evaluate((el) => {
+      el.scrollLeft = 401
+    })
+    await expect.poll(scrolled).toBe(402)
+  })
 })

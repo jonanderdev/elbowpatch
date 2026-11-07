@@ -88,8 +88,12 @@ export function useCaretFollowing(
     const onPointer = (): void => {
       memory.lastMove = -1
     }
-    // The browser scrolled the pager by itself to show the caret: settle on the caret's page.
-    pager.onDrift = () => followCaret(editor.view, pager, flowEl)
+    // The browser scrolled the pager by itself to show the caret: settle on the caret's page. With the
+    // caret in a title, or none, the text's caret says nothing: settle on the page it reached.
+    pager.onDrift = () => {
+      if (editor.view.hasFocus()) followCaret(editor.view, pager, flowEl)
+      else pager.settle()
+    }
     document.addEventListener('selectionchange', follow)
     mountEl.addEventListener('mousedown', onPointer)
     return () => {

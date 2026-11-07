@@ -157,7 +157,7 @@ export class Pager {
     viewport.addEventListener('scroll', () => {
       if (viewport.scrollLeft === this.page * this.g.stride) return
       if (this.onDrift) this.onDrift()
-      else this.turnTo(Math.round(viewport.scrollLeft / this.g.stride))
+      else this.settle()
     })
   }
 
@@ -196,6 +196,11 @@ export class Pager {
   private size(count: number): void {
     this.columns.style.columnCount = String(count)
     this.columns.style.width = `${count * this.g.stride - (this.g.stride - this.g.measure)}px`
+  }
+
+  /** Back onto the whole page nearest to where the browser scrolled. */
+  settle(): void {
+    this.turnTo(Math.round(this.viewport.scrollLeft / this.g.stride))
   }
 
   turnTo(page: number): void {
