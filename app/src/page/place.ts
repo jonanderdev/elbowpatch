@@ -8,9 +8,9 @@ import type { EditorView } from 'prosemirror-view'
 import type { Place, Screen } from '../domain/model'
 
 /** Where the writer is: the caret if writing, else the first line on screen. */
-export function placeOf(view: EditorView, sectionId: string, page: number, screen: Screen, viewport: HTMLElement | null): Place | undefined {
+export function placeOf(view: EditorView, sectionId: string, page: number, screen: Screen, viewport: HTMLElement | null, writing: boolean): Place | undefined {
   let pos = view.state.selection.head
-  if (!view.hasFocus() && viewport) {
+  if (!writing && viewport) {
     const r = viewport.getBoundingClientRect()
     pos = view.posAtCoords({ left: r.left + 2, top: r.top + 2 })?.pos ?? pos
   }
@@ -25,7 +25,7 @@ export function placeOf(view: EditorView, sectionId: string, page: number, scree
     snippet: node.textContent.slice(0, 160),
     page: page + 1,
     screen,
-    caret: view.hasFocus(),
+    caret: writing,
     at: Date.now(),
   }
 }

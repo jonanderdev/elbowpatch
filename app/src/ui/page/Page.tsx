@@ -240,7 +240,10 @@ export function Page({
     readOnly,
     place: () => {
       const e = editorNow.current
-      const place = moved.current && e && pager ? placeOf(e.view, sectionId, pager.page, phone ? 'phone' : 'desktop', viewport.current) : undefined
+      const place =
+        moved.current && e && pager
+          ? placeOf(e.view, sectionId, pager.page, phone ? 'phone' : 'desktop', viewport.current, e.view.hasFocus() || focus.writingBehind.current)
+          : undefined
       // Once kept, it stays until they move again: a later save, as the page closes behind the
       // library, would read a page no longer laid out as they left it.
       moved.current = false
@@ -281,6 +284,8 @@ export function Page({
       setWriting(focused)
       const e = editorNow.current
       setSelection(focused && e ? { rect: selectionBox(e.view, viewport.current), active: e.active() } : null)
+      // The library took the focus, not the writer: they were writing, and the place kept says so.
+      if (!focused && screen.current?.inert) focus.writingBehind.current = true
       if (!focused) void saving?.flush()
     },
     onChapterLine: (at) => chapter.line(at),
@@ -375,9 +380,9 @@ export function Page({
     }
   }, [saving, pager, editor])
 
-  // Writing here or not changed (another window took the piece, or Write here): the editor asks
-  // `editable` again at once.
-  useEffect(() => {
+  // Writing here or not changed (the lock arrived, another window took the piece, or Write here): the
+  // editor asks `editable` again at once, and before any effect, for it takes no focus until it knows.
+  useLayoutEffect(() => {
     editor?.view.setProps({ editable: () => !readOnly })
   }, [editor, readOnly])
 

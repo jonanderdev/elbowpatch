@@ -116,3 +116,40 @@ test('on desktop Escape goes back one place: an area to Settings, Settings to th
   await page.keyboard.press('Escape')
   await expect(page.getByRole('navigation', { name: 'Library' })).toBeVisible()
 })
+
+test.describe('the caret comes back to a piece left while writing', () => {
+  test.skip(({ hasTouch }) => hasTouch, 'on a phone the caret waits for a tap')
+
+  test('opened from the library, once another piece has been open', async ({ page }) => {
+    await essay(page, 'First draft', 'One.')
+    await essay(page, 'Second draft', 'Two.')
+    await page.locator('.row', { hasText: 'First draft' }).click()
+    await expect(page.locator('.body')).toBeFocused()
+    await page.keyboard.type('X')
+    await expect(page.locator('.body')).toContainText('One.X')
+  })
+
+  test('left with the Back button, and Continued', async ({ page }) => {
+    await essay(page, 'First draft', 'One.')
+    await page.locator('.continue').click()
+    await expect(page.locator('.body')).toBeFocused()
+    await page.goBack()
+    await page.locator('.continue').click()
+    await expect(page.locator('.body')).toBeFocused()
+  })
+
+  test('left with the Back button, and opened again after a reload', async ({ page }) => {
+    await essay(page, 'First draft', 'One.')
+    await page.locator('.continue').click()
+    await expect(page.locator('.body')).toBeFocused()
+    await page.keyboard.type(' Two.')
+    await page.goBack()
+    // Continue's words are the place's, stored after the text.
+    await expect(page.locator('.continue')).toContainText('One. Two.')
+    await page.reload()
+    await page.locator('.continue').click()
+    await expect(page.locator('.body')).toBeFocused()
+    await page.keyboard.type('X')
+    await expect(page.locator('.body')).toContainText('One. Two.X')
+  })
+})

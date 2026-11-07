@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { type RefObject, useEffect, useRef } from 'react'
 import type { Editor } from '../../page/editor'
 import { caretToFieldEnd, type Opened, type TitleRefs } from './fields'
 import type { Saving } from './saving'
@@ -46,11 +46,15 @@ interface Options {
  * On a phone the caret waits for a tap, so the keyboard does not cover the page unasked.
  *
  * Going to the library keeps a moment. Returns `leaving()`, for the Library button to call first:
- * it remembers whether the writer was writing, since the library takes the focus away.
+ * it remembers whether the writer was writing, since the library takes the focus away. And `writingBehind`,
+ * for the page to set when the library takes it however it was reached (the Back button): they were writing.
  */
-export function useFocusOnOpen({ opened, editor, saving, titles, covered, readOnly, titlePage, titleEditable, noCaret }: Options): { leaving(): void } {
+export function useFocusOnOpen({ opened, editor, saving, titles, covered, readOnly, titlePage, titleEditable, noCaret }: Options): {
+  leaving(): void
+  writingBehind: RefObject<boolean>
+} {
   const firstCover = useRef(true)
-  const writingWhenCovered = useRef(false)
+  const writingBehind = useRef(false)
   // The caret was placed for this opening (the page is remounted per section, so once per mount).
   const placed = useRef(false)
 
@@ -74,8 +78,8 @@ export function useFocusOnOpen({ opened, editor, saving, titles, covered, readOn
       return
     }
     if (readOnly) return
-    if (writingWhenCovered.current) {
-      writingWhenCovered.current = false
+    if (writingBehind.current) {
+      writingBehind.current = false
       if (desktop) editor.focus()
       return
     }
@@ -101,7 +105,8 @@ export function useFocusOnOpen({ opened, editor, saving, titles, covered, readOn
 
   return {
     leaving() {
-      writingWhenCovered.current = !!editor?.view.hasFocus()
+      writingBehind.current = !!editor?.view.hasFocus()
     },
+    writingBehind,
   }
 }
