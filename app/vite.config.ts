@@ -63,6 +63,15 @@ const config: UserConfig = defineConfig({
         // The PDF code is fetched when the first PDF is made, not installed (docs/decisions/0019).
         globIgnores: ['**/og-image.png', '**/assets/pdf-*.js', '**/assets/makePdf-*.js'],
         navigateFallback: 'index.html',
+        // The first PDF fetches its code and fixed fonts and keeps them, so later ones need no network. Their names carry a
+        // hash, so a kept file is never stale; a new version asks for new names, and the oldest are let go.
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => /\/assets\/((pdf|makePdf)-[^/]*\.js|[^/]*\.ttf)$/.test(url.pathname),
+            handler: 'CacheFirst',
+            options: { cacheName: 'pdf', cacheableResponse: { statuses: [200] }, expiration: { maxEntries: 40 } },
+          },
+        ],
       },
     }),
   ],
@@ -70,7 +79,11 @@ const config: UserConfig = defineConfig({
     rolldownOptions: {
       output: {
         // One chunk with a name of its own for the PDF code and the libraries it uses, so the install can leave it out by name.
-        advancedChunks: { groups: [{ name: 'pdf', test: /node_modules[\\/](pdf-lib|@pdf-lib|pako)[\\/]|src[\\/]pdf[\\/][a-z]+\.ts$/ }] },
+        // Only the modules named here go in it: what the rest of the app shares with it stays in the main chunk, which must
+        // never need this one to open (a chunk left out of the install would stop the app opening offline).
+        advancedChunks: {
+          groups: [{ name: 'pdf', includeDependenciesRecursively: false, test: /node_modules[\\/](pdf-lib|@pdf-lib|pako|tslib)[\\/]|src[\\/]pdf[\\/]/ }],
+        },
       },
     },
   },
