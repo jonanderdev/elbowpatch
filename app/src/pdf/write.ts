@@ -61,8 +61,8 @@ import { fileOf, type Script, splitRuns } from './runs'
 
 const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
 
-/** One sheet of paper. */
-export type Sheet =
+/** One page of the PDF, as it is printed (not the UI's bottom sheet). */
+export type PrintedPage =
   /** A title page: no running head and no number. */
   | { kind: 'title'; title: string; subtitle: string }
   /** A book's contents: no running head and no number, and as many sheets as its rows need. Each row is a chapter's title and the page it starts on. */
@@ -71,7 +71,7 @@ export type Sheet =
   | { kind: 'text'; lines: Line[]; head: string; number: number }
 
 export interface Printed {
-  sheets: Sheet[]
+  sheets: PrintedPage[]
   /** A journal's look: a margin rule on every sheet, and the number flush with the text's right edge instead of centred. */
   ruled: boolean
   paper: Paper
@@ -243,7 +243,7 @@ export async function write({ sheets, ruled, paper, title, lang }: Printed): Pro
 }
 
 /** A sheet as it is drawn: a contents sheet is one sheet of a book's contents, its rows already broken into lines. */
-type Leaf = Exclude<Sheet, { kind: 'contents' }> | ContentsLeaf
+type Leaf = Exclude<PrintedPage, { kind: 'contents' }> | ContentsLeaf
 
 interface ContentsLeaf {
   kind: 'contents'
