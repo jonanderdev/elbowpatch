@@ -15,9 +15,59 @@ export interface Run {
   y: number
 }
 
+/** A filled rectangle, such as the journal's margin rule, in points up from the page's foot. */
+export interface Rect {
+  x: number
+  y: number
+  width: number
+  height: number
+  color: string
+}
+
+type Matrix = [number, number, number, number, number, number]
+
+/** `a` after `b`, as a `cm` operator composes. */
+const compose = (a: Matrix, b: Matrix): Matrix => [
+  a[0] * b[0] + a[1] * b[2],
+  a[0] * b[1] + a[1] * b[3],
+  a[2] * b[0] + a[3] * b[2],
+  a[2] * b[1] + a[3] * b[3],
+  a[4] * b[0] + a[5] * b[2] + b[4],
+  a[4] * b[1] + a[5] * b[3] + b[5],
+]
+
+/** The rectangles a page fills, from its operators: the colour, the transform in force, and the path's bounds. */
+function filledRects(list: { fnArray: number[]; argsArray: unknown[] }): Rect[] {
+  const rects: Rect[] = []
+  const saved: Matrix[] = []
+  let matrix: Matrix = [1, 0, 0, 1, 0, 0]
+  let color = '#000000'
+  list.fnArray.forEach((fn, i) => {
+    const args = list.argsArray[i] as unknown[]
+    if (fn === OPS.save) saved.push(matrix)
+    else if (fn === OPS.restore) matrix = saved.pop() ?? matrix
+    else if (fn === OPS.transform) matrix = compose(args as unknown as Matrix, matrix)
+    else if (fn === OPS.setFillRGBColor) color = args[0] as string
+    else if (fn === OPS.constructPath && args[0] === OPS.fill) {
+      const [x0, y0, x1, y1] = args[2] as number[]
+      const [a, , , d, e, f] = matrix
+      rects.push({
+        x: e + a * (x0 as number),
+        y: f + d * (y0 as number),
+        width: a * ((x1 as number) - (x0 as number)),
+        height: d * ((y1 as number) - (y0 as number)),
+        color,
+      })
+    }
+  })
+  return rects
+}
+
 export interface ReadPage {
   width: number
   height: number
+  /** The rectangles the page fills, such as a margin rule. */
+  rects: Rect[]
   /** One string per visual line, top to bottom. */
   lines: string[]
   /** Every piece of text as it stands in the file, in order: what searching reads. */
@@ -75,7 +125,15 @@ export async function readPdf(file: Download): Promise<{ count: number; pages: R
         width: item.width,
         y: item.transform[5] as number,
       }))
-    pages.push({ width: width as number, height: height as number, lines, text, runs, operators: JSON.stringify([drawn, items]).replace(/g_d\d+_/g, 'g_') })
+    pages.push({
+      width: width as number,
+      height: height as number,
+      rects: filledRects(list),
+      lines,
+      text,
+      runs,
+      operators: JSON.stringify([drawn, items]).replace(/g_d\d+_/g, 'g_'),
+    })
   }
   await task.destroy()
   return { count: pages.length, pages }

@@ -23,13 +23,39 @@ import {
 import type { Paper } from '../domain/paper'
 import { faceBytes } from './fonts'
 import type { FaceName, Line } from './layout'
-import { COLUMN, columnLeft, INK, MARGIN_TOP, PAGE_NUMBER, PAGE_NUMBER_FROM_BOTTOM, PAPER, RUNNING_HEAD, RUNNING_HEAD_TOP, SECONDARY } from './page'
+import {
+  COLUMN,
+  columnLeft,
+  INK,
+  MARGIN_TOP,
+  PAGE_NUMBER,
+  PAGE_NUMBER_FROM_BOTTOM,
+  PAPER,
+  RULE,
+  RULE_FROM_TEXT,
+  RULE_WIDTH,
+  RUNNING_HEAD,
+  RUNNING_HEAD_TOP,
+  SECONDARY,
+  TITLE_PAGE_GAP,
+  TITLE_PAGE_SUBTITLE,
+  TITLE_PAGE_SUBTITLE_LEADING,
+  TITLE_PAGE_TITLE,
+  TITLE_PAGE_TITLE_LEADING,
+  TITLE_PAGE_TOP,
+} from './page'
+
+/** One sheet of paper. */
+export type Sheet =
+  /** A title page: no running head and no number. */
+  | { kind: 'title'; title: string; subtitle: string }
+  /** Text already set into lines, with its running head ('' for none) and the number it is printed with. */
+  | { kind: 'text'; lines: Line[]; head: string; number: number }
 
 export interface Printed {
-  /** One list of lines for each page, from the first. */
-  pages: Line[][]
-  /** The running head, from the second page on. */
-  head: string
+  sheets: Sheet[]
+  /** A journal's look: a margin rule on every sheet, and the number flush with the text's right edge instead of centred. */
+  ruled: boolean
   paper: Paper
   title: string
   lang: string
@@ -55,7 +81,7 @@ function color(hex: string) {
   return rgb((n >> 16) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255)
 }
 
-export async function write({ pages, head, paper, title, lang }: Printed): Promise<Uint8Array> {
+export async function write({ sheets, ruled, paper, title, lang }: Printed): Promise<Uint8Array> {
   const doc = await PDFDocument.create({ updateMetadata: false })
   doc.registerFontkit(fontkit)
   doc.setTitle(title, { showInWindowTitleBar: true })
@@ -80,8 +106,9 @@ export async function write({ pages, head, paper, title, lang }: Printed): Promi
 
   const size = PAPER[paper]
   const left = columnLeft(paper)
-  for (const [index, lines] of pages.entries()) {
+  for (const sheet of sheets) {
     const page = doc.addPage([size.width, size.height])
+    if (ruled) page.drawRectangle({ x: left - RULE_FROM_TEXT, y: 0, width: RULE_WIDTH, height: size.height, color: color(RULE) })
     const keys = new Map<FaceName, PDFName>()
     const draw = async (name: FaceName, text: string, pt: number, x: number, baselineFromTop: number, ink: string, tracking = 0): Promise<void> => {
       const f = await face(name)
@@ -101,7 +128,11 @@ export async function write({ pages, head, paper, title, lang }: Printed): Promi
         endText(),
       )
     }
-    for (const line of lines) {
+    if (sheet.kind === 'title') {
+      await titlePage(sheet, size, left, face, draw)
+      continue
+    }
+    for (const line of sheet.lines) {
       for (const [i, fragment] of line.fragments.entries()) {
         const next = line.fragments[i + 1]
         const f = await face(fragment.face)
@@ -113,18 +144,71 @@ export async function write({ pages, head, paper, title, lang }: Printed): Promi
         await draw(fragment.face, text, fragment.size, left + fragment.x, MARGIN_TOP + line.baseline + fragment.drop, INK, fragment.tracking)
       }
     }
-    if (index > 0 && head !== '') {
+    if (sheet.head !== '') {
       const f = await face('literata-italic-400')
-      const text = fitted(f, head, RUNNING_HEAD, COLUMN)
+      const text = fitted(f, sheet.head, RUNNING_HEAD, COLUMN)
       const y = RUNNING_HEAD_TOP + ascent(f, RUNNING_HEAD)
       await draw('literata-italic-400', text, RUNNING_HEAD, (size.width - width(f, text, RUNNING_HEAD)) / 2, y, SECONDARY)
     }
     const f = await face('literata-360')
-    const number = String(index + 1)
+    const number = String(sheet.number)
     const y = size.height - PAGE_NUMBER_FROM_BOTTOM + ascent(f, PAGE_NUMBER)
-    await draw('literata-360', number, PAGE_NUMBER, (size.width - width(f, number, PAGE_NUMBER)) / 2, y, SECONDARY)
+    const across = width(f, number, PAGE_NUMBER)
+    // The rule holds the left of a journal's page and the number its right; elsewhere the number is centred.
+    await draw('literata-360', number, PAGE_NUMBER, ruled ? left + COLUMN - across : (size.width - across) / 2, y, SECONDARY)
   }
   return doc.save()
+}
+
+type Draw = (name: FaceName, text: string, pt: number, x: number, baselineFromTop: number, ink: string, tracking?: number) => Promise<void>
+
+/** The title, and the subtitle in italic under it, each line centred on the column, in the upper third. */
+async function titlePage(
+  sheet: { title: string; subtitle: string },
+  size: { width: number; height: number },
+  left: number,
+  face: (name: FaceName) => Promise<Face>,
+  draw: Draw,
+): Promise<void> {
+  const tracking = -0.012
+  let top = size.height * TITLE_PAGE_TOP
+  const set = async (name: FaceName, text: string, pt: number, leading: number, spacing: number): Promise<void> => {
+    if (text === '') return
+    const f = await face(name)
+    const across = (line: string): number => width(f, line, pt) + spacing * pt * [...line].length
+    // The line box is `leading` tall and the text sits in its middle, as a browser sets it.
+    const above = (leading - ((f.metrics.ascent - f.metrics.descent) / f.metrics.unitsPerEm) * pt) / 2 + ascent(f, pt)
+    for (const line of wrapped(text, across, COLUMN)) {
+      await draw(name, line, pt, left + (COLUMN - across(line)) / 2, top + above, INK, spacing)
+      top += leading
+    }
+    top += TITLE_PAGE_GAP
+  }
+  await set('literata-300-title', sheet.title, TITLE_PAGE_TITLE, TITLE_PAGE_TITLE * TITLE_PAGE_TITLE_LEADING, tracking)
+  await set('literata-italic-400', sheet.subtitle, TITLE_PAGE_SUBTITLE, TITLE_PAGE_SUBTITLE * TITLE_PAGE_SUBTITLE_LEADING, 0)
+}
+
+/** Text broken into lines that fit a room, at its spaces; a word wider than the room is broken where it must be. */
+function wrapped(text: string, across: (line: string) => number, room: number): string[] {
+  const lines: string[] = []
+  let line = ''
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    if (line !== '' && across(`${line} ${word}`) <= room) {
+      line = `${line} ${word}`
+      continue
+    }
+    if (line !== '') lines.push(line)
+    line = ''
+    for (const letter of word) {
+      if (line !== '' && across(line + letter) > room) {
+        lines.push(line)
+        line = ''
+      }
+      line += letter
+    }
+  }
+  if (line !== '') lines.push(line)
+  return lines
 }
 
 function ascent(f: Face, pt: number): number {

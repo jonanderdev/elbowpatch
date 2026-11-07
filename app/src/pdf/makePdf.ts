@@ -6,8 +6,9 @@ import { parse } from '../domain/markdown'
 import type { Piece } from '../domain/model'
 import type { Paper } from '../domain/paper'
 import type { OpenSection } from '../domain/pieces'
+import { printOrder } from '../domain/printOrder'
 import { type Look, layOut } from './layout'
-import { write } from './write'
+import { type Sheet, write } from './write'
 
 export type { Look }
 
@@ -16,8 +17,16 @@ export type { Look }
  * page is fixed, so a piece makes the same pages on every screen.
  */
 export async function makePdf(piece: Piece, sections: OpenSection[], paper: Paper, look: Look): Promise<Uint8Array> {
-  if (piece.kind !== 'essay') throw new Error('Only an essay has its PDF so far')
-  const title = piece.title.trim()
-  const pages = await layOut(title, parse(sections[0]?.content ?? ''), paper, piece.lang, look)
-  return write({ pages, head: title, paper, title: title || 'Untitled', lang: piece.lang })
+  const sheets: Sheet[] = []
+  let number = 0
+  for (const item of printOrder(piece, sections)) {
+    if (item.kind === 'title') {
+      sheets.push(item)
+      continue
+    }
+    const pages = await layOut(item.heading, parse(item.content), paper, piece.lang, look)
+    // The running head carries from a section's second page; its first opens under its heading. Only text is counted.
+    for (const [i, lines] of pages.entries()) sheets.push({ kind: 'text', lines, head: i > 0 ? item.heading : '', number: ++number })
+  }
+  return write({ sheets, ruled: piece.kind === 'journal', paper, title: piece.title.trim() || 'Untitled', lang: piece.lang })
 }

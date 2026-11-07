@@ -298,6 +298,175 @@ test('a paragraph after Markdown kept as written is indented like any other', as
   expect(starting(runs, 'Back').x - left).toBeCloseTo(1.5 * 11, 1)
 })
 
+// Friday 30 October 2026, fixed: the journal opens on a day of its own, with no words yet.
+const NOW = new Date(2026, 9, 30, 10, 0)
+
+/** Stores a journal with these days, as earlier sessions left it, and opens it. */
+async function journal(page: Page, title: string, days: Record<string, string>, subtitle?: string): Promise<void> {
+  await page.clock.setFixedTime(NOW)
+  await page.goto('./')
+  await expect(page.locator('.start.journal')).toBeVisible()
+  const sections = Object.keys(days).map((day, i) => ({ sectionId: `day-${i}`, title: day }))
+  const piece = {
+    id: 'journal',
+    kind: 'journal',
+    lang: 'en',
+    createdAt: NOW.getTime() - 1000,
+    updatedAt: NOW.getTime() - 1000,
+    title,
+    ...(subtitle ? { subtitle } : {}),
+    sections,
+    words: Object.fromEntries(sections.map((s) => [s.sectionId, (days[s.title] ?? '').split(/\s+/).filter(Boolean).length])),
+    outlineId: null,
+  }
+  const working = sections.map((s) => ({
+    sectionId: s.sectionId,
+    pieceId: piece.id,
+    content: days[s.title] ?? '',
+    baseVersionId: null,
+    updatedAt: NOW.getTime() - 1000,
+  }))
+  await page.evaluate(
+    ({ piece, working }) =>
+      new Promise<void>((done) => {
+        const open = indexedDB.open('elbowpatch')
+        open.onsuccess = () => {
+          const db = open.result
+          const tx = db.transaction(['pieces', 'working'], 'readwrite')
+          tx.objectStore('pieces').put(piece)
+          for (const w of working) tx.objectStore('working').put(w)
+          tx.oncomplete = () => {
+            db.close()
+            done()
+          }
+        }
+      }),
+    { piece, working },
+  )
+  await page.reload()
+  await page.locator('.row', { hasText: title }).or(page.locator('.continue')).first().click()
+  await expect(page.locator('.body')).toHaveAttribute('contenteditable', 'true')
+}
+
+const DAYS = {
+  '2026-10-25': '',
+  '2026-10-26': 'Woke before the alarm and lay listening to the rain on the skylight.',
+  '2026-10-27': LONG,
+  '2026-10-28': '  \n ',
+  '2026-10-29': 'Kept one page of four. It is enough.',
+}
+
+test.describe('a journal', () => {
+  test('the row names its days', async ({ page }) => {
+    await journal(page, 'Dream journal', DAYS)
+    await openExport(page)
+    await expect(page.getByRole('button', { name: /PDF/ })).toContainText('Numbered pages to print or keep, each day on a fresh page.')
+  })
+
+  test('opens with its title page, not counted, then its first day on page 1', async ({ page }) => {
+    await journal(page, 'Dream journal', DAYS, 'nights since the move')
+    const { file, pdf } = await makePdf(page)
+    expect(file.suggestedFilename()).toBe('Dream journal.pdf')
+    const [titlePage, first] = pdf.pages
+    expect(titlePage?.lines).toEqual(['Dream journal', 'nights since the move'])
+    // The title page has no number and no running head; the first day is page 1.
+    expect(first?.lines[0]).toBe('Monday 26 October')
+    expect(first?.lines.at(-1)).toBe('1')
+    expect(first?.text).toContain('Woke before the alarm')
+    // The title, 3 times the body and the subtitle 1.15 times, both centred on the column.
+    const runs = titlePage?.runs ?? []
+    const title = starting(runs, 'Dream')
+    const subtitle = starting(runs, 'nights')
+    expect(title.size).toBeCloseTo(33, 1)
+    expect(subtitle.size).toBeCloseTo(12.65, 1)
+    expect(subtitle.font).not.toBe(title.font)
+    for (const run of [title, subtitle]) {
+      const row = lineOf(runs, run)
+      const middle = (Math.min(...row.map((r) => r.x)) + Math.max(...row.map((r) => r.x + r.width))) / 2
+      expect(middle).toBeCloseTo((titlePage?.width ?? 0) / 2, 0)
+    }
+    // Upper third of the sheet, the title above its subtitle.
+    expect(title.y).toBeGreaterThan((titlePage?.height ?? 0) * 0.6)
+    expect(title.y - subtitle.y).toBeGreaterThan(14)
+    expect(title.y - subtitle.y).toBeLessThan(40)
+  })
+
+  test('each day starts a fresh page, the days with no words are left out, and the numbers run on', async ({ page }) => {
+    await journal(page, 'Dream journal', DAYS)
+    const { pdf } = await makePdf(page)
+    const heads = pdf.pages.map((p) => p.lines[0])
+    // Title page, 26 October, 27 October on one page or more, 29 October.
+    expect(heads[0]).toBe('Dream journal')
+    expect(heads[1]).toBe('Monday 26 October')
+    expect(heads[2]).toBe('Tuesday 27 October')
+    expect(heads.at(-1)).toBe('Thursday 29 October')
+    // Days with nothing in them, and the day just opened, are not there.
+    const all = pdf.pages.map((p) => p.text).join(' ')
+    expect(all).not.toContain('Sunday 25 October')
+    expect(all).not.toContain('Wednesday 28 October')
+    expect(all).not.toContain('Friday 30 October')
+    // A long day goes on to pages that carry the day as their running head; the numbers count every page after the title page.
+    expect(pdf.count).toBeGreaterThan(4)
+    for (const [i, sheet] of pdf.pages.slice(1).entries()) expect(sheet.lines.at(-1)).toBe(String(i + 1))
+    expect(pdf.pages[3]?.lines[0]).toBe('Tuesday 27 October')
+    // Thursday begins its own page: nothing of Tuesday is on it.
+    expect(pdf.pages.at(-1)?.text).not.toContain('Paragraph')
+  })
+
+  test('the margin rule prints on every page, and the number sits flush with the text’s right edge', async ({ page }) => {
+    await journal(page, 'Dream journal', DAYS, 'nights since the move')
+    const { pdf } = await makePdf(page)
+    const mm = 72 / 25.4
+    for (const sheet of pdf.pages) {
+      const left = (sheet.width - 117 * mm) / 2
+      // One thin rule the height of the sheet, 12 mm left of the text, in the page's own line colour.
+      const rule = sheet.rects.filter((r) => r.height >= sheet.height - 1)
+      expect(rule).toHaveLength(1)
+      expect(rule[0]?.x).toBeCloseTo(left - 12 * mm, 0)
+      expect(rule[0]?.width).toBeLessThan(1.5)
+      expect(rule[0]?.color).toBe('#e2e2de')
+    }
+    for (const sheet of pdf.pages.slice(1)) {
+      const number = sheet.runs.at(-1)
+      expect(number?.size).toBeCloseTo(9, 1)
+      expect((number?.x ?? 0) + (number?.width ?? 0)).toBeCloseTo((sheet.width + 117 * mm) / 2, 0)
+    }
+  })
+
+  test('a journal with no words still makes a file, with its title', async ({ page }) => {
+    await journal(page, 'Dream journal', { '2026-10-25': '', '2026-10-26': ' ' })
+    const { pdf } = await makePdf(page)
+    expect(pdf.count).toBe(1)
+    expect(pdf.pages[0]?.lines).toEqual(['Dream journal'])
+  })
+
+  test('the words just typed on today are in the file, on a day of their own', async ({ page }) => {
+    await journal(page, 'Dream journal', { '2026-10-29': 'Yesterday.' })
+    await page.locator('.body').click()
+    await page.keyboard.type('Typed a moment ago.')
+    const { pdf } = await makePdf(page)
+    expect(pdf.count).toBe(3)
+    expect(pdf.pages[2]?.lines[0]).toBe('Friday 30 October')
+    expect(pdf.pages[2]?.text).toContain('Typed a moment ago.')
+  })
+
+  test.describe('on A4', () => {
+    test.use({ locale: 'en-GB' })
+
+    test('the title page and the rule follow the paper', async ({ page }) => {
+      await journal(page, 'Dream journal', DAYS, 'nights since the move')
+      const { pdf } = await makePdf(page)
+      const sheet = pdf.pages[0]
+      expect(Math.round(sheet?.width ?? 0)).toBe(595)
+      const mm = 72 / 25.4
+      expect(sheet?.rects.find((r) => r.height >= sheet.height - 1)?.x).toBeCloseTo(((sheet?.width ?? 0) - 117 * mm) / 2 - 12 * mm, 0)
+      // The frame has the title's line box 189 pt from the top: its baseline is at 221.8.
+      const title = starting(sheet?.runs ?? [], 'Dream')
+      expect((sheet?.height ?? 0) - title.y).toBeCloseTo(221.8, 0)
+    })
+  })
+})
+
 test.describe('in the piece’s own language', () => {
   test.use({ locale: 'de-DE' })
 
