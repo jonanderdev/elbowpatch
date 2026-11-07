@@ -22,5 +22,12 @@ The reasons for making the file in the app are in 0007. This records how, and wh
 - `pdf-lib` 1.17.1 and `@pdf-lib/fontkit` 1.1.1 (MIT, with `pako`, MIT and Zlib, which `pdf-lib` uses), about 510 KB gzipped with the app's own PDF code. Their last releases are from 2022; they run in current Chromium, WebKit and Firefox. They are the only pair that writes real text with embedded subset fonts in the browser; a smaller route (drawing each page as an image) would make a file that cannot be searched. The code is one lazy chunk named `pdf`, left out of the install, so a writer who never makes a PDF pays nothing, and the main bundle did not grow.
 - `pdfjs-dist` (Apache-2.0) reads the file back in the tests only; it is a development dependency and never in the app.
 
+## Out of the install, kept after the first PDF
+- The code and the fixed fonts are left out of the precache by name (`globIgnores` for the `pdf` chunk, and the `.ttf` files are outside the glob). One cache-first rule in the service worker keeps them the first time they are fetched; their names carry a hash, so a kept file is never stale, and a new version asks for new names.
+- The `pdf` chunk takes only the PDF modules and the libraries (`includeDependenciesRecursively: false`). With the default, code the whole app shares, such as the Markdown reading, was pulled into it, the main file then needed it to start, and the app stopped opening offline. A test now opens the app offline, so that cannot come back unseen.
+- A PDF asks the network only for those files: plain GETs of the app's own assets, nothing sent. The offline test records the requests and checks it.
+- Offline before the first PDF, the row says so (`navigator.onLine` is false when the fetch fails); any other failure shows the failure line. Both are in the row's status, so a screen reader hears them.
+- There is no `clientsClaim` (0010), so a first session is not held by the service worker: a PDF made in it is fetched but kept only from the next load. Writers reload long before they need it offline, and the browser's own cache usually holds it; left as it is.
+
 ## Known, and left
 - A retry after a failed first load works in Chromium and Firefox; WebKit remembers a module that failed until the page is loaded again.
