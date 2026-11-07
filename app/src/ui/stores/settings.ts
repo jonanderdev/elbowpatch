@@ -76,6 +76,11 @@ export function update(change: Partial<Settings>): void {
   apply()
 }
 
+/** The settings as they are now, for what is made once and not drawn again, such as a file. */
+export function settingsNow(): Settings {
+  return current
+}
+
 export function useSettings(): Settings {
   return useSyncExternalStore(
     (l) => {
