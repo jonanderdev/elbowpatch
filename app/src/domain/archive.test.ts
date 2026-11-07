@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { memoryStore } from '../adapters/memory-store'
 import { exportAll, FORMAT_VERSION, guessKind, importArchive, importMarkdown, readDay } from './archive'
+import { pieceAsMarkdown } from './export'
 import {
   newPiece,
   openPiece,
@@ -111,7 +112,7 @@ describe('export and import', () => {
       ['Only a title', ''],
     ])
     const whole = files.find((f) => f.path === 'Untitled/Untitled.md')!
-    expect(whole.text).toBe('# One\n\nThe ferry.\n\n# Between them\n\nBetween.\n\n# Only a title\n')
+    expect(whole.text).toBe('# Untitled\n\n## One\n\nThe ferry.\n\n## Between them\n\nBetween.\n\n## Only a title\n')
   })
 
   it('a book of split and added chapters comes back whole, and as one file has one heading per chapter, in order', async () => {
@@ -159,7 +160,7 @@ describe('export and import', () => {
       ['Winter', 'The harbour in winter.'],
     ])
     const text = files.find((f) => f.path === 'Untitled/Untitled.md')!.text
-    expect(text).toBe('# One\n\nThe ferry.\n\n# Added\n\nAdded.\n\n# Untitled\n\nSalt on the rail.\n\n# Winter\n\nThe harbour in winter.\n')
+    expect(text).toBe('# Untitled\n\n## One\n\nThe ferry.\n\n## Added\n\nAdded.\n\n## Untitled\n\nSalt on the rail.\n\n## Winter\n\nThe harbour in winter.\n')
     const read = await importMarkdown(elsewhere, 'again.md', text as string, 'book', 'en')
     expect(read.sections.map((s) => s.title)).toEqual(['One', 'Added', 'Untitled', 'Winter'])
   })
@@ -199,7 +200,7 @@ describe('export and import', () => {
     // Its history travels, as a file the book's own text does not list.
     expect(files.some((f) => f.path.endsWith('.md') && f.text === 'Soon gone.')).toBe(true)
     const whole = files.find((f) => f.path.endsWith('Untitled.md'))!
-    expect(whole.text).not.toContain('Untitled')
+    expect(whole.text).not.toContain('## Untitled')
 
     const elsewhere = { ...setup(), store: memoryStore() }
     expect(await importArchive(elsewhere, files)).toMatchObject({ ok: true, added: 1 })
@@ -239,7 +240,9 @@ describe('export and import', () => {
     const files = await exportAll(a)
     const at = (path: string) => files.find((f) => f.path === path)?.text
     expect(at('The second draft/The second draft.md')).toBe('# The second draft\n\nOne. *Two*. Three. Not a moment yet.\n')
+    // A day's own file keeps its `# ` heading; the whole journal opens with its title.
     expect(at('Journal/01 Monday 26 October.md')).toBe('# Monday 26 October 2026\n\nHoy, 2026-10-26.\n')
+    expect(at('Journal/Journal.md')).toBe('# Journal\n\n## Monday 26 October 2026\n\nHoy, 2026-10-26.\n\n## Tuesday 27 October 2026\n\nHoy, 2026-10-27.\n')
     expect(at('Put away/Put away one/Put away one.md')).toContain('Waiting.')
     expect(files.filter((f) => f.path.startsWith('The second draft/history/'))).toHaveLength(4) // 3 versions + the working copy
     expect(JSON.parse(at('index.json')!).formatVersion).toBe(FORMAT_VERSION)
@@ -379,5 +382,105 @@ describe('loose .md files', () => {
 
     const journal = await importMarkdown(d, 'Diary.md', '# Monday 26 October 2026\n\nRain.', 'journal', 'en')
     expect((await openPiece(d, journal.id))?.piece.sections).toEqual([{ sectionId: expect.any(String), title: '2026-10-26' }])
+  })
+})
+
+describe('a title with chapters or days in one .md file', () => {
+  const SHAPE = '# The Long Winter\n\n*A year on the island*\n\n## One\n\nThe ferry.\n\n## Two\n\nSalt on the rail.\n'
+  const DAYS = '# Diary\n\n## Monday 26 October 2026\n\nRain.\n\n## Tuesday 27 October 2026\n\nWind.\n'
+
+  it('guesses a book from one # and ## headings, a journal when those are all dates', () => {
+    expect(guessKind(SHAPE)).toBe('book')
+    expect(guessKind('# Title\n\n## Only one\n\nText.')).toBe('book')
+    expect(guessKind(DAYS)).toBe('journal')
+    expect(guessKind('# Diary\n\n## Monday 26 October 2026\n\nA.\n\n## The weekend\n\nB.')).toBe('book')
+    // No ## under the title: still an essay. Two # headings: the old shape.
+    expect(guessKind('# Title\n\nText.')).toBe('essay')
+    expect(guessKind('# One\n\n## a\n\nA.\n\n# Two\n\nB.')).toBe('book')
+    expect(guessKind('# Monday 26 October 2026\n\n## a\n\nA.\n\n# Tuesday 27 October 2026\n\nB.')).toBe('journal')
+  })
+
+  it('a book comes back from its own file with title, subtitle and every chapter', async () => {
+    const a = setup()
+    const book = newPiece(a, 'book', 'en')
+    const first = book.sections[0]!.sectionId
+    await write(a, book, first, 'The ferry.\n\n### A note kept inside')
+    await renameSection(a, book, first, 'One')
+    const withTwo = withChapter(a, book)
+    await write(a, withTwo.piece, withTwo.sectionId, 'Salt.')
+    await renameSection(a, withTwo.piece, withTwo.sectionId, 'Two')
+    const open = (await openPiece(a, book.id))!
+    const piece = { ...open.piece, title: 'The Long Winter', subtitle: 'A *year* on_the island\\' }
+    const file = pieceAsMarkdown(piece, open.sections)
+
+    const b = setup()
+    const read = await importMarkdown(b, file.name, file.text, guessKind(file.text), 'en')
+    expect(read).toMatchObject({ kind: 'book', title: 'The Long Winter', subtitle: 'A *year* on_the island\\' })
+    const back = (await openPiece(b, read.id))!
+    expect(back.sections.map((s) => [s.title, s.content])).toEqual(open.sections.map((s) => [s.title, s.content]))
+  })
+
+  it('a book with no subtitle comes back with none', async () => {
+    const read = await importMarkdown(setup(), 'x.md', '# Quiet\n\n## One\n\nText.\n', 'book', 'en')
+    expect(read.title).toBe('Quiet')
+    expect('subtitle' in read).toBe(false)
+  })
+
+  it('only the italic line straight under the title is the subtitle', async () => {
+    const d = setup()
+    const text = '# Quiet\n\nA first line.\n\n*Not a subtitle*\n\n## One\n\nText.\n'
+    const read = await importMarkdown(d, 'x.md', text, 'book', 'en')
+    expect(read.subtitle).toBeUndefined()
+    // Text between the title and the first heading is a section of its own, as before the first # in the old shape.
+    expect((await openPiece(d, read.id))!.sections.map((s) => [s.title, s.content])).toEqual([
+      ['', 'A first line.\n\n*Not a subtitle*'],
+      ['One', 'Text.'],
+    ])
+    const bold = await importMarkdown(d, 'x.md', '# Quiet\n\n**Loud**\n\n## One\n\nText.\n', 'book', 'en')
+    expect(bold.subtitle).toBeUndefined()
+  })
+
+  it('a journal comes back with its title and every day, as a new journal', async () => {
+    const a = setup()
+    await writeSome(a)
+    const journal = (await a.store.transaction((tx) => tx.pieces())).find((p) => p.kind === 'journal')!
+    const open = (await openPiece(a, journal.id))!
+    const file = pieceAsMarkdown({ ...open.piece, title: 'Island diary', subtitle: 'Winter' }, open.sections)
+    expect(file.text.startsWith('# Island diary\n\n*Winter*\n\n## Monday 26 October 2026\n')).toBe(true)
+
+    // Imported into the very store it came from: a new journal, the first one untouched.
+    const read = await importMarkdown(a, file.name, file.text, guessKind(file.text), 'en')
+    expect(guessKind(file.text)).toBe('journal')
+    expect(read).toMatchObject({ kind: 'journal', title: 'Island diary', subtitle: 'Winter' })
+    expect(read.id).not.toBe(journal.id)
+    const back = (await openPiece(a, read.id))!
+    expect(back.sections.map((s) => [s.title, s.content])).toEqual(open.sections.map((s) => [s.title, s.content]))
+    expect((await a.store.transaction((tx) => tx.pieces())).filter((p) => p.kind === 'journal')).toHaveLength(2)
+  })
+
+  it('choosing Essay keeps the text whole', async () => {
+    const d = setup()
+    const read = await importMarkdown(d, 'x.md', SHAPE, 'essay', 'en')
+    expect(read.title).toBe('The Long Winter')
+    expect((await openPiece(d, read.id))!.sections.map((s) => s.content)).toEqual([
+      '*A year on the island*\n\n## One\n\nThe ferry.\n\n## Two\n\nSalt on the rail.',
+    ])
+  })
+
+  it('files in the old shape import as before', async () => {
+    const d = setup()
+    const read = await importMarkdown(d, 'Winter.md', '# One\n\n## inside\n\nFirst.\n\n# Two\n\nSecond.', 'book', 'en')
+    expect(read.title).toBe('Winter')
+    expect((await openPiece(d, read.id))!.sections.map((s) => [s.title, s.content])).toEqual([
+      ['One', '## inside\n\nFirst.'],
+      ['Two', 'Second.'],
+    ])
+  })
+
+  it('a title with chapters read as a journal keeps the days, whatever the file is called', async () => {
+    const d = setup()
+    const read = await importMarkdown(d, 'x.md', DAYS, 'journal', 'en')
+    expect(read.title).toBe('Diary')
+    expect(read.sections.map((s) => s.title)).toEqual(['2026-10-26', '2026-10-27'])
   })
 })
