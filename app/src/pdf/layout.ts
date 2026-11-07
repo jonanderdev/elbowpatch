@@ -2,7 +2,7 @@
 // (docs/decisions/0019). The text is set at 8 times the printed size and divided again, because WebKit
 // rounds the boxes it reports to whole pixels.
 
-import { type Block, BREAK } from '../domain/markdown'
+import { type Block, BREAK, type Span } from '../domain/markdown'
 import type { Paper } from '../domain/paper'
 import { BODY, COLUMN, INK, LEADING, PARAGRAPH_GAP, TITLE_SCALE, textHeight } from './page'
 
@@ -183,16 +183,13 @@ function element(block: Block, before: Block | undefined, first: boolean, last: 
       'text-align:center',
       'hyphens:manual',
     )
-  } else if (look.indent && before?.type === 'paragraph') style.push('text-indent:1.5em')
+  } else if (look.indent && before && before.type !== 'quote') style.push('text-indent:1.5em')
   el.style.cssText = style.join(';')
-  if (block.type === 'raw') {
-    el.textContent = block.text
-    return el
-  }
-  // The drop cap: the first letter of the text, four lines deep.
-  let initial = look.dropcap && first && block.type === 'paragraph' ? /^[\p{P}\p{S}]*[\p{L}\p{N}]/u.exec(block.spans[0]?.text ?? '')?.[0] : undefined
-  if (block.spans[0]?.marks.length) initial = undefined
-  for (const span of block.spans) {
+  // Markdown the page keeps as written is a paragraph of its own words, symbols and all.
+  const spans: Span[] = block.type === 'raw' ? [{ text: block.text, marks: [] }] : block.spans
+  // The drop cap: the first letter of the text, four lines deep, upright and heavy wherever the first word's mark leaves it.
+  let initial = look.dropcap && first && !quote ? /^[\p{P}\p{S}]*[\p{L}\p{N}]/u.exec(spans[0]?.text ?? '')?.[0] : undefined
+  for (const span of spans) {
     span.text.split(BREAK).forEach((part, i) => {
       if (i > 0) el.append(document.createElement('br'))
       if (part === '') return
