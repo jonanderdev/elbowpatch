@@ -37,5 +37,8 @@ The reasons for making the file in the app are in 0007. This records how, and wh
 - Offline before the first PDF, the row says so (`navigator.onLine` is false when the fetch fails); any other failure shows the failure line. Both are in the row's status, so a screen reader hears them.
 - There is no `clientsClaim` (0010), so a first session is not held by the service worker: a PDF made in it is fetched but kept only from the next load. Writers reload long before they need it offline, and the browser's own cache usually holds it; left as it is.
 
+## A long piece gives the page back
+- Laying out and writing run in slices: `pdf/breathe.ts` hands the page back to the browser (a zero-delay timer, the same in every browser) whenever 20 ms of work have passed, and the layout's read-back and the writing's loops call it for every word and line. Before, nothing in the writing waited on the browser, so a journal of about 1,000 printed pages held the page for 12 s in Chromium. Now the longest wait between frames is 80 to 150 ms on a laptop across the three engines (`e2e/pdf-long.spec.ts`, tagged `@long`, run with `npm run e2e:long`). What cannot be sliced is one section's first layout and the file's final `save()`.
+
 ## Known, and left
 - A retry after a failed first load works in Chromium and Firefox; WebKit remembers a module that failed until the page is loaded again.
