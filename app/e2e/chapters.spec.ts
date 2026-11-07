@@ -373,8 +373,9 @@ test('the focus ring on a Contents row stands whole outside it, at the top, the 
   await list.evaluate((el) => {
     el.scrollTop = 0
   })
-  // A key first, so the ring shows. (Not in WebKit, whose Tab passes over buttons: there the room alone is read.)
-  await page.keyboard.press('Shift')
+  // Tab first, so the ring shows: Firefox counts neither Shift alone nor an arrow as the keyboard at work.
+  // (Not in WebKit, whose Tab passes over buttons: there the room alone is read.)
+  await page.keyboard.press('Tab')
   await rows(page).nth(1).focus()
   await rows(page).first().focus()
   if (browserName !== 'webkit') {
