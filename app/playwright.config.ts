@@ -15,6 +15,8 @@ const config: PlaywrightTestConfig = defineConfig({
   // workers keep a laptop responsive.
   workers: 4,
   reporter: 'list',
+  // The very long piece takes minutes: it runs only when asked (`npm run e2e:long`).
+  grepInvert: process.env.E2E_LONG ? undefined : /@long/,
   // The built app, service worker included.
   use: { baseURL: `http://localhost:${port}/` },
   webServer: {
