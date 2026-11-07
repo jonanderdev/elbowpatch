@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-import { openTools, saved, write } from './helpers'
+import { caretToEnd, openTools, saved, write } from './helpers'
 import { type Run, readPdf } from './pdf'
 
 // Browsers hyphenate differently, so these tests never expect the same line breaks from two of them.
@@ -442,8 +442,8 @@ test.describe('a journal', () => {
 
   test('the words just typed on today are in the file, on a day of their own', async ({ page }) => {
     await journal(page, 'Dream journal', { '2026-10-29': 'Yesterday.' })
-    await page.locator('.body').click()
-    await page.keyboard.type('Typed a moment ago.')
+    await caretToEnd(page)
+    await page.keyboard.insertText('Typed a moment ago.')
     const { pdf } = await makePdf(page)
     expect(pdf.count).toBe(3)
     expect(pdf.pages[2]?.lines[0]).toBe('Friday 30 October')
