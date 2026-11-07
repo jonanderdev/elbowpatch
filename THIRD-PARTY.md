@@ -14,6 +14,6 @@ Elbowpatch itself is MIT (see [LICENSE](LICENSE)). The code and fonts below are 
 | Literata 3.103, fixed instances of it | SIL Open Font License 1.1 | Copyright 2017 The Literata Project Authors; text in `app/src/ui/styles/fonts/OFL-Literata.txt` |
 | EB Garamond 1.003, fixed instances of it | SIL Open Font License 1.1 | Copyright 2017 The EB Garamond Project Authors; text in `app/src/ui/styles/fonts/OFL-EB-Garamond.txt` |
 
-The fixed font files in `app/src/pdf/fonts/` are made from the two fonts above by `app/scripts/pdf-fonts.mjs`: instanced to one weight and cut to Latin, extended Latin and Vietnamese. Their licence and copyright notices are kept inside the files. Neither font's licence reserves a font name.
+The fixed font files in `app/src/pdf/fonts/` are made from the two fonts above by `app/scripts/pdf-fonts.mjs`: instanced to one weight and cut to three files for each: Latin with extended Latin and Vietnamese, Cyrillic, and Greek. No other font is added: a character none of them holds is drawn by the browser with a font already on the writer's device and appears in the file only as a picture, never as a copy of that font. Their licence and copyright notices are kept inside the files. Neither font's licence reserves a font name.
 
 `pdfjs-dist` (Apache-2.0) reads a PDF back in the tests. It is a development dependency and is never part of the app.
