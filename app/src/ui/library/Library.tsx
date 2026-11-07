@@ -240,18 +240,14 @@ export function Library({
       {exporting && (
         <ExportSheet
           title={exporting.title.trim() || 'Untitled'}
-          pdf={
-            pdfNote(exporting.kind) !== undefined
-              ? {
-                  note: pdfNote(exporting.kind) ?? '',
-                  make: async () => {
-                    const name = await onExportPdf(exporting)
-                    setExporting(null)
-                    if (name) setLine(`Saved as ${name}.`)
-                  },
-                }
-              : undefined
-          }
+          pdf={{
+            note: pdfNote(exporting.kind),
+            make: async () => {
+              const name = await onExportPdf(exporting)
+              setExporting(null)
+              if (name) setLine(`Saved as ${name}.`)
+            },
+          }}
           onMarkdown={async () => {
             const name = await onExport(exporting)
             setExporting(null)

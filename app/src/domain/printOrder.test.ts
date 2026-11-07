@@ -58,3 +58,34 @@ describe('what an essay prints', () => {
     expect(printOrder(piece('essay', 'Empty'), [])).toEqual([{ kind: 'section', heading: 'Empty', content: '' }])
   })
 })
+
+describe('what a book prints, and in what order', () => {
+  const chapter = (title: string, content: string): OpenSection => ({ sectionId: title, title, content })
+
+  it('opens with its title page, then its contents, then each chapter under its title', () => {
+    const order = printOrder(piece('book', 'The harbour in winter', 'a story in six chapters'), [
+      chapter('The ferry at seven', 'The first boat was late.'),
+      chapter('Salt on the windows', 'Ana scraped a small square clear.'),
+    ])
+    expect(order).toEqual([
+      { kind: 'title', title: 'The harbour in winter', subtitle: 'a story in six chapters' },
+      { kind: 'contents' },
+      { kind: 'section', heading: 'The ferry at seven', content: 'The first boat was late.' },
+      { kind: 'section', heading: 'Salt on the windows', content: 'Ana scraped a small square clear.' },
+    ])
+  })
+
+  it('keeps a chapter with no words, in its place', () => {
+    const order = printOrder(piece('book', 'The harbour in winter'), [chapter('One', 'Words.'), chapter('Two', ''), chapter('Three', '  \n ')])
+    expect(order.map((item) => (item.kind === 'section' ? item.heading : item.kind))).toEqual(['title', 'contents', 'One', 'Two', 'Three'])
+  })
+
+  it('calls a chapter with no title Untitled, as Contents does', () => {
+    const order = printOrder(piece('book', 'B'), [chapter('  ', 'Words.')])
+    expect(order[2]).toEqual({ kind: 'section', heading: 'Untitled', content: 'Words.' })
+  })
+
+  it('is its title page and contents when it has no chapters, so there is still a file', () => {
+    expect(printOrder(piece('book', 'B'), [])).toEqual([{ kind: 'title', title: 'B', subtitle: '' }, { kind: 'contents' }])
+  })
+})
