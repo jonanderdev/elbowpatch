@@ -438,6 +438,10 @@ describe('a title with chapters or days in one .md file', () => {
     ])
     const bold = await importMarkdown(d, 'x.md', '# Quiet\n\n**Loud**\n\n## One\n\nText.\n', 'book', 'en')
     expect(bold.subtitle).toBeUndefined()
+    // Two italic spans are a line of the writer's text, kept whole, not a subtitle.
+    const two = await importMarkdown(d, 'x.md', '# Quiet\n\n*A* and *B*\n\n## One\n\nText.\n', 'book', 'en')
+    expect(two.subtitle).toBeUndefined()
+    expect((await openPiece(d, two.id))!.sections[0]!.content).toBe('*A* and *B*')
   })
 
   it('a journal comes back with its title and every day, as a new journal', async () => {

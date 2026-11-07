@@ -235,7 +235,7 @@ export function readTitled(markdown: string): Titled | undefined {
   const title = lines[first]!.slice(2).trim()
   let at = rest.findIndex((l) => l.trim() !== '')
   let subtitle: string | undefined
-  const italic = at >= 0 ? rest[at]!.trim().match(/^([*_])(?![*_\s])(.+)\1$/) : null
+  const italic = at >= 0 ? rest[at]!.trim().match(/^([*_])(?![*_\s])((?:\\[\\*_]|[^\\*_])+)\1$/) : null
   if (italic) {
     subtitle = italic[2]!.replace(/\\([\\*_])/g, '$1')
     at++
