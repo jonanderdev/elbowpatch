@@ -1,10 +1,18 @@
 import { type CSSProperties, type ReactElement, useEffect, useRef, useState } from 'react'
+import type { Kind } from '../../domain/model'
 
 /** What a piece's PDF row says before it is tapped, and how to make the file. Left out where a kind has no PDF yet. */
 export interface PdfRow {
   note: string
   /** Makes the file and hands it over. Rejects when it cannot be made; the sheet says so. */
   make(): Promise<void>
+}
+
+/** The line under a piece's PDF row, by kind (DESIGN.md, Export); none where a kind has no PDF yet, which leaves the row out. */
+export function pdfNote(kind: Kind): string | undefined {
+  if (kind === 'essay') return 'Numbered pages to print or keep.'
+  if (kind === 'journal') return 'Numbered pages to print or keep, each day on a fresh page.'
+  return undefined
 }
 
 const WORKING = 'Setting your pages…'

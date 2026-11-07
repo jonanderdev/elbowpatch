@@ -28,8 +28,22 @@ export const PAGE_NUMBER = 9
 export const RUNNING_HEAD_TOP = 36
 export const PAGE_NUMBER_FROM_BOTTOM = 52
 
+/** A title page (the Ready frames of the printed title pages): the title 3 times the body, the subtitle 1.15 times, a gap between. */
+export const TITLE_PAGE_TITLE: number = 3 * BODY
+export const TITLE_PAGE_TITLE_LEADING = 1.12
+export const TITLE_PAGE_SUBTITLE: number = 1.15 * BODY
+export const TITLE_PAGE_SUBTITLE_LEADING = 1.4
+export const TITLE_PAGE_GAP = 14
+/** Where the title's first line begins, as a share of the paper's height: the upper third (189 pt on A4, 178 on Letter). */
+export const TITLE_PAGE_TOP = 0.2245
+
+/** A journal's margin rule: a hairline the sheet's height, this far left of the text. */
+export const RULE_FROM_TEXT: number = 12 * MM
+export const RULE_WIDTH = 1
+
 export const INK = '#1f1f1f'
 export const SECONDARY = '#676767'
+export const RULE = '#e2e2de'
 
 export function textHeight(paper: Paper): number {
   return PAPER[paper].height - MARGIN_TOP - MARGIN_BOTTOM

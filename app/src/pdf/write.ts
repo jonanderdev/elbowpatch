@@ -28,16 +28,43 @@ import type { Paper } from '../domain/paper'
 import { faceBytes } from './fonts'
 import { advance, draw as drawn } from './images'
 import type { FaceName, Line } from './layout'
-import { COLUMN, columnLeft, INK, MARGIN_TOP, PAGE_NUMBER, PAGE_NUMBER_FROM_BOTTOM, PAPER, RUNNING_HEAD, RUNNING_HEAD_TOP, SECONDARY } from './page'
+import {
+  COLUMN,
+  columnLeft,
+  INK,
+  MARGIN_TOP,
+  PAGE_NUMBER,
+  PAGE_NUMBER_FROM_BOTTOM,
+  PAPER,
+  RULE,
+  RULE_FROM_TEXT,
+  RULE_WIDTH,
+  RUNNING_HEAD,
+  RUNNING_HEAD_TOP,
+  SECONDARY,
+  TITLE_PAGE_GAP,
+  TITLE_PAGE_SUBTITLE,
+  TITLE_PAGE_SUBTITLE_LEADING,
+  TITLE_PAGE_TITLE,
+  TITLE_PAGE_TITLE_LEADING,
+  TITLE_PAGE_TOP,
+} from './page'
+
 import { fileOf, type Script, splitRuns } from './runs'
 
 const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
 
+/** One sheet of paper. */
+export type Sheet =
+  /** A title page: no running head and no number. */
+  | { kind: 'title'; title: string; subtitle: string }
+  /** Text already set into lines, with its running head ('' for none) and the number it is printed with. */
+  | { kind: 'text'; lines: Line[]; head: string; number: number }
+
 export interface Printed {
-  /** One list of lines for each page, from the first. */
-  pages: Line[][]
-  /** The running head, from the second page on. */
-  head: string
+  sheets: Sheet[]
+  /** A journal's look: a margin rule on every sheet, and the number flush with the text's right edge instead of centred. */
+  ruled: boolean
   paper: Paper
   title: string
   lang: string
@@ -71,7 +98,7 @@ function color(hex: string) {
   return rgb((n >> 16) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255)
 }
 
-export async function write({ pages, head, paper, title, lang }: Printed): Promise<Uint8Array> {
+export async function write({ sheets, ruled, paper, title, lang }: Printed): Promise<Uint8Array> {
   const doc = await PDFDocument.create({ updateMetadata: false })
   doc.registerFontkit(fontkit)
   doc.setTitle(title, { showInWindowTitleBar: true })
@@ -120,8 +147,9 @@ export async function write({ pages, head, paper, title, lang }: Printed): Promi
 
   const size = PAPER[paper]
   const left = columnLeft(paper)
-  for (const [index, lines] of pages.entries()) {
+  for (const sheet of sheets) {
     const page = doc.addPage([size.width, size.height])
+    if (ruled) page.drawRectangle({ x: left - RULE_FROM_TEXT, y: 0, width: RULE_WIDTH, height: size.height, color: color(RULE) })
     const keys = new Map<string, PDFName>()
     const key = (id: string, make: () => PDFName): PDFName => {
       const known = keys.get(id) ?? make()
@@ -158,7 +186,11 @@ export async function write({ pages, head, paper, title, lang }: Printed): Promi
         pen += part.width
       }
     }
-    for (const line of lines) {
+    if (sheet.kind === 'title') {
+      await titlePage(sheet, left, size.height, { face, shape, total, draw })
+      continue
+    }
+    for (const line of sheet.lines) {
       for (const [i, fragment] of line.fragments.entries()) {
         const next = line.fragments[i + 1]
         let tail = next?.spaced ? ' ' : ''
@@ -173,17 +205,68 @@ export async function write({ pages, head, paper, title, lang }: Printed): Promi
         await draw(fragment.face, parts, fragment.size, left + fragment.x, MARGIN_TOP + line.baseline + fragment.drop, INK, fragment.tracking)
       }
     }
-    if (index > 0 && head !== '') {
-      const parts = await fitted('literata-italic-400', head, RUNNING_HEAD, COLUMN)
+    if (sheet.head !== '') {
+      const parts = await fitted('literata-italic-400', sheet.head, RUNNING_HEAD, COLUMN)
       const y = RUNNING_HEAD_TOP + ascent(await face('literata-italic-400', 'latin'), RUNNING_HEAD)
       await draw('literata-italic-400', parts, RUNNING_HEAD, (size.width - total(parts)) / 2, y, SECONDARY)
     }
-    const number = String(index + 1)
     const y = size.height - PAGE_NUMBER_FROM_BOTTOM + ascent(await face('literata-360', 'latin'), PAGE_NUMBER)
-    const parts = await shape('literata-360', number, PAGE_NUMBER)
-    await draw('literata-360', parts, PAGE_NUMBER, (size.width - total(parts)) / 2, y, SECONDARY)
+    const parts = await shape('literata-360', String(sheet.number), PAGE_NUMBER)
+    // The rule holds the left of a journal's page and the number its right; elsewhere the number is centred.
+    await draw('literata-360', parts, PAGE_NUMBER, ruled ? left + COLUMN - total(parts) : (size.width - total(parts)) / 2, y, SECONDARY)
   }
   return doc.save()
+}
+
+/** What a title page needs of the file being written: the faces, the parts a text is drawn in, and drawing them. */
+interface Tools {
+  face(name: FaceName, script: Script): Promise<Face>
+  shape(name: FaceName, text: string, pt: number, tracking?: number): Promise<Part[]>
+  total(parts: Part[]): number
+  draw(name: FaceName, parts: Part[], pt: number, x: number, baselineFromTop: number, ink: string, tracking?: number): Promise<void>
+}
+
+/** The title, and the subtitle in italic under it, each line centred on the column, in the upper third. */
+async function titlePage(sheet: { title: string; subtitle: string }, left: number, height: number, tools: Tools): Promise<void> {
+  let top = height * TITLE_PAGE_TOP
+  const set = async (name: FaceName, text: string, pt: number, leading: number, tracking: number): Promise<void> => {
+    if (text === '') return
+    const metrics = (await tools.face(name, 'latin')).metrics
+    const across = async (line: string): Promise<number> => tools.total(await tools.shape(name, line, pt, tracking))
+    // The line box is `leading` tall and the text sits in its middle, as a browser sets it.
+    const above = (leading - ((metrics.ascent - metrics.descent) / metrics.unitsPerEm) * pt) / 2 + (metrics.ascent / metrics.unitsPerEm) * pt
+    for (const line of await wrapped(text, across, COLUMN)) {
+      const parts = await tools.shape(name, line, pt, tracking)
+      await tools.draw(name, parts, pt, left + (COLUMN - tools.total(parts)) / 2, top + above, INK, tracking)
+      top += leading
+    }
+    top += TITLE_PAGE_GAP
+  }
+  await set('literata-300-title', sheet.title, TITLE_PAGE_TITLE, TITLE_PAGE_TITLE * TITLE_PAGE_TITLE_LEADING, -0.012)
+  await set('literata-italic-400', sheet.subtitle, TITLE_PAGE_SUBTITLE, TITLE_PAGE_SUBTITLE * TITLE_PAGE_SUBTITLE_LEADING, 0)
+}
+
+/** Text broken into lines that fit a room, at its spaces; a word wider than the room is broken between its letters. */
+async function wrapped(text: string, across: (line: string) => Promise<number>, room: number): Promise<string[]> {
+  const lines: string[] = []
+  let line = ''
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    if (line !== '' && (await across(`${line} ${word}`)) <= room) {
+      line = `${line} ${word}`
+      continue
+    }
+    if (line !== '') lines.push(line)
+    line = ''
+    for (const { segment } of graphemes.segment(word)) {
+      if (line !== '' && (await across(line + segment)) > room) {
+        lines.push(line)
+        line = ''
+      }
+      line += segment
+    }
+  }
+  if (line !== '') lines.push(line)
+  return lines
 }
 
 function ascent(f: Face, pt: number): number {

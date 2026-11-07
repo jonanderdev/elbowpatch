@@ -11,7 +11,7 @@ import { screenOf } from '../../page/pager'
 import { placeOf } from '../../page/place'
 import { closeUndo, takeUndo } from '../../page/undoMemory'
 import { settled } from '../app/settled'
-import { ExportSheet } from '../components/ExportSheet'
+import { ExportSheet, pdfNote } from '../components/ExportSheet'
 import { Path } from '../components/Path'
 import { usePhone } from '../components/usePhone'
 import { useScrolled } from '../components/useScrolled'
@@ -862,9 +862,9 @@ export function Page({
           title={heading || (journal ? piece.title : 'Untitled')}
           style={anchor}
           pdf={
-            piece.kind === 'essay'
+            pdfNote(piece.kind) !== undefined
               ? {
-                  note: 'Numbered pages to print or keep.',
+                  note: pdfNote(piece.kind) ?? '',
                   make: async () => {
                     const name = await exportPdf()
                     closeSheet()

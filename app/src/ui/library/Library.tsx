@@ -2,7 +2,7 @@ import { type ReactElement, useEffect, useRef, useState } from 'react'
 import type { Kind, Piece } from '../../domain/model'
 import { placePage } from '../../domain/pieces'
 import { screenOf } from '../../page/pager'
-import { ExportSheet } from '../components/ExportSheet'
+import { ExportSheet, pdfNote } from '../components/ExportSheet'
 import { IconButton } from '../components/Icon'
 import { ScrollMark } from '../components/ScrollMark'
 import { ThemeButton } from '../components/ThemeButton'
@@ -241,9 +241,9 @@ export function Library({
         <ExportSheet
           title={exporting.title.trim() || 'Untitled'}
           pdf={
-            exporting.kind === 'essay'
+            pdfNote(exporting.kind) !== undefined
               ? {
-                  note: 'Numbered pages to print or keep.',
+                  note: pdfNote(exporting.kind) ?? '',
                   make: async () => {
                     const name = await onExportPdf(exporting)
                     setExporting(null)
