@@ -20,8 +20,9 @@ import {
 import type { WriterLock } from '../../domain/ports'
 import { forgetPutAway, thin } from '../../domain/thinning'
 import { isoDay } from '../../domain/words'
-import { download } from '../files/download'
+import { download, downloadBytes } from '../files/download'
 import { downloadEverything } from '../files/everything'
+import { pdfFile } from '../files/pdfFile'
 import { Library } from '../library/Library'
 import { titleOf } from '../page/fields'
 import { type OpenAt, type Opened, Page } from '../page/Page'
@@ -436,6 +437,14 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
             if (!found) return undefined
             const file = pieceAsMarkdown(found.piece, found.sections)
             download(file.name, file.text)
+            return file.name
+          }}
+          onExportPdf={async (piece) => {
+            if (opened?.piece.id === piece.id) await flushPage.current?.()
+            const found = await openPiece(deps, piece.id)
+            if (!found) return undefined
+            const file = await pdfFile(found.piece, found.sections)
+            downloadBytes(file.name, file.bytes, 'application/pdf')
             return file.name
           }}
           onOpen={(piece) => {

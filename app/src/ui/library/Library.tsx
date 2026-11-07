@@ -25,6 +25,8 @@ interface Props {
   onRename(piece: Piece, title: string): void
   /** Downloads the piece as one .md file; gives the file name. */
   onExport(piece: Piece): Promise<string | undefined>
+  /** Downloads the piece as a PDF; gives the file name. */
+  onExportPdf(piece: Piece): Promise<string | undefined>
   onPutAway(piece: Piece): Promise<void>
   onRestore(piece: Piece): Promise<void>
   onSettings(): void
@@ -43,6 +45,7 @@ export function Library({
   onNew,
   onRename,
   onExport,
+  onExportPdf,
   onPutAway,
   onRestore,
   onSettings,
@@ -237,6 +240,18 @@ export function Library({
       {exporting && (
         <ExportSheet
           title={exporting.title.trim() || 'Untitled'}
+          pdf={
+            exporting.kind === 'essay'
+              ? {
+                  note: 'Numbered pages to print or keep.',
+                  make: async () => {
+                    const name = await onExportPdf(exporting)
+                    setExporting(null)
+                    if (name) setLine(`Saved as ${name}.`)
+                  },
+                }
+              : undefined
+          }
           onMarkdown={async () => {
             const name = await onExport(exporting)
             setExporting(null)

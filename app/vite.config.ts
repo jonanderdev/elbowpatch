@@ -60,11 +60,20 @@ const config: UserConfig = defineConfig({
         // Every font is precached, so a page in any script opens offline (0011).
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         // Only link previews fetch this one; no installed copy needs it.
-        globIgnores: ['**/og-image.png'],
+        // The PDF code is fetched when the first PDF is made, not installed (docs/decisions/0019).
+        globIgnores: ['**/og-image.png', '**/assets/pdf-*.js', '**/assets/makePdf-*.js'],
         navigateFallback: 'index.html',
       },
     }),
   ],
+  build: {
+    rolldownOptions: {
+      output: {
+        // One chunk with a name of its own for the PDF code and the libraries it uses, so the install can leave it out by name.
+        advancedChunks: { groups: [{ name: 'pdf', test: /node_modules[\\/](pdf-lib|@pdf-lib|pako)[\\/]|src[\\/]pdf[\\/][a-z]+\.ts$/ }] },
+      },
+    },
+  },
   resolve: {
     alias: [
       { find: /^react\/jsx-runtime$/, replacement: 'preact/jsx-runtime' },

@@ -15,8 +15,9 @@ import { ExportSheet } from '../components/ExportSheet'
 import { Path } from '../components/Path'
 import { usePhone } from '../components/usePhone'
 import { useScrolled } from '../components/useScrolled'
-import { download } from '../files/download'
-import { markdownFile } from '../files/markdownFile'
+import { download, downloadBytes } from '../files/download'
+import { markdownFile, pieceAsPageHolds } from '../files/markdownFile'
+import { pdfFile } from '../files/pdfFile'
 import { useSettings } from '../stores/settings'
 import { useUnsaved } from '../stores/unsaved'
 import type { Today } from '../timeMachine/TimeMachine'
@@ -653,6 +654,15 @@ export function Page({
     return file.name
   }
 
+  /** The whole piece as a PDF, with the words as the page holds them now. Makes no moment, and writes nothing. */
+  async function exportPdf(): Promise<string | undefined> {
+    if (!editor) return undefined
+    const held = await pieceAsPageHolds(deps, piece, sectionId, editor.markdown(), titles.title.current?.textContent ?? '')
+    const file = await pdfFile(held.piece, held.sections)
+    downloadBytes(file.name, file.bytes, 'application/pdf')
+    return file.name
+  }
+
   async function keepMoment(): Promise<void> {
     if (await saving?.keep()) setSaid({ text: 'Moment kept', over: announcement })
   }
@@ -851,6 +861,18 @@ export function Page({
         <ExportSheet
           title={heading || (journal ? piece.title : 'Untitled')}
           style={anchor}
+          pdf={
+            piece.kind === 'essay'
+              ? {
+                  note: 'Numbered pages to print or keep.',
+                  make: async () => {
+                    const name = await exportPdf()
+                    closeSheet()
+                    if (name) setLine(`Saved as ${name}.`)
+                  },
+                }
+              : undefined
+          }
           onMarkdown={async () => {
             const name = await exportMarkdown()
             closeSheet()

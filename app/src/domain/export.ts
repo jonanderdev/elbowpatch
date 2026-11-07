@@ -19,9 +19,14 @@ export function pieceAsMarkdown(piece: Piece, sections: OpenSection[]): { name: 
           ...sections.flatMap((s) => [`## ${piece.kind === 'journal' ? dayTitle(s.title, true) : s.title.trim() || 'Untitled'}`, s.content]),
         ]
   return {
-    name: `${title.replace(/[\\/:*?"<>|]/g, '').trim() || 'Untitled'}.md`,
+    name: fileName(piece.title, 'md'),
     text: `${parts.filter((p) => p !== '').join('\n\n')}\n`,
   }
+}
+
+/** The name a piece's file has: its title without what a file name cannot hold, and the extension. */
+export function fileName(title: string, extension: 'md' | 'pdf'): string {
+  return `${title.replace(/[\\/:*?"<>|]/g, '').trim() || 'Untitled'}.${extension}`
 }
 
 /** The subtitle as one italic line, with what would end it early escaped; nothing when there is none. */
