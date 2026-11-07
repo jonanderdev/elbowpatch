@@ -80,11 +80,11 @@ export interface Printed {
 }
 
 interface Face {
-  /** The font file's name: a face in one group of scripts. */
-  file: string
+  /** Names the face in a page's fonts: the font file's name (a face in one group of scripts), and `:tabular` when its figures are tabular. */
+  id: string
   pdf: PDFFont
   metrics: fontkit.Font
-  features: { liga: boolean } | undefined
+  features: { liga?: boolean; tnum?: boolean } | undefined
 }
 
 /**
@@ -119,27 +119,30 @@ export async function write({ sheets, ruled, paper, title, lang }: Printed): Pro
   doc.setModificationDate(now)
 
   const faces = new Map<string, Face>()
-  const face = async (name: FaceName, script: Script): Promise<Face> => {
+  const face = async (name: FaceName, script: Script, tabular = false): Promise<Face> => {
     const file = fileOf(name, script)
-    let known = faces.get(file)
+    const id = tabular ? `${file}:tabular` : file
+    let known = faces.get(id)
     if (!known) {
       const bytes = await faceBytes(file)
-      const features = NO_LIGATURES.includes(name) ? { liga: false } : undefined
-      known = { file, pdf: await doc.embedFont(bytes, { subset: true, features }), metrics: fontkit.create(bytes), features }
-      faces.set(file, known)
+      // The writer applies no OpenType features of its own; these are asked of the font when it lays a run out.
+      const features = { ...(NO_LIGATURES.includes(name) ? { liga: false } : {}), ...(tabular ? { tnum: true } : {}) }
+      const chosen = Object.keys(features).length ? features : undefined
+      known = { id, pdf: await doc.embedFont(bytes, { subset: true, features: chosen }), metrics: fontkit.create(bytes), features: chosen }
+      faces.set(id, known)
     }
     return known
   }
 
   /** The text in the face as its parts: in each file that holds its characters, or an image where none does. */
-  const shape = async (name: FaceName, text: string, pt: number, tracking = 0): Promise<Part[]> => {
+  const shape = async (name: FaceName, text: string, pt: number, tracking = 0, tabular = false): Promise<Part[]> => {
     const parts: Part[] = []
     for (const run of splitRuns(name, text)) {
       if (run.script === 'image') {
         parts.push({ kind: 'image', text: run.text, width: await advance(name, run.text, pt) })
         continue
       }
-      const f = await face(name, run.script)
+      const f = await face(name, run.script, tabular)
       parts.push({ kind: 'font', face: f, text: run.text, width: width(f, run.text, pt) + tracking * pt * [...run.text].length })
     }
     return parts
@@ -181,7 +184,7 @@ export async function write({ sheets, ruled, paper, title, lang }: Printed): Pro
             beginText(),
             setFillingColor(color(ink)),
             setFontAndSize(
-              key(f.file, () => page.node.newFontDictionary(f.pdf.name, f.pdf.ref)),
+              key(f.id, () => page.node.newFontDictionary(f.pdf.name, f.pdf.ref)),
               pt,
             ),
             // Part of the graphics state, so set for every word: the title's letter-spacing must not carry on.
@@ -251,8 +254,8 @@ interface ContentsLeaf {
 
 /** What a title page needs of the file being written: the faces, the parts a text is drawn in, and drawing them. */
 interface Tools {
-  face(name: FaceName, script: Script): Promise<Face>
-  shape(name: FaceName, text: string, pt: number, tracking?: number): Promise<Part[]>
+  face(name: FaceName, script: Script, tabular?: boolean): Promise<Face>
+  shape(name: FaceName, text: string, pt: number, tracking?: number, tabular?: boolean): Promise<Part[]>
   total(parts: Part[]): number
   draw(name: FaceName, parts: Part[], pt: number, x: number, baselineFromTop: number, ink: string, tracking?: number): Promise<void>
 }
@@ -293,7 +296,7 @@ async function contentsLeaves(
   let cursor = ((label.ascent - label.descent) / label.unitsPerEm) * BODY + CONTENTS_GAP
   for (const row of rows) {
     const number = String(row.number)
-    const numberWidth = tools.total(await tools.shape('literata-360', number, BODY))
+    const numberWidth = tools.total(await tools.shape('literata-360', number, BODY, 0, true))
     const lines = await wrapped(
       row.title,
       async (line) => tools.total(await tools.shape('literata-360', line, BODY)),
@@ -328,7 +331,8 @@ async function contentsPage(sheet: ContentsLeaf, left: number, tools: Tools): Pr
       const parts = await tools.shape('literata-360', line, BODY)
       await tools.draw('literata-360', parts, BODY, left, MARGIN_TOP + row.top + i * CONTENTS_LEADING + above, INK)
     }
-    const number = await tools.shape('literata-360', row.number, BODY)
+    // Tabular lining figures, so a column of numbers lines up; the folio keeps the font's own lining figures.
+    const number = await tools.shape('literata-360', row.number, BODY, 0, true)
     await tools.draw('literata-360', number, BODY, left + COLUMN - tools.total(number), MARGIN_TOP + row.top + above, SECONDARY)
   }
 }

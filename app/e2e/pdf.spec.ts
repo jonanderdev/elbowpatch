@@ -646,6 +646,18 @@ test.describe('a book', () => {
     for (const n of numbers) expect(n.x + n.width).toBeCloseTo(((sheet?.width ?? 0) + 117 * mm) / 2, 0)
   })
 
+  test('Contents numbers are tabular lining figures: every digit takes the same room; the folio stays proportional', async ({ page }) => {
+    await book(page, 'The harbour in winter', CHAPTERS)
+    const { pdf } = await makePdf(page)
+    const numbers = (pdf.pages[1]?.runs ?? []).filter((r) => /^\d+$/.test(r.str))
+    expect(numbers.length).toBeGreaterThan(2)
+    // Literata's tabular figures are 582 units wide, at 11 pt; the plain "1" is 407.
+    for (const n of numbers) expect(n.width / n.str.length).toBeCloseTo(0.582 * 11, 1)
+    // The folio is the font's own lining figures, not tabular: its "1" is narrow.
+    const folio = (pdf.pages[2]?.runs ?? []).find((r) => r.str === '1' && r.size < 9.5)
+    expect(folio?.width).toBeCloseTo(0.407 * 9, 1)
+  })
+
   test('a long chapter title goes on to a second line, and its number stays on the first', async ({ page }) => {
     const name = 'The very long account of what the harbourmaster kept in the lower drawer of the old desk'
     await book(page, 'The harbour in winter', [[name, 'Words.']])

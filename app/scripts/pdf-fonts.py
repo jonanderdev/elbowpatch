@@ -33,6 +33,12 @@ FACES = {
 SCRIPTS = {'latin': '', 'cyrillic': '-cyrillic', 'greek': '-greek'}
 unicodes = json.load(open(unicodes_file))
 FEATURES = ['kern', 'liga', 'ccmp', 'locl', 'mark', 'mkmk', 'rvrn']
+# A book's contents sets its page numbers in tabular figures (right-aligned, so each column of digits lines
+# up), which Literata has as `tnum`. The PDF writer applies the feature when it lays the number out, so
+# the tabular glyphs must stay in the file. They are kept only where the numbers are set: the text face's
+# Latin file. The figures a font starts with are already lining, which is what a folio wants, so `lnum`
+# (oldstyle to lining) is not kept.
+TABULAR = {'literata-360': ['latin']}
 
 
 def ranges(codes):
@@ -62,7 +68,7 @@ for name, (path, axes) in FACES.items():
         buffer.seek(0)
         fixed = TTFont(buffer, recalcTimestamp=False)
         options = subset.Options()
-        options.layout_features = FEATURES
+        options.layout_features = FEATURES + (['tnum'] if script in TABULAR.get(name, []) else [])
         options.hinting = False
         options.notdef_outline = True
         options.name_IDs = ['*']
