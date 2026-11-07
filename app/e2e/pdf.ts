@@ -1,13 +1,15 @@
 // Reads a downloaded PDF back, for tests. pdf.js is a development dependency only: nothing of it is in the app.
 
 import type { Download } from '@playwright/test'
-import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
+import { getDocument, OPS } from 'pdfjs-dist/legacy/build/pdf.mjs'
 
 export interface ReadPage {
   width: number
   height: number
   /** One string per visual line, top to bottom. */
   lines: string[]
+  /** Every piece of text as it stands in the file, in order: what searching reads. */
+  text: string
   /** What was drawn, as pdf.js reports it: the same for the same pages. */
   operators: string
 }
@@ -46,7 +48,10 @@ export async function readPdf(file: Download): Promise<{ count: number; pages: R
           .trimEnd(),
       )
     const list = await page.getOperatorList()
-    pages.push({ width: width as number, height: height as number, lines, operators: JSON.stringify([list.fnArray, list.argsArray]) })
+    const text = (items as { str: string }[]).map((item) => item.str).join('')
+    // Which fonts are ready is the reader's own business (it adds a "dependency" operator as they load): not part of the page.
+    const drawn = list.fnArray.map((fn, i) => [fn, list.argsArray[i]] as const).filter(([fn]) => fn !== OPS.dependency)
+    pages.push({ width: width as number, height: height as number, lines, text, operators: JSON.stringify([drawn, items]).replace(/g_d\d+_/g, 'g_') })
   }
   await task.destroy()
   return { count: pages.length, pages }
