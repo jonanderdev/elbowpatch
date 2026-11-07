@@ -70,7 +70,8 @@ async function toPageOf(page: Page, words: string) {
           range.setEnd(node, at + 1)
           const box = range.getBoundingClientRect()
           const shown = document.querySelector('.pager')!.getBoundingClientRect()
-          return box.left >= shown.left && box.right <= shown.right
+          // A pixel of give, as the selection menu has: WebKit lays a page's first word 1/64 px before its edge.
+          return box.left >= shown.left - 1 && box.right <= shown.right + 1
         }
         return false
       }, words),
