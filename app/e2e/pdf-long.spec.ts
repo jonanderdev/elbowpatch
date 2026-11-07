@@ -1,7 +1,7 @@
 import { expect, type Page, test } from '@playwright/test'
 import { PDFDocument } from 'pdf-lib'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
-import { openTools, saved } from './helpers'
+import { caretToEnd, openTools, saved } from './helpers'
 
 // A very long journal (docs/decisions/0019): about 1,000 printed pages must finish, the app must keep answering
 // while it works, and the writer's place and text must be as they were. It takes minutes, so it is tagged @long and
@@ -242,7 +242,7 @@ test.describe('a journal of about a thousand printed pages @long', () => {
   test('finishes, keeps the app answering and leaves the writer where they were', async ({ page, browserName }) => {
     await openJournal(page, 'Dream journal', days())
     // Words on today's page too, so there is open text and a caret in it.
-    await page.locator('.body').click()
+    await caretToEnd(page)
     await page.keyboard.insertText('Typed a moment ago, not yet saved.')
     await saved(page, 'Typed a moment ago')
     await openSheet(page)
