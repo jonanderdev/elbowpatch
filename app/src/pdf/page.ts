@@ -37,6 +37,16 @@ export const TITLE_PAGE_GAP = 14
 /** Where the title's first line begins, as a share of the paper's height: the upper third (189 pt on A4, 178 on Letter). */
 export const TITLE_PAGE_TOP = 0.2245
 
+/**
+ * A book's contents page (the Ready frame of the printed contents): the label and each chapter's row set at
+ * the body's size, a row being 6 above its line, the line at the body's leading, and 4 between rows. A title
+ * leaves at least this much room before the number at the column's right edge.
+ */
+export const CONTENTS_ROW_ABOVE = 6
+export const CONTENTS_LEADING: number = BODY * LEADING
+export const CONTENTS_GAP = 4
+export const CONTENTS_NUMBER_ROOM = 24
+
 /** A journal's margin rule: a hairline the sheet's height, this far left of the text. */
 export const RULE_FROM_TEXT: number = 12 * MM
 export const RULE_WIDTH = 1
