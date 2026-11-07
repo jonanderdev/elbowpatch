@@ -22,7 +22,7 @@ import { useUnsaved } from '../stores/unsaved'
 import type { Today } from '../timeMachine/TimeMachine'
 import { ContentsRail, ContentsSheet, NewChapter, RailToggle, RunningHeadControl } from './Contents'
 import { DaysRail, DaysSheet } from './Days'
-import { fillTitleFields, keptFor, type OpenAt, type Opened, type TitleRefs } from './fields'
+import { fieldOf, fillTitleFields, keptFor, type OpenAt, type Opened, type TitleRefs } from './fields'
 import { PageFoot, StatusLine } from './PageFoot'
 import { SectionTitle, TitlePage } from './Titles'
 import { HeadTools, TextSettings } from './Tools'
@@ -241,9 +241,7 @@ export function Page({
     place: () => {
       const e = editorNow.current
       const place =
-        moved.current && e && pager
-          ? placeOf(e.view, sectionId, pager.page, phone ? 'phone' : 'desktop', viewport.current, e.view.hasFocus() || focus.writingBehind.current)
-          : undefined
+        moved.current && e && pager ? placeOf(e.view, sectionId, pager.page, phone ? 'phone' : 'desktop', viewport.current, focus.writing()) : undefined
       // Once kept, it stays until they move again: a later save, as the page closes behind the
       // library, would read a page no longer laid out as they left it.
       moved.current = false
@@ -285,7 +283,7 @@ export function Page({
       const e = editorNow.current
       setSelection(focused && e ? { rect: selectionBox(e.view, viewport.current), active: e.active() } : null)
       // The library took the focus, not the writer: they were writing, and the place kept says so.
-      if (!focused && screen.current?.inert) focus.writingBehind.current = true
+      if (!focused && screen.current?.inert) focus.writingBehind.current = 'text'
       if (!focused) void saving?.flush()
     },
     onChapterLine: (at) => chapter.line(at),
@@ -745,8 +743,18 @@ export function Page({
             className="flow"
             lang={piece.lang}
             data-title-page={titlePage || undefined}
-            onFocus={(e) => setField(e.target === editor?.view.dom ? null : (e.target as HTMLElement))}
-            onBlur={() => setField(null)}
+            onFocus={(e) => {
+              if (fieldOf(e.target, titles)) moved.current = true
+              setField(e.target === editor?.view.dom ? null : (e.target as HTMLElement))
+            }}
+            onBlur={(e) => {
+              setField(null)
+              const left = fieldOf(e.target, titles)
+              if (!left) return
+              // Out of a title, the place kept says so; as in the text, the library taking the focus is not the writer leaving.
+              moved.current = true
+              if (screen.current?.inert) focus.writingBehind.current = left
+            }}
           >
             {titlePage ? (
               <TitlePage

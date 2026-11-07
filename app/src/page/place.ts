@@ -5,12 +5,19 @@
 import type { Node } from 'prosemirror-model'
 import { TextSelection } from 'prosemirror-state'
 import type { EditorView } from 'prosemirror-view'
-import type { Place, Screen } from '../domain/model'
+import type { Place, Screen, TitleField } from '../domain/model'
 
-/** Where the writer is: the caret if writing, else the first line on screen. */
-export function placeOf(view: EditorView, sectionId: string, page: number, screen: Screen, viewport: HTMLElement | null, writing: boolean): Place | undefined {
+/** Where the writer is: the caret if writing in the text, else the first line on screen, and the title field if writing in one. */
+export function placeOf(
+  view: EditorView,
+  sectionId: string,
+  page: number,
+  screen: Screen,
+  viewport: HTMLElement | null,
+  writing: 'text' | TitleField | null,
+): Place | undefined {
   let pos = view.state.selection.head
-  if (!writing && viewport) {
+  if (writing !== 'text' && viewport) {
     const r = viewport.getBoundingClientRect()
     pos = view.posAtCoords({ left: r.left + 2, top: r.top + 2 })?.pos ?? pos
   }
@@ -25,7 +32,8 @@ export function placeOf(view: EditorView, sectionId: string, page: number, scree
     snippet: node.textContent.slice(0, 160),
     page: page + 1,
     screen,
-    caret: writing,
+    caret: writing !== null,
+    ...(writing && writing !== 'text' ? { field: writing } : {}),
     at: Date.now(),
   }
 }

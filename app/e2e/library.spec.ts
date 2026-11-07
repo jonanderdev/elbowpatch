@@ -1,5 +1,21 @@
 import { expect, type Page, test } from '@playwright/test'
-import { saved, write } from './helpers'
+import { caretToEnd, saved, write } from './helpers'
+
+/** The title field the stored place names, if any. */
+const storedField = (page: Page): Promise<string | undefined> =>
+  page.evaluate(
+    () =>
+      new Promise<string | undefined>((done) => {
+        const open = indexedDB.open('elbowpatch')
+        open.onsuccess = () => {
+          const all = open.result.transaction('pieces').objectStore('pieces').getAll()
+          all.onsuccess = () => {
+            open.result.close()
+            done((all.result as { place?: { field?: string } }[])[0]?.place?.field)
+          }
+        }
+      }),
+  )
 
 async function essay(page: Page, title: string, text: string) {
   await page.goto('./#/')
@@ -151,5 +167,82 @@ test.describe('the caret comes back to a piece left while writing', () => {
     await expect(page.locator('.body')).toBeFocused()
     await page.keyboard.type('X')
     await expect(page.locator('.body')).toContainText('One. Two.X')
+  })
+
+  test('left in the title, and Continued', async ({ page }) => {
+    await essay(page, 'First draft', 'One.')
+    await page.locator('.continue').click()
+    await page.locator('.title').click()
+    await page.locator('.head .home').click()
+    await page.locator('.continue').click()
+    await expect(page.locator('.title')).toBeFocused()
+    await page.keyboard.type('X')
+    await expect(page.locator('.title')).toHaveText('First draftX')
+  })
+
+  test('left in the title, and opened again after a reload', async ({ page }) => {
+    await essay(page, 'First draft', 'One.')
+    await page.locator('.continue').click()
+    await page.locator('.title').click()
+    await page.keyboard.type('!')
+    await page.locator('.head .home').click()
+    await expect(page.locator('.continue')).toBeVisible()
+    await expect.poll(() => storedField(page)).toBe('title')
+    await page.reload()
+    await page.locator('.continue').click()
+    await expect(page.locator('.title')).toBeFocused()
+    await page.keyboard.type('X')
+    await expect(page.locator('.title')).toContainText('X')
+    await expect(page.locator('.body')).toHaveText('One.')
+  })
+
+  test("left in a book's subtitle, on its title page, after a reload", async ({ page }) => {
+    await page.goto('./#/')
+    await write(page, 'Book')
+    await expect(page.locator('.book-title')).toBeFocused()
+    await page.keyboard.type('A book')
+    await page.keyboard.press('Enter')
+    await page.keyboard.type('Its subtitle')
+    await page.locator('.head .home').click()
+    await expect(page.locator('.continue')).toBeVisible()
+    await expect.poll(() => storedField(page)).toBe('subtitle')
+    await page.reload()
+    await page.locator('.continue').click()
+    await expect(page.locator('.subtitle')).toBeFocused()
+    await expect(page.locator('.subtitle')).toBeInViewport()
+    await page.keyboard.type('X')
+    await expect(page.locator('.subtitle')).toHaveText('Its subtitleX')
+  })
+
+  test('a title clicked out of is reading again: no caret', async ({ page }) => {
+    await essay(page, 'First draft', 'One.')
+    await page.locator('.continue').click()
+    await page.locator('.title').click()
+    await page.locator('.title').evaluate((el: HTMLElement) => el.blur())
+    await page.locator('.head .home').click()
+    await expect(page.locator('.continue')).toBeVisible()
+    await expect.poll(() => storedField(page)).toBeUndefined()
+    await page.reload()
+    await page.locator('.continue').click()
+    await expect(page.locator('.page-screen:not([inert])')).toBeVisible()
+    await expect(page.locator('.title')).not.toBeFocused()
+    await expect(page.locator('.body')).not.toBeFocused()
+  })
+
+  test('a journal opened on a new day: the caret in the empty page', async ({ page }) => {
+    await page.clock.install({ time: new Date('2026-11-07T10:00:00') })
+    await page.goto('./#/')
+    await write(page, 'Journal')
+    await expect(page.locator('.book-title')).toBeFocused()
+    await caretToEnd(page)
+    await page.keyboard.type('Today I wrote.')
+    await page.locator('.head .home').click()
+    await expect(page.locator('.continue')).toContainText('Today I wrote.')
+    await page.clock.setFixedTime(new Date('2026-11-08T10:00:00'))
+    await page.reload()
+    await page.locator('.continue').click()
+    await expect(page.locator('.body')).toBeFocused()
+    await page.keyboard.type('Tomorrow.')
+    await expect(page.locator('.body')).toHaveText('Tomorrow.')
   })
 })

@@ -3,7 +3,7 @@
 // contentEditable elements, filled each time a section opens and read when saving.
 
 import type { RefObject } from 'react'
-import type { Piece } from '../../domain/model'
+import type { Piece, TitleField } from '../../domain/model'
 import { dayTitle } from '../../domain/words'
 import type { Passage } from '../../page/passage'
 import { type Unsaved, unsaved } from '../stores/unsaved'
@@ -55,6 +55,14 @@ export interface TitleRefs {
   title: RefObject<HTMLHeadingElement | null>
   bookTitle: RefObject<HTMLHeadingElement | null>
   subtitle: RefObject<HTMLParagraphElement | null>
+}
+
+/** Which of the page's title fields this is, if any. */
+export function fieldOf(el: EventTarget | null, titles: TitleRefs): TitleField | undefined {
+  if (!el) return undefined
+  if (el === titles.title.current) return 'title'
+  if (el === titles.bookTitle.current) return 'bookTitle'
+  return el === titles.subtitle.current ? 'subtitle' : undefined
 }
 
 /** The section's title as stored: an essay's own, a chapter's, or a journal day's date. */
