@@ -301,7 +301,10 @@ test('pasted headings stay plain paragraphs', async ({ page }) => {
   await page.evaluate(() => {
     const data = new DataTransfer()
     data.setData('text/plain', '# Pasted\n\n')
-    document.querySelector('.body')!.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }))
+    const paste = new ClipboardEvent('paste', { bubbles: true, cancelable: true })
+    // Firefox drops the data given to the constructor, so the event is handed it after.
+    Object.defineProperty(paste, 'clipboardData', { value: data })
+    document.querySelector('.body')!.dispatchEvent(paste)
   })
   await expect(page.locator('.body')).toContainText('# Pasted')
   await expect(page.locator('.title')).toHaveText('One')
