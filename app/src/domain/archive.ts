@@ -198,7 +198,11 @@ function fingerprint(piece: Piece, versions: Version[], working: Working[]): str
  * when they all do; anything else an essay.
  */
 export function guessKind(markdown: string): Kind {
-  const titled = readTitled(markdown)
+  return guessKindFrom(markdown, readTitled(markdown))
+}
+
+/** The same guess for a file already read with `readTitled`, so it is read once. */
+export function guessKindFrom(markdown: string, titled: Titled | undefined): Kind {
   const headings = titled
     ? titled.headings
     : markdown
