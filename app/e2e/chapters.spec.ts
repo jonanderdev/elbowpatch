@@ -14,6 +14,9 @@ const long = (paragraphs: number) => Array.from({ length: paragraphs }, (_, i) =
 /** The name an imported book takes from its file. */
 const BOOK = 'harbour'
 
+/** On macOS, WebKit's Tab skips buttons unless Option is held, as Safari's does. */
+const tab = (browserName: string): string => (browserName === 'webkit' ? 'Alt+Tab' : 'Tab')
+
 const TWO = '# One\n\nFirst chapter.\n\n# Two\n\nSecond.\n'
 /** Long enough that each chapter has later pages, and with them a running head. */
 const THREE = `# One\n\n${long(12)}\n\n# Two\n\n${long(12)}\n\n# Three\n\nThe end.\n`
@@ -829,11 +832,11 @@ test('the chapter on screen, chosen in the rail, goes back to its opening page',
   await expect(page.locator('.head-tools .count .visually-hidden')).toHaveText(/^Page 2 of /)
 })
 
-test('the rail works by keyboard, is named for a screen reader, and Escape leaves it', async ({ page }) => {
+test('the rail works by keyboard, is named for a screen reader, and Escape leaves it', async ({ page, browserName }) => {
   desktopOnly(page)
   await importBook(page, TWO)
   await toggle(page).focus()
-  await page.keyboard.press('Tab')
+  await page.keyboard.press(tab(browserName))
   await expect(rows(page).nth(0)).toBeFocused()
   await expect(rows(page).nth(0)).toHaveAttribute('aria-current', 'true')
 
@@ -841,8 +844,8 @@ test('the rail works by keyboard, is named for a screen reader, and Escape leave
   await expect(toggle(page)).toBeFocused()
   await expect(contents(page)).toBeVisible()
 
-  await page.keyboard.press('Tab')
-  await page.keyboard.press('Tab')
+  await page.keyboard.press(tab(browserName))
+  await page.keyboard.press(tab(browserName))
   await expect(rows(page).nth(1)).toBeFocused()
   await page.keyboard.press('Enter')
   await expect(page.locator('.title')).toHaveText('Two')
@@ -853,7 +856,7 @@ test('the rail works by keyboard, is named for a screen reader, and Escape leave
   await toggle(page).focus()
   await page.keyboard.press('Enter')
   await expect(contents(page)).toBeHidden()
-  await page.keyboard.press('Tab')
+  await page.keyboard.press(tab(browserName))
   await expect(page.locator('.contents-row:focus')).toHaveCount(0)
 })
 
