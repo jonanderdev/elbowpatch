@@ -80,5 +80,5 @@ for name, (path, axes) in FACES.items():
         print(file, len(cmap), 'characters')
 
 with open(f'{out}/coverage.json', 'w') as handle:
-    json.dump(coverage, handle, indent=0, sort_keys=True)
+    json.dump(coverage, handle, indent=2, sort_keys=True)
     handle.write('\n')
