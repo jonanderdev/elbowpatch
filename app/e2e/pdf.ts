@@ -3,6 +3,18 @@
 import type { Download } from '@playwright/test'
 import { getDocument, OPS } from 'pdfjs-dist/legacy/build/pdf.mjs'
 
+/** A piece of text as the file draws it: one word, with the font it is set in (the same id for the same font in the file). */
+export interface Run {
+  str: string
+  font: string
+  /** In points. */
+  size: number
+  x: number
+  width: number
+  /** The baseline, up from the foot of the page. */
+  y: number
+}
+
 export interface ReadPage {
   width: number
   height: number
@@ -10,6 +22,8 @@ export interface ReadPage {
   lines: string[]
   /** Every piece of text as it stands in the file, in order: what searching reads. */
   text: string
+  /** Every piece of text with where and in what it is drawn, in order. */
+  runs: Run[]
   /** What was drawn, as pdf.js reports it: the same for the same pages. */
   operators: string
 }
@@ -51,7 +65,17 @@ export async function readPdf(file: Download): Promise<{ count: number; pages: R
     const text = (items as { str: string }[]).map((item) => item.str).join('')
     // Which fonts are ready is the reader's own business (it adds a "dependency" operator as they load): not part of the page.
     const drawn = list.fnArray.map((fn, i) => [fn, list.argsArray[i]] as const).filter(([fn]) => fn !== OPS.dependency)
-    pages.push({ width: width as number, height: height as number, lines, text, operators: JSON.stringify([drawn, items]).replace(/g_d\d+_/g, 'g_') })
+    const runs = (items as { str: string; fontName: string; width: number; transform: number[] }[])
+      .filter((item) => item.str.trim() !== '')
+      .map((item) => ({
+        str: item.str,
+        font: item.fontName.replace(/^g_d\d+_/, ''),
+        size: Math.hypot(item.transform[0] as number, item.transform[1] as number),
+        x: item.transform[4] as number,
+        width: item.width,
+        y: item.transform[5] as number,
+      }))
+    pages.push({ width: width as number, height: height as number, lines, text, runs, operators: JSON.stringify([drawn, items]).replace(/g_d\d+_/g, 'g_') })
   }
   await task.destroy()
   return { count: pages.length, pages }
