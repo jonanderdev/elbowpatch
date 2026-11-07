@@ -85,11 +85,17 @@ const config: UserConfig = defineConfig({
         navigateFallback: 'index.html',
         // The first PDF fetches its code and fixed fonts and keeps them, so later ones need no network. Their names carry a
         // hash, so a kept file is never stale; a new version asks for new names, and the oldest are let go.
+        // The code asked for again after a failure carries a query (pdfFile.ts); the kept copy is found without it.
         runtimeCaching: [
           {
             urlPattern: ({ url }) => /\/assets\/((pdf|makePdf)-[^/]*\.js|[^/]*\.ttf)$/.test(url.pathname),
             handler: 'CacheFirst',
-            options: { cacheName: 'pdf', cacheableResponse: { statuses: [200] }, expiration: { maxEntries: 40 } },
+            options: {
+              cacheName: 'pdf',
+              cacheableResponse: { statuses: [200] },
+              expiration: { maxEntries: 40 },
+              matchOptions: { ignoreSearch: true },
+            },
           },
         ],
       },

@@ -195,3 +195,40 @@ test('a first PDF fetches its code and fonts, and later PDFs work offline', asyn
   await page.getByRole('button', { name: /PDF/ }).click()
   expect((await again).suggestedFilename()).toBe('On a train.pdf')
 })
+
+test('code that was fetched again after a failure is kept too, and later PDFs work offline', async ({ page, context, browserName }) => {
+  // Offline reaches the worker's own fetches in Chromium only (not Firefox), so only there does it prove the kept copy answers.
+  test.skip(browserName !== 'chromium', 'checked in Chromium')
+  test.setTimeout(120_000)
+  await essay(page)
+  await page.reload()
+  await page.evaluate(() => navigator.serviceWorker.ready)
+  await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true)
+  await expect(page.locator('.body')).toContainText(WORDS)
+
+  await context.route(PDF_CODE, (route) => route.abort())
+  await openExport(page)
+  await page.getByRole('button', { name: /PDF/ }).click()
+  await expect(page.getByRole('status').filter({ hasText: FAILED })).toBeVisible()
+  await context.unroute(PDF_CODE)
+
+  // The second try asks for the code under another address, and it is kept all the same.
+  const download = page.waitForEvent('download', { timeout: 60_000 })
+  await page.getByRole('button', { name: /PDF/ }).click()
+  expect((await download).suggestedFilename()).toBe('On a train.pdf')
+  await expect
+    .poll(async () => {
+      const held = Object.values(await cached(page)).flat()
+      return held.some((path) => PDF_CODE.test(path)) && held.some((path) => path.endsWith('.ttf'))
+    })
+    .toBe(true)
+
+  // A new session asks for the plain address: the kept copy answers.
+  await context.setOffline(true)
+  await page.reload()
+  await expect(page.locator('.body')).toContainText(WORDS)
+  await openExport(page)
+  const again = page.waitForEvent('download', { timeout: 60_000 })
+  await page.getByRole('button', { name: /PDF/ }).click()
+  expect((await again).suggestedFilename()).toBe('On a train.pdf')
+})
