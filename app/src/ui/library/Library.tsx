@@ -2,11 +2,12 @@ import { type ReactElement, useEffect, useRef, useState } from 'react'
 import type { Kind, Piece } from '../../domain/model'
 import { placePage } from '../../domain/pieces'
 import { screenOf } from '../../page/pager'
-import { ExportSheet, pdfNote } from '../components/ExportSheet'
+import { ExportSheet } from '../components/ExportSheet'
 import { IconButton } from '../components/Icon'
 import { ScrollMark } from '../components/ScrollMark'
 import { ThemeButton } from '../components/ThemeButton'
 import { useGoneUnder, useScrolled } from '../components/useScrolled'
+import { pdfNote, savedAs } from '../files/exportCopy'
 import { update, useSettings } from '../stores/settings'
 import { Colophon } from './Colophon'
 import { Empty, EmptyKind, KINDS, NewPiece } from './NewPiece'
@@ -245,13 +246,13 @@ export function Library({
             make: async () => {
               const name = await onExportPdf(exporting)
               setExporting(null)
-              if (name) setLine(`Saved as ${name}.`)
+              if (name) setLine(savedAs(name))
             },
           }}
           onMarkdown={async () => {
             const name = await onExport(exporting)
             setExporting(null)
-            if (name) setLine(`Saved as ${name}.`)
+            if (name) setLine(savedAs(name))
           }}
           onDone={() => setExporting(null)}
         />

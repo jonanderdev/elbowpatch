@@ -20,9 +20,9 @@ import {
 import type { WriterLock } from '../../domain/ports'
 import { forgetPutAway, thin } from '../../domain/thinning'
 import { isoDay } from '../../domain/words'
-import { download, downloadBytes } from '../files/download'
+import { download } from '../files/download'
 import { downloadEverything } from '../files/everything'
-import { pdfFile } from '../files/pdfFile'
+import { savePdf } from '../files/pdfFile'
 import { Library } from '../library/Library'
 import { titleOf } from '../page/fields'
 import { type OpenAt, type Opened, Page } from '../page/Page'
@@ -443,9 +443,7 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
             if (opened?.piece.id === piece.id) await flushPage.current?.()
             const found = await openPiece(deps, piece.id)
             if (!found) return undefined
-            const file = await pdfFile(found.piece, found.sections)
-            downloadBytes(file.name, file.bytes, 'application/pdf')
-            return file.name
+            return savePdf(found.piece, found.sections)
           }}
           onOpen={(piece) => {
             // The piece behind the library is already laid out: Continue is instant. Not a journal left

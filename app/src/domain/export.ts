@@ -24,6 +24,9 @@ export function pieceAsMarkdown(piece: Piece, sections: OpenSection[]): { name: 
   }
 }
 
+/** The PDF's code or one of its font files could not be fetched. Offline, the writer is told so; any other failure is not this. */
+export class PdfLoadError extends Error {}
+
 /** The name a piece's file has: its title without what a file name cannot hold, and the extension. */
 export function fileName(title: string, extension: 'md' | 'pdf'): string {
   return `${title.replace(/[\\/:*?"<>|]/g, '').trim() || 'Untitled'}.${extension}`
