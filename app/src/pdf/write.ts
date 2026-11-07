@@ -25,6 +25,7 @@ import {
   setTextMatrix,
 } from 'pdf-lib'
 import type { Paper } from '../domain/paper'
+import { breathe } from './breathe'
 import { faceBytes } from './fonts'
 import { advance, draw as drawn } from './images'
 import type { FaceName, Line } from './layout'
@@ -148,6 +149,7 @@ export async function write({ sheets, ruled, paper, title, lang }: Printed): Pro
   const size = PAPER[paper]
   const left = columnLeft(paper)
   for (const sheet of sheets) {
+    await breathe()
     const page = doc.addPage([size.width, size.height])
     if (ruled) page.drawRectangle({ x: left - RULE_FROM_TEXT, y: 0, width: RULE_WIDTH, height: size.height, color: color(RULE) })
     const keys = new Map<string, PDFName>()
@@ -191,6 +193,7 @@ export async function write({ sheets, ruled, paper, title, lang }: Printed): Pro
       continue
     }
     for (const line of sheet.lines) {
+      await breathe()
       for (const [i, fragment] of line.fragments.entries()) {
         const next = line.fragments[i + 1]
         let tail = next?.spaced ? ' ' : ''

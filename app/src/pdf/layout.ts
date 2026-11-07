@@ -4,6 +4,7 @@
 
 import { type Block, BREAK, type Span } from '../domain/markdown'
 import type { Paper } from '../domain/paper'
+import { breathe } from './breathe'
 import { BODY, COLUMN, INK, LEADING, PARAGRAPH_GAP, TITLE_SCALE, textHeight } from './page'
 
 const K = 8
@@ -94,7 +95,7 @@ export async function layOut(title: string, blocks: Block[], paper: Paper, lang:
   for (const [i, block] of blocks.entries()) root.append(element(block, blocks[i - 1], i === 0, i === blocks.length - 1, look))
   document.body.append(root)
   try {
-    return read(root)
+    return await read(root)
   } finally {
     root.remove()
   }
@@ -264,7 +265,7 @@ class Baselines {
 
 const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
 
-function read(root: HTMLElement): Line[][] {
+async function read(root: HTMLElement): Promise<Line[][]> {
   const origin = root.getBoundingClientRect()
   const baselines = new Baselines()
   const pages: Line[][] = [[]]
@@ -308,7 +309,8 @@ function read(root: HTMLElement): Line[][] {
       continue
     }
     const sizePx = Number.parseFloat(getComputedStyle(node.parentElement as Element).fontSize)
-    words.forEach((match, w) => {
+    for (const [w, match] of words.entries()) {
+      await breathe()
       const word = match[0]
       const start = match.index as number
       const range = document.createRange()
@@ -320,7 +322,7 @@ function read(root: HTMLElement): Line[][] {
       if (rects.length <= 1) {
         const r = rects[0]
         if (r) place(word, node, r, r.top, space, false, false)
-        return
+        continue
       }
       // The word is split across lines: by a hyphen the browser added, or at the column's edge.
       const pieces: { text: string; box: Box; top: number; hyphenBox: boolean }[] = []
@@ -350,7 +352,7 @@ function read(root: HTMLElement): Line[][] {
         const box = { ...piece.box, right: Math.max(piece.box.right, line?.right ?? 0) }
         place(piece.text, node, box, piece.top, i === 0 ? space : false, i < pieces.length - 1, piece.hyphenBox)
       })
-    })
+    }
     spaced = /\s$/u.test(data)
   }
   for (const page of pages) {
