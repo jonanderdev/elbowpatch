@@ -1471,6 +1471,12 @@ button.count[aria-expanded='true'] {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* The rows stand 4px apart (Figma, Export sheet), closer than the sheet's own parts. */
+.sheet-options {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
 .sheet-row {
   display: flex;
   flex-direction: column;

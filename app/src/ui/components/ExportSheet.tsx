@@ -32,18 +32,20 @@ export function ExportSheet(props: { title: string; pdf?: PdfRow; onMarkdown(): 
         <span>Export</span>
         <span className="sheet-aside">{props.title}</span>
       </div>
-      <button ref={first} type="button" className="sheet-row" onClick={() => state !== 'working' && props.onMarkdown()}>
-        <span className="sheet-row-name">Markdown</span>
-        <span className="sheet-row-note">One .md file, plain text any app can open.</span>
-      </button>
-      {props.pdf && (
-        <button type="button" className="sheet-row" aria-busy={state === 'working'} onClick={() => void makePdf()}>
-          <span className="sheet-row-name">PDF</span>
-          <span className="sheet-row-note" role="status">
-            {state === 'working' ? WORKING : state === 'failed' ? FAILED : props.pdf.note}
-          </span>
+      <div className="sheet-options">
+        <button ref={first} type="button" className="sheet-row" onClick={() => state !== 'working' && props.onMarkdown()}>
+          <span className="sheet-row-name">Markdown</span>
+          <span className="sheet-row-note">One .md file, plain text any app can open.</span>
         </button>
-      )}
+        {props.pdf && (
+          <button type="button" className="sheet-row" aria-busy={state === 'working'} onClick={() => void makePdf()}>
+            <span className="sheet-row-name">PDF</span>
+            <span className="sheet-row-note" role="status">
+              {state === 'working' ? WORKING : state === 'failed' ? FAILED : props.pdf.note}
+            </span>
+          </button>
+        )}
+      </div>
       <div className="sheet-foot">
         <button type="button" className="text-link" onClick={props.onDone}>
           Done
