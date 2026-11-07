@@ -259,14 +259,41 @@ test('the arrows move between months, and the count follows', async ({ page }) =
   await expect(page.locator('.title')).toHaveText('Saturday 12 September')
 })
 
+test('a day’s first page names the journal in the head, and opens the month from it', async ({ page }) => {
+  phoneOnly(page)
+  await openJournal(page)
+  // Today, on its one page: the date is on the page, so the head names the journal.
+  await expect(page.locator('.title')).toHaveText('Friday 30 October')
+  const head = page.getByRole('button', { name: 'Journal. Days' })
+  await expect(head).toBeVisible()
+  await expect(head.locator('.icon')).toBeVisible()
+  await head.click()
+  await expect(sheet(page)).toBeVisible()
+  await expect(head).toHaveAttribute('aria-expanded', 'true')
+  expect((await sheet(page).boundingBox())!.y).toBe(56)
+  await day(page, '26 October, written').click()
+  await expect(page.locator('.title')).toHaveText('Monday 26 October')
+  await expect(head).toBeVisible()
+})
+
+test('the journal’s title page has no head', async ({ page }) => {
+  phoneOnly(page)
+  await openJournal(page)
+  await openMonth(page)
+  await sheet(page).getByRole('button', { name: 'September 2026' }).click()
+  await day(page, '12 September, written').click()
+  await expect(page.locator('.title')).toHaveText('Saturday 12 September')
+  await page.keyboard.press('PageUp')
+  await expect(page.locator('.book-title')).toBeInViewport()
+  await expect(page.locator('.running-control')).toHaveCount(0)
+})
+
 test('from a day’s second page the running head names the day and drops the month under the head', async ({ page }) => {
   phoneOnly(page)
   await openJournal(page)
   await openMonth(page)
   await day(page, '26 October, written').click()
   await expect(page.locator('.title')).toHaveText('Monday 26 October')
-  // Its opening page carries the date already.
-  await expect(page.locator('.running-control')).toHaveCount(0)
   await page.keyboard.press('PageDown')
   const head = page.getByRole('button', { name: 'Monday 26 October. Days' })
   await head.click()

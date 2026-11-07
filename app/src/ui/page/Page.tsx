@@ -718,9 +718,9 @@ export function Page({
             {newChapter}
           </ContentsRail>
         ) : null}
-        {phone && (book ? !(titlePage && page === 0) : journal && page > openingAt) ? (
-          // A chapter's opening page carries its title already: its head names the book, and Contents stays in reach.
-          // A day's has no head: its date is on the page, and the count opens Days (DESIGN.md, The journal).
+        {phone && (book || journal) && !(titlePage && page === 0) ? (
+          // A chapter's or a day's opening page carries its title or date already: its head names the book or the
+          // journal, and Contents or Days stays in reach (DESIGN.md, Books and chapters, The journal).
           <RunningHeadControl title={openingPage ? name : heading} label={journal ? 'Days' : 'Contents'} open={sheet === 'contents'} onOpen={openContents} />
         ) : page > openingAt ? (
           <div className="running-head">{heading}</div>
