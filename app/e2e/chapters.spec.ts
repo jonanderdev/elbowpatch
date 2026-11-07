@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-import { caretToEnd, saved } from './helpers'
+import { caretToEnd, saved, write } from './helpers'
 
 // Contents: a sheet on a phone (#55), the rail on desktop (#57).
 const onDesktop = (page: Page) => page.viewportSize()!.width >= 700
@@ -454,6 +454,20 @@ test('a long name runs downwards in the path to three lines, then cuts, and the 
   // Shortened again, the rail goes back.
   await named('Harbour')
   await expect.poll(async () => (await line.boundingBox())!.y).toBe(76)
+})
+
+test('§ and the word beside it stand in the same place in the library, on a book and on an essay', async ({ page }) => {
+  desktopOnly(page)
+  await importBook(page, TWO)
+  const on = async (home: string) => (await page.locator(home).boundingBox())!.y
+  const book = { mark: await on('.head .home span:first-child'), word: await on('.head .home-word') }
+  await page.locator('.head .home').click()
+  await expect(page.locator('.rail-mark')).toBeVisible()
+  expect(await on('.rail-mark .home')).toBe(book.mark)
+  await write(page, 'Essay')
+  await expect(page.locator('.title')).toBeFocused()
+  expect(await on('.head .home span:first-child')).toBe(book.mark)
+  expect(await on('.head .home-word')).toBe(book.word)
 })
 
 test('a failed save stands in the rail, above + New chapter, with every word and every chapter in reach', async ({ page }) => {
