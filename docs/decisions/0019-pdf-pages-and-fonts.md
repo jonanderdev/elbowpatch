@@ -1,0 +1,26 @@
+# 19. How a PDF is made: the pages, the fonts and the library
+
+Date: 2026-11-07 · Status: accepted
+
+The reasons for making the file in the app are in 0007. This records how, and what was tried.
+
+## The browser sets the lines; the app writes the file
+- The text is laid out off screen by the browser, in CSS columns one printed page tall, at **8 times** the printed size and divided again. WebKit rounds the boxes it reports to whole pixels, so at 1x a word could be 1 px out; at 8x the same. Every browser takes this one path.
+- The layout takes nothing from the screen, the text settings or the theme: its own column (117 mm), body 11 pt, leading 1.55, titles 2.05 times, paper colours. Only the writer's *indent* and *drop cap* settings enter, because they are how the writer sets their own text. A drop cap is a floated first letter, the same in every browser, since not all have `initial-letter`.
+- Each word is read back with a `Range`, a line at a time; a word split by a hyphen or at the column's edge is read letter by letter. The hyphen is not in the DOM, so it is found where the browser left it: a box of its own (Chromium) or room in the word's box (Firefox, WebKit). Each word is then placed where the browser put it, in a real run of glyphs with a real space between words, so the text can be selected and searched. Kerning, which `pdf-lib` leaves out, is put back with the numbers of a `TJ` array. A baseline is found once for each style by a probe, since browsers measure a text box from different font metrics.
+- **The same pages hold within one browser, not across browsers.** Hyphenation differs by engine and operating system, so a piece exported from Safari on a phone and from Chrome on a Mac can break its lines, and so its pages, differently. Doing the hyphenation ourselves, with a pattern file for each language, would make them equal; it was left for when it is missed.
+- Letter-spacing switches ligatures off in a browser, and the title has some; the title is drawn without them, as the browser measured it.
+- The paragraph space is one line of the leading, as the Ready frames of the printed pages show (DESIGN.md says "the screen's paragraph space", which on screen is one em; the frames win).
+- Optical size is in CSS px, as the browser sets it, in the layout and in the fixed fonts alike: 11 pt is `opsz` 14.667.
+
+## Fonts
+- `pdf-lib` and fontkit cannot embed the shipped `woff2` (fontkit cannot vary a `woff2`), and embed only a variable font's default weight. So **fixed files** are made at build time (`scripts/pdf-fonts.mjs`, which needs Python and fonttools once, and is run by hand; its output is committed): Literata at 300 (title), 360 (text), 600 (bold, drop cap) and italic 400 (running head), and EB Garamond italic at 400 and 600, from the same versions as the web fonts (Literata 3.103, EB Garamond 1.003).
+- Latin, extended Latin and Vietnamese are in **one file** per face. A word such as `Łódź` or `Việt` needs glyphs that the web fonts keep in three files; from one file, it sets.
+- The files are fetched when the first PDF is made, not installed (0011 is amended). Cyrillic, Greek and the characters no font holds are for #99.
+
+## The library
+- `pdf-lib` 1.17.1 and `@pdf-lib/fontkit` 1.1.1 (MIT, with `pako`, MIT and Zlib, which `pdf-lib` uses), about 510 KB gzipped with the app's own PDF code. Their last releases are from 2022; they run in current Chromium, WebKit and Firefox. They are the only pair that writes real text with embedded subset fonts in the browser; a smaller route (drawing each page as an image) would make a file that cannot be searched. The code is one lazy chunk named `pdf`, left out of the install, so a writer who never makes a PDF pays nothing, and the main bundle did not grow.
+- `pdfjs-dist` (Apache-2.0) reads the file back in the tests only; it is a development dependency and never in the app.
+
+## Known, and left
+- A retry after a failed first load works in Chromium and Firefox; WebKit remembers a module that failed until the page is loaded again.
