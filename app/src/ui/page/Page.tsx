@@ -861,18 +861,14 @@ export function Page({
         <ExportSheet
           title={heading || (journal ? piece.title : 'Untitled')}
           style={anchor}
-          pdf={
-            pdfNote(piece.kind) !== undefined
-              ? {
-                  note: pdfNote(piece.kind) ?? '',
-                  make: async () => {
-                    const name = await exportPdf()
-                    closeSheet()
-                    if (name) setLine(`Saved as ${name}.`)
-                  },
-                }
-              : undefined
-          }
+          pdf={{
+            note: pdfNote(piece.kind),
+            make: async () => {
+              const name = await exportPdf()
+              closeSheet()
+              if (name) setLine(`Saved as ${name}.`)
+            },
+          }}
           onMarkdown={async () => {
             const name = await exportMarkdown()
             closeSheet()

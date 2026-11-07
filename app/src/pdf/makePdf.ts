@@ -19,11 +19,19 @@ export type { Look }
 export async function makePdf(piece: Piece, sections: OpenSection[], paper: Paper, look: Look): Promise<Uint8Array> {
   const sheets: Sheet[] = []
   let number = 0
+  // A book's contents lists the same rows the pages are laid out from, and is written with them once every
+  // page is laid out: the number beside a chapter is the one its first page is printed with, so they cannot disagree.
+  const chapters: { title: string; number: number }[] = []
   for (const item of printOrder(piece, sections)) {
     if (item.kind === 'title') {
       sheets.push(item)
       continue
     }
+    if (item.kind === 'contents') {
+      sheets.push({ kind: 'contents', rows: chapters })
+      continue
+    }
+    chapters.push({ title: item.heading, number: number + 1 })
     const pages = await layOut(item.heading, parse(item.content), paper, piece.lang, look)
     // The running head carries from a section's second page; its first opens under its heading. Only text is counted.
     for (const [i, lines] of pages.entries()) sheets.push({ kind: 'text', lines, head: i > 0 ? item.heading : '', number: ++number })

@@ -8,11 +8,11 @@ export interface PdfRow {
   make(): Promise<void>
 }
 
-/** The line under a piece's PDF row, by kind (DESIGN.md, Export); none where a kind has no PDF yet, which leaves the row out. */
-export function pdfNote(kind: Kind): string | undefined {
+/** The line under a piece's PDF row, by kind (DESIGN.md, Export). */
+export function pdfNote(kind: Kind): string {
   if (kind === 'essay') return 'Numbered pages to print or keep.'
   if (kind === 'journal') return 'Numbered pages to print or keep, each day on a fresh page.'
-  return undefined
+  return 'Numbered pages to print or keep, with contents at the front.'
 }
 
 const WORKING = 'Setting your pages…'

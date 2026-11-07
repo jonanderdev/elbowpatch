@@ -467,6 +467,234 @@ test.describe('a journal', () => {
   })
 })
 
+/** Stores a book with these chapters, as earlier sessions left it, and opens it on its title page. */
+async function book(page: Page, title: string, chapters: [string, string][], subtitle?: string): Promise<void> {
+  await page.clock.setFixedTime(NOW)
+  await page.goto('./')
+  await expect(page.locator('.start.book')).toBeVisible()
+  const sections = chapters.map(([name], i) => ({ sectionId: `chapter-${i}`, title: name }))
+  const piece = {
+    id: 'book',
+    kind: 'book',
+    lang: 'en',
+    createdAt: NOW.getTime() - 1000,
+    updatedAt: NOW.getTime() - 1000,
+    title,
+    ...(subtitle ? { subtitle } : {}),
+    sections,
+    words: Object.fromEntries(chapters.map(([, text], i) => [`chapter-${i}`, text.split(/\s+/).filter(Boolean).length])),
+    outlineId: null,
+  }
+  const working = chapters.map(([, text], i) => ({
+    sectionId: `chapter-${i}`,
+    pieceId: piece.id,
+    content: text,
+    baseVersionId: null,
+    updatedAt: NOW.getTime() - 1000,
+  }))
+  await page.evaluate(
+    ({ piece, working }) =>
+      new Promise<void>((done) => {
+        const open = indexedDB.open('elbowpatch')
+        open.onsuccess = () => {
+          const db = open.result
+          const tx = db.transaction(['pieces', 'working'], 'readwrite')
+          tx.objectStore('pieces').put(piece)
+          for (const w of working) tx.objectStore('working').put(w)
+          tx.oncomplete = () => {
+            db.close()
+            done()
+          }
+        }
+      }),
+    { piece, working },
+  )
+  await page.reload()
+  await page.locator('.row', { hasText: title }).or(page.locator('.continue')).first().click()
+  await expect(page.locator('.book-title')).toBeVisible()
+}
+
+const CHAPTERS: [string, string][] = [
+  ['The ferry at seven', 'The first boat was late, and nobody on the quay minded.'],
+  ['A room above the chandler', LONG.repeat(2)],
+  ['Salt on the windows', ''],
+  ['What the harbourmaster kept', 'A ledger, a lamp, and the key to the lower door.'],
+]
+
+/** What a contents page lists: each row's title and the number at its right, read back from the lines. */
+function contentsOf(sheets: { lines: string[] }[]): { title: string; number: number }[] {
+  return sheets
+    .flatMap((s) => s.lines)
+    .filter((l) => l !== 'Contents')
+    .map((line) => {
+      const [, title, number] = /^(.*\D)(\d+)$/.exec(line) ?? []
+      return { title: (title as string).trim(), number: Number(number) }
+    })
+}
+
+test.describe('a book', () => {
+  test('the row says the pages come with contents', async ({ page }) => {
+    await book(page, 'The harbour in winter', CHAPTERS)
+    await openExport(page)
+    await expect(page.getByRole('button', { name: /PDF/ })).toContainText('Numbered pages to print or keep, with contents at the front.')
+  })
+
+  test('opens with its title page, then Contents, neither numbered nor counted, and chapter 1 on page 1', async ({ page }) => {
+    await book(page, 'The harbour in winter', CHAPTERS, 'a story in six chapters')
+    const { file, pdf } = await makePdf(page)
+    expect(file.suggestedFilename()).toBe('The harbour in winter.pdf')
+    const [titlePage, contents, first] = pdf.pages
+    expect(titlePage?.lines).toEqual(['The harbour in winter', 'a story in six chapters'])
+    expect(contents?.lines[0]).toBe('Contents')
+    // Contents does not carry the book's title, which is on the title page.
+    expect(contents?.text).not.toContain('harbour in winter')
+    // Neither sheet has a number or a running head: nothing stands in the top or the foot margin.
+    for (const sheet of [titlePage, contents]) for (const run of sheet?.runs ?? []) expect(run.y > 60 && run.y < (sheet?.height ?? 0) - 60).toBe(true)
+    expect(first?.lines[0]).toBe('The ferry at seven')
+    expect(first?.lines.at(-1)).toBe('1')
+  })
+
+  test('Contents lists every chapter with the page it really starts on, read back from the file', async ({ page }) => {
+    await book(page, 'The harbour in winter', CHAPTERS)
+    const { pdf } = await makePdf(page)
+    // Chapter 1 stands on the sheet numbered 1; everything before it is the title page and Contents.
+    const one = pdf.pages.findIndex((p) => p.lines.at(-1) === '1')
+    expect(one).toBe(2)
+    const listed = contentsOf(pdf.pages.slice(1, one))
+    expect(listed.map((row) => row.title)).toEqual(CHAPTERS.map(([name]) => name))
+    // Where each chapter really starts: the first sheet that opens on its title.
+    const starts = CHAPTERS.map(([name]) => pdf.pages.findIndex((p, i) => i >= one && p.lines[0] === name) - one + 1)
+    expect(listed.map((row) => row.number)).toEqual(starts)
+    // The long chapter has more than one page, so the numbers are not just 1, 2, 3, 4.
+    expect(starts).not.toEqual([1, 2, 3, 4])
+    // Each of those sheets is printed with that number.
+    for (const n of starts) expect(pdf.pages[one + n - 1]?.lines.at(-1)).toBe(String(n))
+  })
+
+  test('each chapter starts on a fresh page, and its later pages carry its title as the running head', async ({ page }) => {
+    await book(page, 'The harbour in winter', CHAPTERS)
+    const { pdf } = await makePdf(page)
+    const chapters = pdf.pages.slice(2)
+    // The long chapter runs over: its first page has the title once, as its heading, and its next ones as the head.
+    const long = chapters.filter((p) => p.lines[0] === 'A room above the chandler')
+    expect(long.length).toBeGreaterThan(1)
+    expect(long[0]?.lines.filter((l) => l === 'A room above the chandler')).toHaveLength(1)
+    expect(long[0]?.text).toContain('We kept the lamp')
+    // The next chapter's words never share a page with it.
+    expect(long.some((p) => p.text.includes('ledger'))).toBe(false)
+    expect(chapters.find((p) => p.text.includes('ledger'))?.lines[0]).toBe('What the harbourmaster kept')
+    // The numbers run on, one for each page after Contents.
+    for (const [i, sheet] of chapters.entries()) expect(sheet.lines.at(-1)).toBe(String(i + 1))
+  })
+
+  test('an empty chapter stays in the book and in Contents', async ({ page }) => {
+    await book(page, 'The harbour in winter', CHAPTERS)
+    const { pdf } = await makePdf(page)
+    const sheet = pdf.pages.find((p, i) => i > 1 && p.lines[0] === 'Salt on the windows')
+    // Its own page, with its title and its number, and nothing else.
+    expect(sheet?.lines).toEqual(['Salt on the windows', sheet?.lines.at(-1)])
+    expect(Number(sheet?.lines.at(-1))).toBeGreaterThan(1)
+    const listed = contentsOf(pdf.pages.slice(1, 2))
+    expect(listed.find((row) => row.title === 'Salt on the windows')?.number).toBe(Number(sheet?.lines.at(-1)))
+    // The chapter after it starts on the page after it.
+    expect(listed.find((row) => row.title === 'What the harbourmaster kept')?.number).toBe(Number(sheet?.lines.at(-1)) + 1)
+  })
+
+  test('a book with no words still makes a file: its title page, its Contents and a page for each chapter', async ({ page }) => {
+    await book(page, 'The harbour in winter', [
+      ['One', ''],
+      ['Two', '  \n '],
+    ])
+    const { pdf } = await makePdf(page)
+    expect(pdf.count).toBe(4)
+    expect(pdf.pages[0]?.lines).toEqual(['The harbour in winter'])
+    expect(contentsOf(pdf.pages.slice(1, 2))).toEqual([
+      { title: 'One', number: 1 },
+      { title: 'Two', number: 2 },
+    ])
+    expect(pdf.pages[2]?.lines).toEqual(['One', '1'])
+    expect(pdf.pages[3]?.lines).toEqual(['Two', '2'])
+  })
+
+  test('a chapter with no title is called Untitled, as Contents calls it', async ({ page }) => {
+    await book(page, 'The harbour in winter', [['', 'Words in a chapter with no name.']])
+    const { pdf } = await makePdf(page)
+    expect(contentsOf(pdf.pages.slice(1, 2))).toEqual([{ title: 'Untitled', number: 1 }])
+    expect(pdf.pages[2]?.lines[0]).toBe('Untitled')
+  })
+
+  test('Contents is set as the frame draws it: small italic label, titles at the left, numbers flush right', async ({ page }) => {
+    await book(page, 'The harbour in winter', CHAPTERS)
+    const { pdf } = await makePdf(page)
+    const sheet = pdf.pages[1]
+    const mm = 72 / 25.4
+    const label = starting(sheet?.runs ?? [], 'Contents')
+    expect(label.size).toBeCloseTo(11, 1)
+    const first = starting(sheet?.runs ?? [], 'The')
+    expect(first.size).toBeCloseTo(11, 1)
+    expect(first.font).not.toBe(label.font)
+    expect(first.x).toBeCloseTo(((sheet?.width ?? 0) - 117 * mm) / 2, 0)
+    // The rows stand 27.05 pt apart: 6 above the line, 17.05 of line, 4 between.
+    const second = starting(sheet?.runs ?? [], 'A')
+    expect(first.y - second.y).toBeCloseTo(27.05, 0)
+    // Under the label, as its 11 pt line and 4 pt gap leave room.
+    expect(label.y - first.y).toBeGreaterThan(20)
+    expect(label.y - first.y).toBeLessThan(32)
+    // Each number ends at the column's right edge.
+    const numbers = (sheet?.runs ?? []).filter((r) => /^\d+$/.test(r.str))
+    expect(numbers).toHaveLength(CHAPTERS.length)
+    for (const n of numbers) expect(n.x + n.width).toBeCloseTo(((sheet?.width ?? 0) + 117 * mm) / 2, 0)
+  })
+
+  test('a long chapter title goes on to a second line, and its number stays on the first', async ({ page }) => {
+    const name = 'The very long account of what the harbourmaster kept in the lower drawer of the old desk'
+    await book(page, 'The harbour in winter', [[name, 'Words.']])
+    const { pdf } = await makePdf(page)
+    const sheet = pdf.pages[1]
+    expect(sheet?.lines).toHaveLength(3)
+    expect(sheet?.lines.at(-1)).not.toMatch(/\d$/)
+    expect(sheet?.lines[1]).toMatch(/1$/)
+    expect(
+      sheet?.lines
+        .slice(1)
+        .join(' ')
+        .replace(/\s1$/, '')
+        .replace(/\s*1\s/, ' '),
+    ).toContain('lower drawer')
+  })
+
+  test('a long Contents goes on to more sheets, none of them numbered, and the numbers do not move', async ({ page }) => {
+    const many: [string, string][] = Array.from({ length: 45 }, (_, i) => [
+      `Chapter ${String.fromCharCode(65 + (i % 26))}${String.fromCharCode(97 + Math.floor(i / 26))}x`,
+      'Some words.',
+    ])
+    await book(page, 'The harbour in winter', many)
+    const { pdf } = await makePdf(page)
+    const one = pdf.pages.findIndex((p) => p.lines.at(-1) === '1')
+    expect(one).toBeGreaterThan(2)
+    const listed = contentsOf(pdf.pages.slice(1, one))
+    expect(listed.map((row) => row.title)).toEqual(many.map(([name]) => name))
+    expect(listed.map((row) => row.number)).toEqual(many.map((_, i) => i + 1))
+    expect(pdf.count).toBe(one + many.length)
+  })
+
+  test.describe('on A4', () => {
+    test.use({ locale: 'en-GB' })
+
+    test('the title page and Contents follow the paper', async ({ page }) => {
+      await book(page, 'The harbour in winter', CHAPTERS, 'a story in six chapters')
+      const { pdf } = await makePdf(page)
+      const [titlePage, contents] = pdf.pages
+      expect(Math.round(titlePage?.width ?? 0)).toBe(595)
+      // The frame has the title's line box 189 pt from the top: its baseline is at 221.8.
+      expect((titlePage?.height ?? 0) - starting(titlePage?.runs ?? [], 'The').y).toBeCloseTo(221.8, 0)
+      // Contents' label stands 25 mm from the top, as the frame has it (70 pt, then its line).
+      expect((contents?.height ?? 0) - starting(contents?.runs ?? [], 'Contents').y).toBeLessThan(70.87 + 20)
+      expect((contents?.height ?? 0) - starting(contents?.runs ?? [], 'Contents').y).toBeGreaterThan(70.87)
+    })
+  })
+})
+
 test.describe('in the piece’s own language', () => {
   test.use({ locale: 'de-DE' })
 

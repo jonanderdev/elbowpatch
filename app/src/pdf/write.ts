@@ -30,7 +30,12 @@ import { faceBytes } from './fonts'
 import { advance, draw as drawn } from './images'
 import type { FaceName, Line } from './layout'
 import {
+  BODY,
   COLUMN,
+  CONTENTS_GAP,
+  CONTENTS_LEADING,
+  CONTENTS_NUMBER_ROOM,
+  CONTENTS_ROW_ABOVE,
   columnLeft,
   INK,
   MARGIN_TOP,
@@ -49,6 +54,7 @@ import {
   TITLE_PAGE_TITLE,
   TITLE_PAGE_TITLE_LEADING,
   TITLE_PAGE_TOP,
+  textHeight,
 } from './page'
 
 import { fileOf, type Script, splitRuns } from './runs'
@@ -59,6 +65,8 @@ const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
 export type Sheet =
   /** A title page: no running head and no number. */
   | { kind: 'title'; title: string; subtitle: string }
+  /** A book's contents: no running head and no number, and as many sheets as its rows need. Each row is a chapter's title and the page it starts on. */
+  | { kind: 'contents'; rows: { title: string; number: number }[] }
   /** Text already set into lines, with its running head ('' for none) and the number it is printed with. */
   | { kind: 'text'; lines: Line[]; head: string; number: number }
 
@@ -148,7 +156,13 @@ export async function write({ sheets, ruled, paper, title, lang }: Printed): Pro
 
   const size = PAPER[paper]
   const left = columnLeft(paper)
+  // Contents may need more than one sheet; how many is known once its rows are measured.
+  const pages: Leaf[] = []
   for (const sheet of sheets) {
+    if (sheet.kind === 'contents') pages.push(...(await contentsLeaves(sheet.rows, { face, shape, total }, textHeight(paper))))
+    else pages.push(sheet)
+  }
+  for (const sheet of pages) {
     await breathe()
     const page = doc.addPage([size.width, size.height])
     if (ruled) page.drawRectangle({ x: left - RULE_FROM_TEXT, y: 0, width: RULE_WIDTH, height: size.height, color: color(RULE) })
@@ -192,6 +206,10 @@ export async function write({ sheets, ruled, paper, title, lang }: Printed): Pro
       await titlePage(sheet, left, size.height, { face, shape, total, draw })
       continue
     }
+    if (sheet.kind === 'contents') {
+      await contentsPage(sheet, left, { face, shape, total, draw })
+      continue
+    }
     for (const line of sheet.lines) {
       await breathe()
       for (const [i, fragment] of line.fragments.entries()) {
@@ -221,6 +239,16 @@ export async function write({ sheets, ruled, paper, title, lang }: Printed): Pro
   return doc.save()
 }
 
+/** A sheet as it is drawn: a contents sheet is one sheet of a book's contents, its rows already broken into lines. */
+type Leaf = Exclude<Sheet, { kind: 'contents' }> | ContentsLeaf
+
+interface ContentsLeaf {
+  kind: 'contents'
+  /** The first sheet opens with its label, *Contents*. */
+  label: boolean
+  rows: { lines: string[]; number: string /** From the top of the text area, to the top of the row's first line. */; top: number }[]
+}
+
 /** What a title page needs of the file being written: the faces, the parts a text is drawn in, and drawing them. */
 interface Tools {
   face(name: FaceName, script: Script): Promise<Face>
@@ -247,6 +275,62 @@ async function titlePage(sheet: { title: string; subtitle: string }, left: numbe
   }
   await set('literata-300-title', sheet.title, TITLE_PAGE_TITLE, TITLE_PAGE_TITLE * TITLE_PAGE_TITLE_LEADING, -0.012)
   await set('literata-italic-400', sheet.subtitle, TITLE_PAGE_SUBTITLE, TITLE_PAGE_SUBTITLE * TITLE_PAGE_SUBTITLE_LEADING, 0)
+}
+
+/**
+ * A book's contents as its sheets: the label, then a row for each chapter, its title at the left and its
+ * page number flush right on the first line. A title too long for the room goes on to more lines. A row that
+ * would pass the foot of the text starts another sheet, which has no label.
+ */
+async function contentsLeaves(
+  rows: { title: string; number: number }[],
+  tools: Pick<Tools, 'face' | 'shape' | 'total'>,
+  room: number,
+): Promise<ContentsLeaf[]> {
+  const label = (await tools.face('literata-italic-400', 'latin')).metrics
+  const leaves: ContentsLeaf[] = [{ kind: 'contents', label: true, rows: [] }]
+  // The label's line is as tall as its font says; the first row's top space comes under the gap.
+  let cursor = ((label.ascent - label.descent) / label.unitsPerEm) * BODY + CONTENTS_GAP
+  for (const row of rows) {
+    const number = String(row.number)
+    const numberWidth = tools.total(await tools.shape('literata-360', number, BODY))
+    const lines = await wrapped(
+      row.title,
+      async (line) => tools.total(await tools.shape('literata-360', line, BODY)),
+      COLUMN - numberWidth - CONTENTS_NUMBER_ROOM,
+    )
+    const height = lines.length * CONTENTS_LEADING
+    let leaf = leaves.at(-1) as ContentsLeaf
+    if (leaf.rows.length > 0 && cursor + CONTENTS_ROW_ABOVE + height > room) {
+      leaf = { kind: 'contents', label: false, rows: [] }
+      leaves.push(leaf)
+      // On a sheet without a label the first row's text stands at the top of the text area.
+      cursor = -CONTENTS_ROW_ABOVE
+    }
+    leaf.rows.push({ lines, number, top: cursor + CONTENTS_ROW_ABOVE })
+    cursor += CONTENTS_ROW_ABOVE + height + CONTENTS_GAP
+  }
+  return leaves
+}
+
+/** One sheet of contents: titles in the title colour at the left, numbers in secondary grey ending at the column's right edge. */
+async function contentsPage(sheet: ContentsLeaf, left: number, tools: Tools): Promise<void> {
+  const metrics = (await tools.face('literata-360', 'latin')).metrics
+  // A line box is `leading` tall and the text sits in its middle, as a browser sets it.
+  const above = (CONTENTS_LEADING - ((metrics.ascent - metrics.descent) / metrics.unitsPerEm) * BODY) / 2 + (metrics.ascent / metrics.unitsPerEm) * BODY
+  if (sheet.label) {
+    const italic = (await tools.face('literata-italic-400', 'latin')).metrics
+    const parts = await tools.shape('literata-italic-400', 'Contents', BODY)
+    await tools.draw('literata-italic-400', parts, BODY, left, MARGIN_TOP + (italic.ascent / italic.unitsPerEm) * BODY, SECONDARY)
+  }
+  for (const row of sheet.rows) {
+    for (const [i, line] of row.lines.entries()) {
+      const parts = await tools.shape('literata-360', line, BODY)
+      await tools.draw('literata-360', parts, BODY, left, MARGIN_TOP + row.top + i * CONTENTS_LEADING + above, INK)
+    }
+    const number = await tools.shape('literata-360', row.number, BODY)
+    await tools.draw('literata-360', number, BODY, left + COLUMN - tools.total(number), MARGIN_TOP + row.top + above, SECONDARY)
+  }
 }
 
 /** Text broken into lines that fit a room, at its spaces; a word wider than the room is broken between its letters. */
