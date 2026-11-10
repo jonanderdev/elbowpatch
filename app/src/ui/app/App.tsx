@@ -22,6 +22,7 @@ import { forgetPutAway, thin } from '../../domain/thinning'
 import { isoDay } from '../../domain/words'
 import { download } from '../files/download'
 import { downloadEverything } from '../files/everything'
+import { savePdf } from '../files/pdfFile'
 import { Library } from '../library/Library'
 import { titleOf } from '../page/fields'
 import { type OpenAt, type Opened, Page } from '../page/Page'
@@ -437,6 +438,12 @@ export function App({ deps, lock }: { deps: Deps; lock: WriterLock }): ReactElem
             const file = pieceAsMarkdown(found.piece, found.sections)
             download(file.name, file.text)
             return file.name
+          }}
+          onExportPdf={async (piece) => {
+            if (opened?.piece.id === piece.id) await flushPage.current?.()
+            const found = await openPiece(deps, piece.id)
+            if (!found) return undefined
+            return savePdf(found.piece, found.sections)
           }}
           onOpen={(piece) => {
             // The piece behind the library is already laid out: Continue is instant. Not a journal left

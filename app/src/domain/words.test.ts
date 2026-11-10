@@ -58,9 +58,28 @@ describe('one piece as markdown', () => {
     })
   })
 
-  it('writes a journal with the year in each day', () => {
+  it('writes a journal under its title, each day a heading that carries the year', () => {
     const journal = { ...base, kind: 'journal' as const, title: 'Journal' }
-    expect(pieceAsMarkdown(journal, [{ sectionId: 's', title: '2026-10-26', content: 'Rain.' }]).text).toBe('# Monday 26 October 2026\n\nRain.\n')
+    expect(pieceAsMarkdown(journal, [{ sectionId: 's', title: '2026-10-26', content: 'Rain.' }]).text).toBe('# Journal\n\n## Monday 26 October 2026\n\nRain.\n')
+  })
+
+  it('writes a book under its title and subtitle, a heading per chapter', () => {
+    const book = { ...base, kind: 'book' as const, title: 'The Long Winter', subtitle: 'A year on the island' }
+    const sections = [
+      { sectionId: 'a', title: 'One', content: 'The ferry.' },
+      { sectionId: 'b', title: '', content: 'Salt.' },
+    ]
+    expect(pieceAsMarkdown(book, sections).text).toBe('# The Long Winter\n\n*A year on the island*\n\n## One\n\nThe ferry.\n\n## Untitled\n\nSalt.\n')
+  })
+
+  it('leaves the subtitle line out when there is none, and keeps an empty book titled', () => {
+    const book = { ...base, kind: 'book' as const, title: 'Quiet', subtitle: '  ' }
+    expect(pieceAsMarkdown(book, []).text).toBe('# Quiet\n')
+  })
+
+  it('escapes what would end a subtitle early', () => {
+    const book = { ...base, kind: 'book' as const, title: 'T', subtitle: 'A *star* and_a\\slash' }
+    expect(pieceAsMarkdown(book, []).text).toBe('# T\n\n*A \\*star\\* and\\_a\\\\slash*\n')
   })
 
   it('names an untitled piece, and keeps file names safe', () => {
