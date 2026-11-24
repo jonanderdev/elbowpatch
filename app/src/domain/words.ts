@@ -5,6 +5,11 @@ export function number(n: number): string {
   return String(Math.trunc(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 }
 
+/** Text on one line: runs of whitespace become a single space, and the ends are trimmed. Nothing when there is none. */
+export function oneLine(text: string | undefined): string {
+  return (text ?? '').replace(/\s+/g, ' ').trim()
+}
+
 export function words(n: number): string {
   return `${number(n)} ${n === 1 ? 'word' : 'words'}`
 }

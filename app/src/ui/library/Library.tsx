@@ -7,6 +7,7 @@ import { IconButton } from '../components/Icon'
 import { ScrollMark } from '../components/ScrollMark'
 import { ThemeButton } from '../components/ThemeButton'
 import { useGoneUnder, useScrolled } from '../components/useScrolled'
+import { pdfNote, savedAs } from '../files/exportCopy'
 import { update, useSettings } from '../stores/settings'
 import { Colophon } from './Colophon'
 import { Empty, EmptyKind, KINDS, NewPiece } from './NewPiece'
@@ -25,6 +26,8 @@ interface Props {
   onRename(piece: Piece, title: string): void
   /** Downloads the piece as one .md file; gives the file name. */
   onExport(piece: Piece): Promise<string | undefined>
+  /** Downloads the piece as a PDF; gives the file name. */
+  onExportPdf(piece: Piece): Promise<string | undefined>
   onPutAway(piece: Piece): Promise<void>
   onRestore(piece: Piece): Promise<void>
   onSettings(): void
@@ -43,6 +46,7 @@ export function Library({
   onNew,
   onRename,
   onExport,
+  onExportPdf,
   onPutAway,
   onRestore,
   onSettings,
@@ -237,10 +241,18 @@ export function Library({
       {exporting && (
         <ExportSheet
           title={exporting.title.trim() || 'Untitled'}
+          pdf={{
+            note: pdfNote(exporting.kind),
+            make: async () => {
+              const name = await onExportPdf(exporting)
+              setExporting(null)
+              if (name) setLine(savedAs(name))
+            },
+          }}
           onMarkdown={async () => {
             const name = await onExport(exporting)
             setExporting(null)
-            if (name) setLine(`Saved as ${name}.`)
+            if (name) setLine(savedAs(name))
           }}
           onDone={() => setExporting(null)}
         />

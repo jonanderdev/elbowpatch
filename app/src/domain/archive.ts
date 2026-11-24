@@ -192,17 +192,66 @@ function fingerprint(piece: Piece, versions: Version[], working: Working[]): str
 }
 
 /**
- * The kind a loose .md file probably is (DESIGN.md, Export & import): two or
- * more `# ` headings a book; headings that all read as dates a journal;
- * anything else an essay.
+ * The kind a loose .md file probably is (DESIGN.md, Export & import): one `# `
+ * title with `## ` headings under it a book, or a journal when those headings
+ * all read as dates; otherwise two or more `# ` headings a book, or a journal
+ * when they all do; anything else an essay.
  */
 export function guessKind(markdown: string): Kind {
-  const headings = markdown
-    .split('\n')
-    .filter((l) => l.startsWith('# '))
-    .map((l) => l.slice(2).trim())
+  return guessKindFrom(markdown, readTitled(markdown))
+}
+
+/** The same guess for a file already read with `readTitled`, so it is read once. */
+export function guessKindFrom(markdown: string, titled: Titled | undefined): Kind {
+  const headings = titled
+    ? titled.headings
+    : markdown
+        .split('\n')
+        .filter((l) => l.startsWith('# '))
+        .map((l) => l.slice(2).trim())
   if (headings.length > 0 && headings.every((h) => readDay(h))) return 'journal'
-  return headings.length >= 2 ? 'book' : 'essay'
+  return titled || headings.length >= 2 ? 'book' : 'essay'
+}
+
+export interface Titled {
+  title: string
+  subtitle?: string
+  /** The `## ` headings, in order. */
+  headings: string[]
+  /** The text between the title (and subtitle) and the first heading. */
+  before: string[]
+  /** What follows each heading, up to the next. */
+  parts: { title: string; lines: string[] }[]
+}
+
+/**
+ * One opening `# ` title followed by `## ` headings (docs/decisions/0007): a book's or journal's
+ * file. The italic line straight after the title is the subtitle. Anything else, including the old
+ * shape with a `# ` per chapter or day, is not this shape.
+ */
+export function readTitled(markdown: string): Titled | undefined {
+  const lines = markdown.replace(/\r\n?/g, '\n').split('\n')
+  const first = lines.findIndex((l) => l.trim() !== '')
+  if (first < 0 || !lines[first]!.startsWith('# ')) return undefined
+  const rest = lines.slice(first + 1)
+  if (rest.some((l) => l.startsWith('# ')) || !rest.some((l) => l.startsWith('## '))) return undefined
+
+  const title = lines[first]!.slice(2).trim()
+  let at = rest.findIndex((l) => l.trim() !== '')
+  let subtitle: string | undefined
+  const italic = at >= 0 ? rest[at]!.trim().match(/^([*_])(?![*_\s])((?:\\[\\*_]|[^\\*_])+)\1$/) : null
+  if (italic) {
+    subtitle = italic[2]!.replace(/\\([\\*_])/g, '$1')
+    at++
+  } else at = 0
+  const body = rest.slice(at)
+  const parts: Titled['parts'] = []
+  const before: string[] = []
+  for (const line of body) {
+    if (line.startsWith('## ')) parts.push({ title: line.slice(3).trim(), lines: [] })
+    else (parts.at(-1)?.lines ?? before).push(line)
+  }
+  return { title, ...(subtitle ? { subtitle } : {}), headings: parts.map((p) => p.title), before, parts }
 }
 
 /** "Monday 26 October 2026" (or without the weekday) to "2026-10-26". */
@@ -221,15 +270,22 @@ export async function importMarkdown(deps: Deps, fileName: string, markdown: str
   const now = deps.clock.now()
   const lines = markdown.replace(/\r\n?/g, '\n').split('\n')
   let title = fileName.replace(/\.(md|markdown|txt)$/i, '')
+  let subtitle: string | undefined
   const parts: { title: string; lines: string[] }[] = []
+  const titled = kind === 'essay' ? undefined : readTitled(markdown)
 
   if (kind === 'essay') {
     // An essay keeps its text whole; an opening `# ` line is its title.
     const first = lines.findIndex((l) => l.trim() !== '')
     if (first >= 0 && lines[first]!.startsWith('# ')) title = lines.splice(first, 1)[0]!.slice(2).trim()
     parts.push({ title: '', lines })
+  } else if (titled) {
+    // A title with `## ` chapters or days under it; text before the first is a section of its own.
+    title = titled.title || title
+    subtitle = titled.subtitle
+    parts.push({ title: '', lines: titled.before }, ...titled.parts)
   } else {
-    // A book or a journal: each `# ` starts a chapter or a day; text before the first is a section of its own.
+    // The old shape, a book or a journal: each `# ` starts a chapter or a day; text before the first is a section of its own.
     for (const line of lines) {
       if (line.startsWith('# ')) parts.push({ title: line.slice(2).trim(), lines: [] })
       else if (parts.length === 0) parts.push({ title: '', lines: [line] })
@@ -250,6 +306,7 @@ export async function importMarkdown(deps: Deps, fileName: string, markdown: str
     createdAt: now,
     updatedAt: now,
     title: kind === 'journal' ? title || 'Journal' : title,
+    ...(subtitle ? { subtitle } : {}),
     sections: sections.map(({ sectionId, title }) => ({ sectionId, title })),
     outlineId: null,
     words: Object.fromEntries(sections.map((s) => [s.sectionId, countWords(s.content)])),

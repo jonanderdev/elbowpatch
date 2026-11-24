@@ -22,13 +22,13 @@ describe('the book as one Markdown file, from a chapter not stored yet', () => {
     const { deps, stored } = await book()
     const { piece, sectionId } = withChapter(deps, stored)
     const file = await markdownFile(deps, piece, sectionId, '', '')
-    expect(file.text).toBe('# One\n\nFirst.\n\n# Two\n\nSecond.\n')
+    expect(file.text).toBe('# Untitled\n\n## One\n\nFirst.\n\n## Two\n\nSecond.\n')
   })
 
   it('has its words and title as the page holds them, where the draft has it', async () => {
     const { deps, stored, first } = await book()
     const { piece, sectionId } = withChapter(deps, stored, first)
     const file = await markdownFile(deps, piece, sectionId, 'Between.', 'Interlude')
-    expect(file.text).toBe('# One\n\nFirst.\n\n# Interlude\n\nBetween.\n\n# Two\n\nSecond.\n')
+    expect(file.text).toBe('# Untitled\n\n## One\n\nFirst.\n\n## Interlude\n\nBetween.\n\n## Two\n\nSecond.\n')
   })
 })

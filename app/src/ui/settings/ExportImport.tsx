@@ -1,11 +1,20 @@
 import { type ReactElement, useEffect, useRef, useState } from 'react'
 import { unzip } from '../../adapters/zip'
-import { guessKind, importArchive, importMarkdown } from '../../domain/archive'
+import { guessKindFrom, importArchive, importMarkdown, readTitled, type Titled } from '../../domain/archive'
 import type { Kind } from '../../domain/model'
 import type { Deps } from '../../domain/pieces'
 import { longDate, number, size } from '../../domain/words'
 import { downloadEverything, lastExport } from '../files/everything'
 import { KIND_WORD, Row } from './parts'
+
+/** A loose .md file chosen for import, read once: its text, what it parsed as, the kind it will come in as and the kind guessed. */
+interface LooseFile {
+  name: string
+  text: string
+  titled: Titled | undefined
+  kind: Kind
+  guess: Kind
+}
 
 interface Props {
   deps: Deps
@@ -18,7 +27,7 @@ export function ExportImport({ deps, beforeExport, onChanged }: Props): ReactEle
   const [used, setUsed] = useState<number | null>(null)
   const [exportStatus, setExportStatus] = useState<string | null>(null)
   const [importStatus, setImportStatus] = useState<string | null>(null)
-  const [loose, setLoose] = useState<{ name: string; text: string; kind: Kind; guess: Kind }[] | null>(null)
+  const [loose, setLoose] = useState<LooseFile[] | null>(null)
   const [busy, setBusy] = useState(false)
   const picker = useRef<HTMLInputElement>(null)
 
@@ -55,7 +64,7 @@ export function ExportImport({ deps, beforeExport, onChanged }: Props): ReactEle
     let added = 0
     let here = 0
     const refused: string[] = []
-    const md: { name: string; text: string; kind: Kind; guess: Kind }[] = []
+    const md: LooseFile[] = []
     try {
       for (const file of [...files]) {
         try {
@@ -70,8 +79,10 @@ export function ExportImport({ deps, beforeExport, onChanged }: Props): ReactEle
             } else refused.push(refusal(result.reason, file.name))
           } else {
             const text = new TextDecoder().decode(bytes)
-            const guess = guessKind(text)
-            md.push({ name: file.name, text, kind: guess, guess })
+            // Read once: the kind, the title and the headings all come from this.
+            const titled = readTitled(text)
+            const guess = guessKindFrom(text, titled)
+            md.push({ name: file.name, text, titled, kind: guess, guess })
           }
         } catch {
           refused.push(`${file.name} could not be read. Nothing from it was added.`)
@@ -150,7 +161,7 @@ export function ExportImport({ deps, beforeExport, onChanged }: Props): ReactEle
               <span className="import-name">{titleOf(f)}</span>
               <span className="import-meta">
                 {f.name}
-                {headingsNote(f.text)}
+                {headingsNote(f)}
               </span>
               <div className="segments" role="radiogroup" aria-label={`Kind of ${titleOf(f)}`}>
                 {(['book', 'journal', 'essay'] as const)
@@ -212,16 +223,18 @@ function result(added: number, here: number): string {
   return here ? `${a} ${number(here)} ${here === 1 ? 'was' : 'were'} already here.` : a
 }
 
-function titleOf(f: { name: string; text: string }): string {
+function titleOf(f: LooseFile): string {
+  if (f.titled?.title) return f.titled.title
   const first = f.text.split('\n').find((l) => l.trim())
-  if (first?.startsWith('# ') && guessKind(f.text) === 'essay') return first.slice(2).trim()
+  if (first?.startsWith('# ') && f.guess === 'essay') return first.slice(2).trim()
   return f.name.replace(/\.(md|markdown|txt)$/i, '')
 }
 
-function headingsNote(text: string): string {
-  const n = text.split('\n').filter((l) => l.startsWith('# ')).length
-  if (n < 2) return ''
-  return guessKind(text) === 'journal' ? ` · ${number(n)} dated headings` : ` · ${number(n)} headings`
+function headingsNote(f: LooseFile): string {
+  const n = f.titled ? f.titled.headings.length : f.text.split('\n').filter((l) => l.startsWith('# ')).length
+  if (n < (f.titled ? 1 : 2)) return ''
+  const word = n === 1 ? 'heading' : 'headings'
+  return f.guess === 'journal' ? ` · ${number(n)} dated ${word}` : ` · ${number(n)} ${word}`
 }
 
 function isZip(bytes: ArrayBuffer): boolean {
