@@ -34,7 +34,7 @@ _Avoid_: Part, block
 A section of a book. It starts on a fresh page and has a title.
 
 **Rejoin**:
-Undo putting a chapter born of a split back onto the end of the chapter before it. Only in the session it was split. The writer sees undo, never this word.
+Putting a chapter back onto the end of the chapter before it: by undo, for a chapter born of a split in this session, or by Backspace at the very start of a chapter's text. The writer sees undo or Backspace, never this word.
 _Avoid_: Merge, join
 
 **Day**:
