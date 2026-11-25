@@ -70,7 +70,8 @@ async function toPageOf(page: Page, words: string) {
           range.setEnd(node, at + 1)
           const box = range.getBoundingClientRect()
           const shown = document.querySelector('.pager')!.getBoundingClientRect()
-          return box.left >= shown.left && box.right <= shown.right
+          // A pixel of give, as the selection menu has: WebKit lays a page's first word 1/64 px before its edge.
+          return box.left >= shown.left - 1 && box.right <= shown.right + 1
         }
         return false
       }, words),
@@ -300,7 +301,10 @@ test('pasted headings stay plain paragraphs', async ({ page }) => {
   await page.evaluate(() => {
     const data = new DataTransfer()
     data.setData('text/plain', '# Pasted\n\n')
-    document.querySelector('.body')!.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }))
+    const paste = new ClipboardEvent('paste', { bubbles: true, cancelable: true })
+    // Firefox drops the data given to the constructor, so the event is handed it after.
+    Object.defineProperty(paste, 'clipboardData', { value: data })
+    document.querySelector('.body')!.dispatchEvent(paste)
   })
   await expect(page.locator('.body')).toContainText('# Pasted')
   await expect(page.locator('.title')).toHaveText('One')
